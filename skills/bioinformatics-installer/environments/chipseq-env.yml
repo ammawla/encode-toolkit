@@ -1,0 +1,35 @@
+# ENCODE ChIP-seq Analysis Environment
+# Covers: histone modification and transcription factor ChIP-seq
+# Standards: Landt et al. 2012, ENCODE Consortium 2020
+# Usage: conda env create -f chipseq-env.yml
+name: encode-chipseq
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  # Alignment
+  - bwa=0.7.17
+  # BAM processing
+  - samtools=1.19
+  - picard=3.1.1
+  # Peak calling
+  - macs2=2.2.9.1
+  # Replicate consistency
+  - idr=2.0.3
+  # Quality metrics
+  - phantompeakqualtools=1.2.2
+  # Signal processing
+  - deeptools=3.5.5
+  # Interval operations
+  - bedtools=2.31.0
+  # QC and trimming
+  - fastqc=0.12.1
+  - trim-galore=0.6.10
+  - multiqc=1.21
+  # Signal format conversion
+  - ucsc-bedgraphtobigwig
+  # Utilities
+  - pigz
+  - gzip

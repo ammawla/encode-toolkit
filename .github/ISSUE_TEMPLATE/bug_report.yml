@@ -1,0 +1,79 @@
+name: Bug Report
+description: Report a bug in ENCODE Toolkit
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of ENCODE Toolkit is affected?
+      options:
+        - MCP Tools (search, download, track)
+        - Skills (analysis, pipelines, external DBs)
+        - File Downloads / MD5 verification
+        - Credential Management
+        - SQLite Tracker
+        - Installation / Setup
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug.
+      placeholder: "When I run encode_search_experiments with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps to reproduce the issue.
+      placeholder: |
+        1. Run `encode_search_experiments(assay_title="ChIP-seq", organ="liver")`
+        2. See error...
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show encode-toolkit | grep Version`
+      placeholder: "0.3.0b1"
+
+  - type: dropdown
+    id: python
+    attributes:
+      label: Python version
+      options:
+        - "3.13"
+        - "3.12"
+        - "3.11"
+        - "3.10"
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP Client
+      options:
+        - Claude Code
+        - Claude Desktop
+        - VS Code (Continue/Cline)
+        - Cursor
+        - Other

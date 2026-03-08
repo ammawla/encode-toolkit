@@ -1,0 +1,48 @@
+name: Plugin Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Verify server imports
+        run: python -c "from encode_connector.server.main import mcp; print('Server module imports OK')"
+
+      - name: Validate plugin.json
+        run: python -c "import json; d=json.load(open('.claude-plugin/plugin.json')); assert 'name' in d; assert 'version' in d; print(f'plugin.json valid: {d[\"name\"]} v{d[\"version\"]}')"
+
+      - name: Validate skill structure
+        run: |
+          python -c "
+          import os
+          skills_dir = 'skills'
+          count = 0
+          for skill in sorted(os.listdir(skills_dir)):
+              skill_path = os.path.join(skills_dir, skill, 'SKILL.md')
+              if os.path.isfile(skill_path):
+                  count += 1
+                  print(f'  OK: {skill}')
+              else:
+                  print(f'  MISSING SKILL.md: {skill}')
+          print(f'Total skills validated: {count}')
+          "
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short

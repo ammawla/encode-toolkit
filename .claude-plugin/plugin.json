@@ -1,0 +1,121 @@
+{
+  "name": "encode-toolkit",
+  "description": "20 ENCODE API tools + 48 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases.",
+  "version": "0.3.0-beta.1",
+  "author": {
+    "name": "Dr. Alex M. Mawla, PhD",
+    "email": "ammawla@ucdavis.edu"
+  },
+  "homepage": "https://github.com/ammawla/encode-toolkit",
+  "repository": "https://github.com/ammawla/encode-toolkit",
+  "icon": "docs/icon.svg",
+  "license": "LicenseRef-Noncommercial",
+  "keywords": [
+    "genomics",
+    "encode",
+    "bioinformatics",
+    "epigenomics",
+    "chip-seq",
+    "atac-seq",
+    "rna-seq",
+    "wgbs",
+    "hi-c",
+    "cut-and-run",
+    "pipeline",
+    "nextflow",
+    "GTEx",
+    "ClinVar",
+    "GWAS",
+    "JASPAR",
+    "CellxGene",
+    "gnomAD",
+    "Ensembl",
+    "UCSC",
+    "provenance",
+    "biology",
+    "science"
+  ],
+  "skills": "skills/*",
+  "tools": [
+    {
+      "name": "encode_search_experiments",
+      "description": "Search ENCODE experiments with 20+ filters including assay type, organism, organ, biosample, target, and more."
+    },
+    {
+      "name": "encode_get_experiment",
+      "description": "Get full details for a specific experiment including all files, quality metrics, and audit info."
+    },
+    {
+      "name": "encode_list_files",
+      "description": "List files for a specific experiment with format/type filters."
+    },
+    {
+      "name": "encode_search_files",
+      "description": "Search files across all experiments with combined experiment + file filters."
+    },
+    {
+      "name": "encode_download_files",
+      "description": "Download specific files by accession to a local directory with MD5 verification."
+    },
+    {
+      "name": "encode_get_metadata",
+      "description": "List valid filter values for any search parameter."
+    },
+    {
+      "name": "encode_batch_download",
+      "description": "Search + download files in one step with preview mode."
+    },
+    {
+      "name": "encode_manage_credentials",
+      "description": "Store, check, or clear ENCODE credentials for restricted data access."
+    },
+    {
+      "name": "encode_get_facets",
+      "description": "Get live counts from ENCODE showing what data exists for given filters."
+    },
+    {
+      "name": "encode_get_file_info",
+      "description": "Get detailed metadata for a single file."
+    },
+    {
+      "name": "encode_track_experiment",
+      "description": "Track an experiment locally with publications, methods, and pipeline info."
+    },
+    {
+      "name": "encode_list_tracked",
+      "description": "List all tracked experiments with metadata and publication counts."
+    },
+    {
+      "name": "encode_get_citations",
+      "description": "Get publications for tracked experiments. Export as BibTeX or RIS."
+    },
+    {
+      "name": "encode_compare_experiments",
+      "description": "Analyze whether two experiments are compatible for combined analysis."
+    },
+    {
+      "name": "encode_log_derived_file",
+      "description": "Log derived files for provenance tracking back to ENCODE source data."
+    },
+    {
+      "name": "encode_get_provenance",
+      "description": "View provenance chains from derived files to source ENCODE data."
+    },
+    {
+      "name": "encode_export_data",
+      "description": "Export tracked experiments as CSV, TSV, or JSON with PMIDs for cross-referencing."
+    },
+    {
+      "name": "encode_summarize_collection",
+      "description": "Get grouped statistics of your tracked experiment collection."
+    },
+    {
+      "name": "encode_link_reference",
+      "description": "Link external references (PubMed, bioRxiv, ClinicalTrials, GEO) to experiments."
+    },
+    {
+      "name": "encode_get_references",
+      "description": "Get external references linked to experiments for cross-server workflows."
+    }
+  ]
+}
