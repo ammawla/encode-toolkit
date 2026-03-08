@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+*.so
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Encrypted credential files
+*.enc
+
+# Testing & linting
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/*.local.md
+
+# Data files (generated at runtime)
+*.db
+*.sqlite
+*.sqlite3
+credentials*
+data/
+
+# OS
+.DS_Store
+Thumbs.db

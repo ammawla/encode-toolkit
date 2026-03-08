@@ -1,0 +1,49 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your suggestion! Help us understand what you need.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New MCP Tool
+        - New Skill
+        - New Pipeline
+        - New Database Integration
+        - Existing Tool Enhancement
+        - Existing Skill Enhancement
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What research problem does this solve?
+      placeholder: "I'm trying to analyze ENCODE CRISPR screen data and need..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should this work? Include example tool calls if possible.
+      placeholder: |
+        A new tool `encode_analyze_screen` that takes an experiment accession
+        and returns guide-level scores...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you've thought about.

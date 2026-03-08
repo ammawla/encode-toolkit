@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -m pytest:*)",
+      "Bash(.venv/bin/python -c:*)",
+      "Bash(grep -c '@mcp.tool':*)",
+      "Bash(wc -l:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

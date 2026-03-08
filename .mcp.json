@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "encode": {
+      "command": "encode-toolkit",
+      "args": []
+    }
+  }
+}

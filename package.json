@@ -1,0 +1,42 @@
+{
+  "name": "encode-toolkit",
+  "version": "0.3.0-beta.1",
+  "description": "ENCODE Toolkit — Genomics research infrastructure with 20 MCP tools, 47 skills, 14 database integrations, and 7 pipelines for Claude Code",
+  "main": "index.js",
+  "bin": {
+    "encode-toolkit": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "encode",
+    "genomics",
+    "bioinformatics",
+    "mcp",
+    "claude",
+    "epigenomics",
+    "chip-seq",
+    "atac-seq",
+    "rna-seq",
+    "model-context-protocol"
+  ],
+  "author": "Dr. Alex M. Mawla, PhD <ammawla@ucdavis.edu>",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ammawla/encode-toolkit"
+  },
+  "homepage": "https://github.com/ammawla/encode-toolkit",
+  "bugs": {
+    "url": "https://github.com/ammawla/encode-toolkit/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ]
+}

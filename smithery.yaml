@@ -1,0 +1,24 @@
+# Smithery configuration for encode-toolkit
+# https://smithery.ai/docs/config
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      ENCODE_ACCESS_KEY:
+        type: string
+        description: "Optional ENCODE API access key for restricted data"
+      ENCODE_SECRET_KEY:
+        type: string
+        description: "Optional ENCODE API secret key for restricted data"
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: "uvx",
+      args: ["encode-toolkit"],
+      env: {
+        ...(config.ENCODE_ACCESS_KEY ? { ENCODE_ACCESS_KEY: config.ENCODE_ACCESS_KEY } : {}),
+        ...(config.ENCODE_SECRET_KEY ? { ENCODE_SECRET_KEY: config.ENCODE_SECRET_KEY } : {})
+      }
+    })
