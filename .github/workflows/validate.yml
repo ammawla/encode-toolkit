@@ -26,7 +26,14 @@ jobs:
         run: python -c "from encode_connector.server.main import mcp; print('Server module imports OK')"
 
       - name: Validate plugin.json
-        run: python -c "import json; d=json.load(open('.claude-plugin/plugin.json')); assert 'name' in d; assert 'version' in d; print(f'plugin.json valid: {d[\"name\"]} v{d[\"version\"]}')"
+        run: |
+          python -c "
+          import json
+          d = json.load(open('.claude-plugin/plugin.json'))
+          assert 'name' in d
+          assert 'version' in d
+          print(f'plugin.json valid: {d[\"name\"]} v{d[\"version\"]}')
+          "
 
       - name: Validate skill structure
         run: |
