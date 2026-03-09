@@ -16,6 +16,10 @@
 [![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg)](https://pypi.org/project/encode-toolkit/)
 [![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
 
+<a href="https://glama.ai/mcp/servers/ammawla/encode-toolkit">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/ammawla/encode-toolkit/badge" />
+</a>
+
 Search ENCODE, cross-reference 14 databases, run 7 analysis pipelines, and generate publication-ready methods — all from natural language in Claude Code.
 
 > Start from ENCODE but go everywhere: discover histone peaks, cross-reference with GWAS variants, check ClinVar pathogenicity, pull GTEx expression, analyze TF binding motifs from JASPAR, run pipelines, and generate publication-ready methods with full provenance — in one conversation.
