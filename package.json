@@ -1,6 +1,6 @@
 {
   "name": "encode-toolkit",
-  "version": "0.3.0-beta.5",
+  "version": "0.3.0-beta.6",
   "mcpName": "io.github.ammawla/encode-toolkit",
   "description": "ENCODE Toolkit — Genomics research infrastructure with 20 MCP tools, 47 skills, 14 database integrations, and 7 pipelines for Claude Code",
   "main": "index.js",

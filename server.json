@@ -7,12 +7,12 @@
     "url": "https://github.com/ammawla/encode-toolkit",
     "source": "github"
   },
-  "version": "0.3.0-beta.5",
+  "version": "0.3.0-beta.6",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "encode-toolkit",
-      "version": "0.3.0-beta.5",
+      "version": "0.3.0-beta.6",
       "transport": {
         "type": "stdio"
       }
@@ -20,7 +20,7 @@
     {
       "registryType": "pypi",
       "identifier": "encode-toolkit",
-      "version": "0.3.0b5",
+      "version": "0.3.0b6",
       "transport": {
         "type": "stdio"
       }
