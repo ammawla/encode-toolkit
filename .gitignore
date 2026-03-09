@@ -51,6 +51,18 @@ data/
 # MCP Registry tokens
 .mcpregistry_*
 
+# Generated PDFs
+*.pdf
+
+# PDF build artifacts
+docs/pdf-build/
+
+# Smithery
+.smithery/
+
+# npm lock (thin wrapper, no deps to lock)
+package-lock.json
+
 # OS
 .DS_Store
 Thumbs.db
