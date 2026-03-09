@@ -48,6 +48,9 @@ node_modules/
 credentials*
 data/
 
+# MCP Registry tokens
+.mcpregistry_*
+
 # OS
 .DS_Store
 Thumbs.db
