@@ -1,0 +1,13 @@
+{
+  "name": "encode-toolkit",
+  "owner": {
+    "name": "Dr. Alex M. Mawla, PhD"
+  },
+  "plugins": [
+    {
+      "name": "encode-toolkit",
+      "source": ".",
+      "description": "20 ENCODE API tools + 48 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases."
+    }
+  ]
+}
