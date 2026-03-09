@@ -13,8 +13,8 @@
 [![Security](https://img.shields.io/badge/security-no_telemetry-blue)]()
 [![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-blueviolet)](https://claude.com/claude-code)
 [![Provenance](https://img.shields.io/badge/provenance-full_audit_trail-green)]()
-[![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg)](https://pypi.org/project/encode-toolkit/)
-[![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
+[![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg?include_prereleases)](https://pypi.org/project/encode-toolkit/)
+[![npm version](https://img.shields.io/npm/v/encode-toolkit.svg)](https://www.npmjs.com/package/encode-toolkit)
 
 <a href="https://glama.ai/mcp/servers/ammawla/encode-toolkit">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/ammawla/encode-toolkit/badge" />
