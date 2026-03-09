@@ -22,7 +22,7 @@
     "model-context-protocol"
   ],
   "author": "Dr. Alex M. Mawla, PhD <ammawla@ucdavis.edu>",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "CC-BY-NC-ND-4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/ammawla/encode-toolkit"

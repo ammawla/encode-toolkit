@@ -1,6 +1,6 @@
 # ENCODE Toolkit — Genomics Research Infrastructure for Claude
 
-[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
+[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC_BY--NC--ND_4.0-red.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.3.0--beta-yellow)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()

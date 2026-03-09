@@ -9,7 +9,7 @@
   "homepage": "https://github.com/ammawla/encode-toolkit",
   "repository": "https://github.com/ammawla/encode-toolkit",
   "icon": "docs/icon.svg",
-  "license": "LicenseRef-Noncommercial",
+  "license": "CC-BY-NC-ND-4.0",
   "keywords": [
     "genomics",
     "encode",
