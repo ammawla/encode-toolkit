@@ -16,6 +16,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg?include_prereleases)](https://pypi.org/project/encode-toolkit/)
 [![npm version](https://img.shields.io/npm/v/encode-toolkit.svg)](https://www.npmjs.com/package/encode-toolkit)
 [![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18917511.svg)](https://doi.org/10.5281/zenodo.18917511)
 
 <a href="https://glama.ai/mcp/servers/ammawla/encode-toolkit">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/ammawla/encode-toolkit/badge" />
