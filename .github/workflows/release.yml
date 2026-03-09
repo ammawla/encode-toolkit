@@ -113,7 +113,19 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          if echo "$TAG_NAME" | grep -qE 'beta|rc|alpha'; then
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITHUB_REF: ${{ github.ref }}
+
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --tag ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
