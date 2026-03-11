@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "encode-toolkit": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "encode-toolkit@latest"]
-    }
-  }
-}
