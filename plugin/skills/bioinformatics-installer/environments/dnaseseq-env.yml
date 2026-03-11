@@ -1,0 +1,31 @@
+# ENCODE DNase-seq Analysis Environment
+# Covers: DNase I hypersensitive site mapping
+# Standards: Thurman et al. 2012, ENCODE Consortium 2020
+# Usage: conda env create -f dnaseseq-env.yml
+name: encode-dnaseseq
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  # Alignment
+  - bwa=0.7.17
+  # BAM processing
+  - samtools=1.19
+  # Hotspot detection
+  - hotspot2=2.3.1
+  # Footprinting
+  - hint=0.13.2
+  # Feature density peak calling
+  - f-seq2=2.0.3
+  # Interval operations
+  - bedtools=2.31.0
+  # QC and trimming
+  - fastqc=0.12.1
+  - trim-galore=0.6.10
+  - multiqc=1.21
+  # Signal format conversion
+  - ucsc-bedgraphtobigwig
+  # Utilities
+  - pigz

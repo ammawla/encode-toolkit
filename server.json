@@ -2,17 +2,17 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ammawla/encode-toolkit",
   "title": "ENCODE Toolkit",
-  "description": "20 MCP tools + 48 skills for ENCODE Project genomics — search, download, pipelines",
+  "description": "20 MCP tools + 47 skills for ENCODE Project genomics — search, download, pipelines",
   "repository": {
     "url": "https://github.com/ammawla/encode-toolkit",
     "source": "github"
   },
-  "version": "0.3.0-beta.7",
+  "version": "0.3.0-beta.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "encode-toolkit",
-      "version": "0.3.0-beta.7",
+      "version": "0.3.0-beta.8",
       "transport": {
         "type": "stdio"
       }
@@ -20,7 +20,7 @@
     {
       "registryType": "pypi",
       "identifier": "encode-toolkit",
-      "version": "0.3.0b7",
+      "version": "0.3.0b8",
       "transport": {
         "type": "stdio"
       }

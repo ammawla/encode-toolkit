@@ -4,7 +4,7 @@
 
 [![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC_BY--NC--ND_4.0-red.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.3.0--beta-yellow)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0--beta.8-yellow)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
 [![Skills](https://img.shields.io/badge/skills-47-orange)](docs/skill-vignettes/)
 [![Tools](https://img.shields.io/badge/MCP_tools-20-purple)](src/encode_connector/server/main.py)
@@ -32,16 +32,31 @@ Search ENCODE, cross-reference 14 databases, run 7 analysis pipelines, and gener
 
 ## Quick Start
 
-### Claude Code (recommended)
+### Claude Code Plugin (recommended)
+
+Start a new Claude Code session and enter:
+
+```
+/plugin marketplace add ammawla/encode-toolkit
+
+/plugin install encode-toolkit
+```
+
+That's it. All 20 tools, 47 skills, and the MCP connector are now available.
+
+<details>
+<summary><strong>MCP-only install (tools only, no skills)</strong></summary>
+
+If you only need the 20 MCP tools without the 47 workflow skills:
 
 ```bash
 claude mcp add encode -- uvx encode-toolkit
 ```
 
-That's it. All 20 tools and 47 skills are now available in Claude Code.
+</details>
 
 <details>
-<summary><strong>Other installation methods</strong></summary>
+<summary><strong>Other editors and platforms</strong></summary>
 
 #### npx (Node.js)
 
@@ -69,24 +84,10 @@ Then use `encode-toolkit` as the command in any MCP client configuration:
 }
 ```
 
-#### Claude Code — Plugin Install
-
-For the full experience (20 tools + 47 skills), install as a Claude Code plugin:
-
-```bash
-claude plugin add /path/to/encode-toolkit
-```
-
-Or install from a marketplace:
-
-```
-/plugin install encode-toolkit
-```
-
 </details>
 
 <details>
-<summary><strong>Claude Desktop</strong></summary>
+<summary><strong>Claude Desktop (MCP only)</strong></summary>
 
 Add to your `claude_desktop_config.json`:
 
