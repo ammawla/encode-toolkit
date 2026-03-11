@@ -1,0 +1,22 @@
+{
+  "name": "encode-toolkit",
+  "version": "0.3.0",
+  "description": "20 ENCODE API tools + 48 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases.",
+  "author": {
+    "name": "Dr. Alex M. Mawla, PhD",
+    "url": "https://github.com/ammawla/encode-toolkit"
+  },
+  "repository": "https://github.com/ammawla/encode-toolkit",
+  "license": "CC-BY-NC-ND-4.0",
+  "keywords": [
+    "genomics",
+    "encode",
+    "bioinformatics",
+    "epigenomics",
+    "chip-seq",
+    "atac-seq",
+    "rna-seq",
+    "pipelines",
+    "science"
+  ]
+}
