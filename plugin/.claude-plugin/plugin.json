@@ -1,12 +1,10 @@
 {
   "name": "encode-toolkit",
-  "version": "0.3.0",
-  "description": "20 ENCODE API tools + 48 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases.",
+  "version": "0.3.0-beta.8",
+  "description": "20 ENCODE API tools + 47 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases.",
   "author": {
-    "name": "Dr. Alex M. Mawla, PhD",
-    "email": "ammawla@ucdavis.edu"
+    "name": "Dr. Alex M. Mawla, PhD"
   },
-  "homepage": "https://github.com/ammawla/encode-toolkit",
   "repository": "https://github.com/ammawla/encode-toolkit",
   "license": "CC-BY-NC-ND-4.0",
   "keywords": [
@@ -19,11 +17,5 @@
     "rna-seq",
     "pipelines",
     "science"
-  ],
-  "mcpServers": {
-    "encode-toolkit": {
-      "command": "npx",
-      "args": ["-y", "encode-toolkit@latest"]
-    }
-  }
+  ]
 }
