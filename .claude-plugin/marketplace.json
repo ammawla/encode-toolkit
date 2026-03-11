@@ -3,10 +3,15 @@
   "owner": {
     "name": "Dr. Alex M. Mawla, PhD"
   },
+  "metadata": {
+    "description": "ENCODE Project genomics research infrastructure for Claude Code",
+    "homepage": "https://github.com/ammawla/encode-toolkit"
+  },
   "plugins": [
     {
       "name": "encode-toolkit",
-      "source": ".",
+      "version": "0.3.0",
+      "source": "./plugin",
       "description": "20 ENCODE API tools + 48 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases."
     }
   ]
