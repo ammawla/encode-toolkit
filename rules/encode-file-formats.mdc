@@ -1,0 +1,45 @@
+---
+description: ENCODE file format conventions and genomics data handling best practices
+alwaysApply: false
+globs: "**/*.{py,R,r,sh,nf,wdl}"
+---
+
+# ENCODE File Format Guide
+
+## Peak Files
+- **narrowPeak** (BED6+4): Point-source peaks (TF ChIP-seq, ATAC-seq, DNase-seq)
+- **broadPeak** (BED6+3): Broad domains (H3K27me3, H3K36me3, H3K9me3)
+- **gappedPeak**: Broad regions with narrow sub-peaks (H3K4me1 enhancers)
+
+### Narrow vs Broad Mark Classification
+| Narrow (point-source) | Broad (domain) |
+|----------------------|----------------|
+| H3K4me3, H3K27ac, H3K4me1 | H3K27me3, H3K36me3, H3K9me3 |
+| TF binding sites | H3K9me2, H3K79me2 |
+| CTCF, cohesin | H4K20me1 |
+
+## Signal Files
+- **bigWig**: Continuous signal tracks (fold change, p-value, read coverage)
+- Use "fold change over control" for visualization
+- Use "signal p-value" for statistical analysis
+
+## Sequence Files
+- **FASTQ**: Raw reads (paired-end: _R1/_R2 naming)
+- **BAM**: Aligned reads (always check assembly version)
+
+## Contact Maps
+- **hic**: Juicer format contact matrices
+- **BEDPE**: Chromatin loop calls (anchor pairs)
+- **cool/mcool**: Cooler format multi-resolution contact matrices
+
+## Methylation Files
+- **bedMethyl**: Per-CpG methylation levels
+- **bigBed**: Browser-compatible methylation tracks
+
+## Quantification Files
+- **TSV**: Gene/transcript quantifications (RSEM, Kallisto)
+- Check for TPM vs FPKM vs raw counts
+
+## File Integrity
+- Always verify MD5 checksums after download
+- encode_download_files does this automatically with verify_md5=True

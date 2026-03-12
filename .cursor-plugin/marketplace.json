@@ -1,0 +1,27 @@
+{
+  "name": "ammawla",
+  "owner": {
+    "name": "Dr. Alex M. Mawla, PhD",
+    "email": "ammawla@ucdavis.edu"
+  },
+  "metadata": {
+    "description": "ENCODE Project genomics research infrastructure for Cursor",
+    "version": "0.3.0-beta.9",
+    "homepage": "https://github.com/ammawla/encode-toolkit"
+  },
+  "plugins": [
+    {
+      "name": "encode-toolkit",
+      "source": ".",
+      "description": "20 ENCODE API tools + 47 expert skills for genomics research. Search experiments, download files with MD5 verification, run pipelines, and cross-reference 14 databases.",
+      "category": "science",
+      "tags": [
+        "genomics",
+        "bioinformatics",
+        "encode",
+        "epigenomics",
+        "pipelines"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+---
+description: ENCODE data quality standards and QC thresholds for genomics experiments
+alwaysApply: false
+globs: "**/*.{py,R,r,sh,nf,wdl}"
+---
+
+# ENCODE Data Quality Standards
+
+## Quality Metrics by Assay
+
+### ChIP-seq (Landt et al. 2012)
+- FRiP (Fraction of Reads in Peaks): >= 1%
+- NSC (Normalized Strand Cross-correlation): > 1.05
+- RSC (Relative Strand Cross-correlation): > 0.8
+- NRF (Non-Redundant Fraction): >= 0.8
+- Require 2+ biological replicates with IDR analysis
+
+### ATAC-seq (Buenrostro et al. 2013)
+- TSS enrichment: >= 6
+- Fragment size distribution: nucleosomal ladder pattern
+- Mitochondrial reads: < 20% after filtering
+- Require Tn5 transposase bias correction
+
+### RNA-seq (Conesa et al. 2016)
+- Mapping rate: > 80%
+- rRNA contamination: < 10%
+- Replicate correlation (Spearman): >= 0.9
+- Strandedness verification required
+
+### WGBS (Foox et al. 2021)
+- Bisulfite conversion rate: > 99%
+- CpG coverage for DMR calling: >= 10x
+- Lambda/pUC19 spike-in for conversion QC
+
+### Hi-C (Yardimci et al. 2019)
+- Cis/trans ratio: > 60%
+- Long-range cis contacts: > 40%
+- Resolution depends on sequencing depth
+
+### CUT&RUN/CUT&Tag (Nordin et al. 2023)
+- Different QC profile from ChIP-seq
+- Use CUT&RUN-specific suspect list, not ENCODE blacklist
+- Lower background expected than ChIP-seq
+
+## ENCODE Audit Levels
+- ERROR: Critical issue, data should not be used
+- NOT_COMPLIANT: Below ENCODE standards
+- WARNING: Minor concern, review before use
+- INTERNAL_ACTION: Informational only
+
+## Universal Requirements
+- Always apply ENCODE Blacklist v2 (Amemiya et al. 2019)
+- Always use 2+ biological replicates
+- Never mix genome assemblies (GRCh38 for human, mm10 for mouse)
+- No single metric is sufficient — interpret collectively
