@@ -1,0 +1,40 @@
+---
+description: Data provenance and reproducibility standards for ENCODE analysis workflows
+alwaysApply: false
+globs: "**/*.{py,R,r,sh,nf,wdl,md}"
+---
+
+# ENCODE Provenance Standards
+
+## Every Analysis Step Must Log
+- Tool name + exact version + citation
+- Full command with all parameters
+- Input file accessions + MD5 checksums
+- Reference genome build AND annotation version
+- Output file descriptions + row/peak/feature counts
+- Filtering statistics: input/pass/fail with percentages
+
+## File Selection Priority
+1. preferred_default=True (ENCODE-recommended files)
+2. IDR thresholded peaks (for ChIP-seq/ATAC-seq)
+3. Fold change over control (for signal tracks)
+4. GRCh38 assembly for human, mm10 for mouse
+
+## Script Organization
+- Sequential numbering: 01_download.sh, 02_filter.sh, 03_analyze.py
+- Each script documents its inputs, outputs, and dependencies
+- Store scripts alongside data for complete reproducibility
+
+## Cross-Database Linking
+When integrating ENCODE data with external databases, always record:
+- ENCODE experiment accession (ENCSR...)
+- ENCODE file accessions (ENCFF...)
+- External database identifiers (PMID, GEO, dbGaP)
+- Assembly version used for coordinate-based operations
+- Date of data access (databases update regularly)
+
+## Citation Requirements
+- Cite ENCODE consortium papers for any ENCODE data use
+- Cite individual lab publications linked to specific experiments
+- Cite software tools with version numbers
+- Include GEO/ENCODE accessions for data accessibility

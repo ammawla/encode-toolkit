@@ -1,0 +1,49 @@
+---
+description: Best practices for using the ENCODE Toolkit MCP tools and API
+alwaysApply: false
+globs: "**/*.{py,R,r,sh,js,ts}"
+---
+
+# ENCODE Toolkit Usage Patterns
+
+## Tool Selection Guide
+
+| Goal | Tool |
+|------|------|
+| Find experiments | encode_search_experiments |
+| Explore what data exists | encode_get_facets |
+| Get valid filter values | encode_get_metadata |
+| Get experiment details | encode_get_experiment |
+| Find specific file types | encode_search_files |
+| List files for experiment | encode_list_files |
+| Download files | encode_download_files |
+| Search + download | encode_batch_download (dry_run=True first) |
+| Track locally | encode_track_experiment |
+| Compare experiments | encode_compare_experiments |
+| Get citations | encode_get_citations |
+| Log derived files | encode_log_derived_file |
+| Link to PubMed/GEO | encode_link_reference |
+
+## Common Patterns
+
+### Discovery Workflow
+1. encode_get_facets to explore available data
+2. encode_search_experiments with specific filters
+3. encode_list_files for chosen experiments
+4. encode_download_files for selected files
+
+### Always Use dry_run=True First
+Before batch downloads, preview what will be downloaded:
+```
+encode_batch_download(..., dry_run=True)
+```
+
+### Assembly Consistency
+- Human: always GRCh38
+- Mouse: always mm10
+- Never mix assemblies in a single analysis
+
+## Key Concepts
+- Assay types: Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, RNA-seq, WGBS, Hi-C, CUT&RUN, CUT&Tag
+- Biosample hierarchy: tissue > primary cell > cell line > in vitro differentiated > organoid
+- Tier 1 cell lines (most data): K562, GM12878, H1-hESC
