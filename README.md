@@ -15,12 +15,12 @@
 [![Security](https://img.shields.io/badge/security-no_telemetry-blue)]()
 [![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-blueviolet)](https://claude.com/claude-code)
 [![Provenance](https://img.shields.io/badge/provenance-full_audit_trail-green)]()
+[![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
 [![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg?include_prereleases)](https://pypi.org/project/encode-toolkit/)
 [![PyPI Downloads](https://img.shields.io/pypi/dw/encode-toolkit?style=flat&label=PyPI%20Downloads)](https://pypi.org/project/encode-toolkit/)
 [![npm version](https://img.shields.io/npm/v/encode-toolkit.svg)](https://www.npmjs.com/package/encode-toolkit)
 [![NPM Downloads](https://img.shields.io/npm/dw/encode-toolkit?style=flat&label=NPM%20Downloads)](https://www.npmjs.com/package/encode-toolkit)
 [![GitHub Clones](https://img.shields.io/badge/dynamic/json?color=success&label=Clones&query=count&url=https://gist.githubusercontent.com/ammawla/8fdeb4cd92776739d329df9afd942b2e/raw/clone.json&logo=github)](https://github.com/ammawla/encode-toolkit)
-[![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18917519.svg)](https://doi.org/10.5281/zenodo.18917519)
 
 <a href="https://glama.ai/mcp/servers/ammawla/encode-toolkit">
