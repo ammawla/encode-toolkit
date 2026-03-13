@@ -99,4 +99,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           git remote set-url origin "https://x-access-token:$SECRET_TOKEN@github.com/$GH_REPO.git"
-          git push origin main || echo "Nothing to push"
+          git push origin HEAD:main || echo "Nothing to push"
