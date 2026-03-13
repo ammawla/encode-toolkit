@@ -1,9 +1,14 @@
 name: Track Clone Count
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "0 0 * * *"  # Daily at midnight UTC
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   clone-count:
@@ -12,18 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Authenticate GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.SECRET_TOKEN }}
-        run: echo "$GH_TOKEN" | gh auth login --with-token
-
       - name: Fetch clone data from GitHub API
         env:
-          GH_TOKEN: ${{ secrets.SECRET_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
           GH_REPO: ${{ github.repository }}
+          SECRET_TOKEN: ${{ secrets.SECRET_TOKEN }}
         run: |
-          curl --user "$GH_ACTOR:$GH_TOKEN" \
+          curl --user "$GH_ACTOR:$SECRET_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$GH_REPO/traffic/clones" \
             > clone.json
@@ -32,13 +32,13 @@ jobs:
         id: set_id
         env:
           GH_TOKEN: ${{ secrets.SECRET_TOKEN }}
-          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_SECRET: ${{ secrets.GIST_ID }}
           GH_ACTOR: ${{ github.actor }}
         run: |
-          if [ -n "$GIST_ID" ]; then
+          if [ -n "$GIST_SECRET" ]; then
               echo "GIST_ID found"
-              echo "GIST=$GIST_ID" >> "$GITHUB_OUTPUT"
-              curl "https://gist.githubusercontent.com/$GH_ACTOR/$GIST_ID/raw/clone.json" > clone_before.json
+              echo "GIST=$GIST_SECRET" >> "$GITHUB_OUTPUT"
+              curl "https://gist.githubusercontent.com/$GH_ACTOR/$GIST_SECRET/raw/clone.json" > clone_before.json
               if grep -q '404: Not Found' clone_before.json; then
                 echo "GIST_ID not valid anymore. Creating another gist..."
                 gist_id=$(gh gist create clone.json | awk -F / '{print $NF}')
@@ -62,7 +62,7 @@ jobs:
 
       - name: Update gist with accumulated data
         env:
-          GH_TOKEN: ${{ secrets.SECRET_TOKEN }}
+          SECRET_TOKEN: ${{ secrets.SECRET_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
           GH_REPO: ${{ github.repository }}
           GIST: ${{ steps.set_id.outputs.GIST }}
@@ -70,7 +70,7 @@ jobs:
           content=$(sed -e 's/\\/\\\\/g' -e 's/\t/\\t/g' -e 's/"/\\"/g' -e 's/\r//g' "clone.json" | sed -E ':a;N;$!ba;s/\r{0,1}\n/\\n/g')
           echo "{\"description\": \"$GH_REPO clone statistics\", \"files\": {\"clone.json\": {\"content\": \"$content\"}}}" > post_clone.json
           curl -s -X PATCH \
-            --user "$GH_ACTOR:$GH_TOKEN" \
+            --user "$GH_ACTOR:$SECRET_TOKEN" \
             -H "Content-Type: application/json" \
             -d @post_clone.json "https://api.github.com/gists/$GIST" > /dev/null 2>&1
 
