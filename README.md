@@ -2,9 +2,9 @@
 
 <!-- mcp-name: io.github.ammawla/encode-toolkit -->
 
-[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC_BY--NC--ND_4.0-red.svg)](LICENSE)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.3.0--beta.8-yellow)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0--beta.10-yellow)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
 [![Skills](https://img.shields.io/badge/skills-47-orange)](docs/skill-vignettes/)
 [![Tools](https://img.shields.io/badge/MCP_tools-20-purple)](src/encode_connector/server/main.py)
@@ -16,7 +16,9 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-blueviolet)](https://claude.com/claude-code)
 [![Provenance](https://img.shields.io/badge/provenance-full_audit_trail-green)]()
 [![PyPI version](https://img.shields.io/pypi/v/encode-toolkit.svg?include_prereleases)](https://pypi.org/project/encode-toolkit/)
+[![PyPI Downloads](https://img.shields.io/pypi/dw/encode-toolkit?style=flat&label=PyPI%20Downloads)](https://pypi.org/project/encode-toolkit/)
 [![npm version](https://img.shields.io/npm/v/encode-toolkit.svg)](https://www.npmjs.com/package/encode-toolkit)
+[![NPM Downloads](https://img.shields.io/npm/dw/encode-toolkit?style=flat&label=NPM%20Downloads)](https://www.npmjs.com/package/encode-toolkit)
 [![smithery badge](https://smithery.ai/badge/encode-toolkit)](https://smithery.ai/server/encode-toolkit)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18917519.svg)](https://doi.org/10.5281/zenodo.18917519)
 

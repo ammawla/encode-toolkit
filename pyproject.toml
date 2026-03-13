@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "encode-toolkit"
-version = "0.3.0b9"
+version = "0.3.0b10"
 description = "MCP server for querying and downloading ENCODE Project genomics data directly from Claude"
 readme = "README.md"
-license = "CC-BY-NC-ND-4.0"
+license = "CC-BY-NC-4.0"
 requires-python = ">=3.10"
 authors = [
     { name = "Dr. Alex M. Mawla, PhD", email = "ammawla@ucdavis.edu" },
