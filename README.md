@@ -21,7 +21,7 @@
 [![npm version](https://img.shields.io/npm/v/encode-toolkit.svg)](https://www.npmjs.com/package/encode-toolkit)
 [![NPM Downloads](https://img.shields.io/npm/dw/encode-toolkit?style=flat&label=NPM%20Downloads)](https://www.npmjs.com/package/encode-toolkit)
 [![GitHub Clones](https://img.shields.io/badge/dynamic/json?color=success&label=Clones&query=count&url=https://gist.githubusercontent.com/ammawla/8fdeb4cd92776739d329df9afd942b2e/raw/clone.json&logo=github)](https://github.com/ammawla/encode-toolkit)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18917519.svg)](https://doi.org/10.5281/zenodo.18917519)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18917519.svg)](https://doi.org/10.5281/zenodo.18917511)
 
 <a href="https://glama.ai/mcp/servers/ammawla/encode-toolkit">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/ammawla/encode-toolkit/badge" />
@@ -30,6 +30,27 @@
 Search ENCODE, cross-reference 14 databases, run 7 analysis pipelines, and generate publication-ready methods — all from natural language in Claude Code.
 
 > Start from ENCODE but go everywhere: discover histone peaks, cross-reference with GWAS variants, check ClinVar pathogenicity, pull GTEx expression, analyze TF binding motifs from JASPAR, run pipelines, and generate publication-ready methods with full provenance — in one conversation.
+
+---
+
+## Citation Notes
+
+If you use **ENCODE-Toolkit**, please cite:
+
+Alex M. Mawla. (2026). *ENCODE-Toolkit: an MCP server, Claude plugin, and skills suite for ENCODE genomic data access and analysis*. Zenodo. https://doi.org/10.5281/zenodo.18917511
+
+### BibTeX
+
+```bibtex
+@software{mawla_2026_encode_toolkit,
+  author  = {Mawla, Alex M.},
+  title   = {ENCODE-Toolkit: an MCP server, Claude plugin, and skills suite for ENCODE genomic data access and analysis},
+  year    = {2026},
+  publisher = {Zenodo},
+  doi     = {10.5281/zenodo.18917511},
+  url     = {https://doi.org/10.5281/zenodo.18917511}
+}
+```
 
 ---
 
