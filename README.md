@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.ammawla/encode-toolkit -->
 
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-green.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.3.0--beta.10-yellow)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
