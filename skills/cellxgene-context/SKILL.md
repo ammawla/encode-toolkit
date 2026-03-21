@@ -237,7 +237,7 @@ ENCODE has single-cell ATAC-seq data for some tissues. These provide cell-type-r
 ```
 # Find ENCODE single-cell data
 encode_search_experiments(
-    assay_title="scATAC-seq",
+    assay_title="snATAC-seq",
     organ="pancreas"
 )
 
@@ -337,7 +337,7 @@ For each cell type, identify marker genes with high expression specificity. Use 
 ### Step 4: Cross-reference with ENCODE single-cell data
 
 ```
-encode_search_experiments(assay_title="scATAC-seq", organ="lung", organism="Homo sapiens")
+encode_search_experiments(assay_title="snATAC-seq", organ="lung", organism="Homo sapiens")
 ```
 
 Expected output:

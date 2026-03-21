@@ -5,6 +5,31 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
+def _extract_assemblies(file_list: list | None) -> list[str]:
+    """Extract sorted, deduplicated assembly names from a list of file dicts."""
+    if not file_list:
+        return []
+    return sorted(set(f.get("assembly", "") for f in file_list if isinstance(f, dict) and f.get("assembly")))
+
+
+def _extract_audit_counts(data: dict) -> dict[str, int]:
+    """Extract all 4 ENCODE audit level counts from an experiment dict.
+
+    Returns a dict with keys: error, not_compliant, warning, internal_action.
+    Each level value must be a list; non-list values are treated as 0.
+    """
+    _zero = {"error": 0, "not_compliant": 0, "warning": 0, "internal_action": 0}
+    audit = data.get("audit", {})
+    if not isinstance(audit, dict):
+        return _zero
+    return {
+        "error": len(v) if isinstance(v := audit.get("ERROR", []), list) else 0,
+        "not_compliant": len(v) if isinstance(v := audit.get("NOT_COMPLIANT", []), list) else 0,
+        "warning": len(v) if isinstance(v := audit.get("WARNING", []), list) else 0,
+        "internal_action": len(v) if isinstance(v := audit.get("INTERNAL_ACTION", []), list) else 0,
+    }
+
+
 class ExperimentSummary(BaseModel):
     """Condensed experiment info returned from search results."""
 
@@ -24,7 +49,9 @@ class ExperimentSummary(BaseModel):
     life_stage: str = ""
     assembly: list[str] = Field(default_factory=list)
     audit_error_count: int = 0
+    audit_not_compliant_count: int = 0
     audit_warning_count: int = 0
+    audit_internal_action_count: int = 0
     dbxrefs: list[str] = Field(default_factory=list)
     url: str = ""
 
@@ -62,18 +89,12 @@ class ExperimentSummary(BaseModel):
             elif isinstance(ont, str):
                 biosample_type = ont
 
-        # Extract assembly list from files
-        assemblies = sorted(
-            set(f.get("assembly", "") for f in data.get("files", []) if isinstance(f, dict) and f.get("assembly"))
-        )
-
-        # Extract audit counts
-        audit = data.get("audit", {})
-        audit_errors = len(audit.get("ERROR", [])) if isinstance(audit, dict) else 0
-        audit_warnings = len(audit.get("WARNING", [])) if isinstance(audit, dict) else 0
+        file_list = data.get("files") or []
+        assemblies = _extract_assemblies(file_list)
+        audit_counts = _extract_audit_counts(data)
 
         # Extract dbxrefs (GEO accessions, etc.)
-        dbxrefs = data.get("dbxrefs", []) or []
+        dbxrefs = data.get("dbxrefs") or []
 
         accession_val = data.get("accession", "")
 
@@ -91,12 +112,14 @@ class ExperimentSummary(BaseModel):
             date_released=data.get("date_released", ""),
             description=data.get("description", ""),
             lab=lab,
-            file_count=len(data.get("files", [])),
+            file_count=len(file_list),
             replication_type=data.get("replication_type", ""),
             life_stage=data.get("life_stage_age", ""),
             assembly=assemblies,
-            audit_error_count=audit_errors,
-            audit_warning_count=audit_warnings,
+            audit_error_count=audit_counts["error"],
+            audit_not_compliant_count=audit_counts["not_compliant"],
+            audit_warning_count=audit_counts["warning"],
+            audit_internal_action_count=audit_counts["internal_action"],
             dbxrefs=dbxrefs,
             url=f"https://www.encodeproject.org/experiments/{accession_val}/" if accession_val else "",
         )
@@ -207,6 +230,7 @@ class ExperimentDetail(BaseModel):
     biosample_type: str = ""
     life_stage: str = ""
     replication_type: str = ""
+    assembly: list[str] = Field(default_factory=list)
     bio_replicate_count: int = 0
     tech_replicate_count: int = 0
     possible_controls: list[str] = Field(default_factory=list)
@@ -215,9 +239,11 @@ class ExperimentDetail(BaseModel):
     url: str = ""
     files: list[FileSummary] = Field(default_factory=list)
 
-    # Quality/audit info
+    # Quality/audit info (all 4 ENCODE levels: ERROR, NOT_COMPLIANT, WARNING, INTERNAL_ACTION)
     audit_error_count: int = 0
+    audit_not_compliant_count: int = 0
     audit_warning_count: int = 0
+    audit_internal_action_count: int = 0
 
     @classmethod
     def from_api(cls, data: dict, files: list[dict] | None = None) -> ExperimentDetail:
@@ -267,12 +293,12 @@ class ExperimentDetail(BaseModel):
             elif isinstance(ctrl, dict):
                 controls.append(ctrl.get("accession", ""))
 
-        # Audit counts
-        audit = data.get("audit", {})
-        error_count = len(audit.get("ERROR", [])) if isinstance(audit, dict) else 0
-        warning_count = len(audit.get("WARNING", [])) if isinstance(audit, dict) else 0
+        # Use files param if provided, otherwise fall back to data["files"]
+        file_dicts = files if files is not None else (data.get("files") or [])
+        assemblies = _extract_assemblies(file_dicts)
+        audit_counts = _extract_audit_counts(data)
 
-        # Parse files
+        # Parse files into summaries
         file_summaries = []
         if files:
             file_summaries = [FileSummary.from_api(f) for f in files]
@@ -293,17 +319,26 @@ class ExperimentDetail(BaseModel):
             biosample_type=biosample_type,
             life_stage=data.get("life_stage_age", ""),
             replication_type=data.get("replication_type", ""),
+            assembly=assemblies,
             bio_replicate_count=data.get("bio_replicate_count", 0) or 0,
             tech_replicate_count=data.get("tech_replicate_count", 0) or 0,
             possible_controls=controls,
             related_series=[
-                s if isinstance(s, str) else s.get("accession", "") for s in data.get("related_series", [])
+                s if isinstance(s, str) else s.get("accession", "")
+                for s in data.get("related_series", [])
+                if isinstance(s, str | dict)
             ],
-            documents=[d if isinstance(d, str) else d.get("@id", "") for d in data.get("documents", [])],
+            documents=[
+                d if isinstance(d, str) else d.get("@id", "")
+                for d in data.get("documents", [])
+                if isinstance(d, str | dict)
+            ],
             url=f"https://www.encodeproject.org/experiments/{data.get('accession', '')}/",
             files=file_summaries,
-            audit_error_count=error_count,
-            audit_warning_count=warning_count,
+            audit_error_count=audit_counts["error"],
+            audit_not_compliant_count=audit_counts["not_compliant"],
+            audit_warning_count=audit_counts["warning"],
+            audit_internal_action_count=audit_counts["internal_action"],
         )
 
 

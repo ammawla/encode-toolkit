@@ -24,8 +24,8 @@ Finds and works with ENCODE single-cell and single-nucleus data (scRNA-seq, scAT
 Check what single-cell data exists for brain before committing to a search strategy.
 
 ```
-encode_get_facets(assay_title="single-cell RNA sequencing assay", organ="brain")
-encode_get_facets(assay_title="single-cell ATAC-seq", organ="brain")
+encode_get_facets(assay_title="scRNA-seq", organ="brain")
+encode_get_facets(assay_title="snATAC-seq", organ="brain")
 ```
 
 This reveals whether ENCODE has brain single-cell data, which biosample types are represented (tissue vs. organoid vs. primary cell), and which labs contributed.
@@ -33,8 +33,8 @@ This reveals whether ENCODE has brain single-cell data, which biosample types ar
 ### Step 2: Search for Experiments
 
 ```
-encode_search_experiments(assay_title="single-cell RNA sequencing assay", organ="brain", biosample_type="tissue", status="released", limit=50)
-encode_search_experiments(assay_title="single-cell ATAC-seq", organ="brain", biosample_type="tissue", status="released", limit=50)
+encode_search_experiments(assay_title="scRNA-seq", organ="brain", biosample_type="tissue", status="released", limit=50)
+encode_search_experiments(assay_title="snATAC-seq", organ="brain", biosample_type="tissue", status="released", limit=50)
 ```
 
 If results are sparse, broaden: `encode_search_experiments(search_term="single cell RNA", organ="brain", limit=50)`. Record the platform for each experiment (10X Chromium v2/v3, Smart-seq2, Drop-seq) -- platform determines detection rates, coverage bias, and integration difficulty.

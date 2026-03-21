@@ -108,8 +108,8 @@ ENCODE uses a controlled vocabulary for assay names. Common mistakes:
 | "ATAC" | "ATAC-seq" |
 | "DNase" | "DNase-seq" |
 | "Bisulfite-seq" | "WGBS" |
-| "scRNA-seq" | "single-cell RNA sequencing assay" |
-| "scATAC-seq" | "single-cell ATAC-seq" |
+| "scRNA-seq" | "scRNA-seq" |
+| "scATAC-seq" | "snATAC-seq" |
 
 Always run `encode_get_metadata(metadata_type="assays")` to see valid values.
 
@@ -256,7 +256,7 @@ Review the assay counts. Confirm that all three assay types (Histone ChIP-seq, A
 ```
 encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", biosample_type="tissue", limit=100)
 encode_search_experiments(assay_title="ATAC-seq", organ="liver", biosample_type="tissue", limit=100)
-encode_search_experiments(assay_title="RNA-seq", organ="liver", biosample_type="tissue", limit=100)
+encode_search_experiments(assay_title="total RNA-seq", organ="liver", biosample_type="tissue", limit=100)
 ```
 
 ### Step 3: Match by Biosample

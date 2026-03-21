@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "ENCODE Toolkit"
+abstract: "A Model Context Protocol server for programmatic access to ENCODE functional genomics data."
+authors:
+  - family-names: Mawla
+    given-names: Alex M.
+    orcid: "https://orcid.org/0000-0003-0907-464X"
+    affiliation: "Independent Researcher"
+version: 0.3.0
+date-released: "2026-03-08"
+license: AGPL-3.0-only
+repository-code: "https://github.com/ammawla/encode-toolkit"
+url: "https://github.com/ammawla/encode-toolkit"
+doi: "10.5281/zenodo.18917511"
+keywords:
+  - bioinformatics
+  - genomics
+  - ENCODE
+  - epigenomics
+  - MCP
+  - functional genomics

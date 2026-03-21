@@ -11,7 +11,7 @@ description: Find and work with ENCODE single-cell genomics data including scRNA
 - User asks about "single-cell", "scRNA-seq", "scATAC-seq", "cell type annotation", or "single-nucleus"
 - User needs to integrate ENCODE single-cell data with bulk epigenomic profiles
 - User wants to identify cell-type-specific regulatory elements from single-cell chromatin accessibility
-- Example queries: "find scRNA-seq data in ENCODE for brain", "what single-cell ATAC-seq is available?", "integrate single-cell with bulk ChIP-seq"
+- Example queries: "find scRNA-seq data in ENCODE for brain", "what snATAC-seq is available?", "integrate single-cell with bulk ChIP-seq"
 
 Help the user find and work with ENCODE single-cell genomics data, understand quality limitations relative to bulk assays, and integrate single-cell with bulk ENCODE profiles for cell-type-resolved regulatory analysis.
 
@@ -43,7 +43,7 @@ Search for scRNA-seq and scATAC-seq experiments in the tissue of interest:
 ```
 # Single-cell RNA-seq
 encode_search_experiments(
-    assay_title="single-cell RNA sequencing assay",
+    assay_title="scRNA-seq",
     organ="pancreas",           # user's tissue of interest
     biosample_type="tissue",
     limit=50
@@ -51,7 +51,7 @@ encode_search_experiments(
 
 # Single-cell ATAC-seq
 encode_search_experiments(
-    assay_title="single-cell ATAC-seq",
+    assay_title="snATAC-seq",
     organ="pancreas",
     biosample_type="tissue",
     limit=50
@@ -66,8 +66,8 @@ encode_search_experiments(search_term="single cell ATAC", organ="pancreas", limi
 
 Check facets first to understand what organs have single-cell data:
 ```
-encode_get_facets(assay_title="single-cell RNA sequencing assay")
-encode_get_facets(assay_title="single-cell ATAC-seq")
+encode_get_facets(assay_title="scRNA-seq")
+encode_get_facets(assay_title="snATAC-seq")
 ```
 
 Present a summary to the user showing:
@@ -196,7 +196,7 @@ Single-cell findings should always be validated against bulk ENCODE data from th
 ```
 # Find bulk RNA-seq for same tissue
 encode_search_experiments(
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     biosample_type="tissue",
     limit=50
@@ -400,7 +400,7 @@ Expected output:
 ### Step 2: Find scATAC-seq experiments for the same tissue
 
 ```
-encode_search_experiments(assay_title="scATAC-seq", organ="brain", organism="Homo sapiens")
+encode_search_experiments(assay_title="snATAC-seq", organ="brain", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -462,7 +462,7 @@ Use → **cellxgene-context** to access the CellxGene Census for additional sing
 
 ### 1. Survey single-cell experiment availability
 ```
-encode_get_facets(assay_title="scATAC-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="snATAC-seq", facet_field="organ", organism="Homo sapiens")
 ```
 
 Expected output:

@@ -103,7 +103,7 @@ assay_title="Histone ChIP-seq", organ="pancreas", biosample_type="tissue"
 assay_title="ATAC-seq", organism="Mus musculus", organ="brain"
 
 # RNA-seq on a specific cell line
-assay_title="RNA-seq", biosample_term_name="GM12878"
+assay_title="total RNA-seq", biosample_term_name="GM12878"
 
 # Free text search
 search_term="CRISPR screen pancreatic"
@@ -796,22 +796,25 @@ The most commonly used assay types:
 | Category | Assay Titles |
 |----------|-------------|
 | **Histone/Chromatin** | `"Histone ChIP-seq"`, `"TF ChIP-seq"`, `"ATAC-seq"`, `"DNase-seq"`, `"CUT&RUN"`, `"CUT&Tag"`, `"MNase-seq"` |
-| **Transcription** | `"RNA-seq"`, `"total RNA-seq"`, `"small RNA-seq"`, `"long read RNA-seq"`, `"CAGE"`, `"RAMPAGE"`, `"PRO-seq"`, `"GRO-seq"` |
+| **Transcription** | `"total RNA-seq"`, `"polyA plus RNA-seq"`, `"small RNA-seq"`, `"long read RNA-seq"`, `"CAGE"`, `"RAMPAGE"`, `"PRO-seq"`, `"GRO-seq"` |
 | **3D Genome** | `"Hi-C"`, `"intact Hi-C"`, `"Micro-C"`, `"ChIA-PET"`, `"HiChIP"`, `"PLAC-seq"`, `"5C"` |
 | **DNA Methylation** | `"WGBS"`, `"RRBS"`, `"MeDIP-seq"`, `"MRE-seq"` |
 | **Functional** | `"STARR-seq"`, `"MPRA"`, `"CRISPR screen"`, `"eCLIP"`, `"iCLIP"` |
-| **Single Cell** | `"single-cell RNA sequencing assay"`, `"snATAC-seq"`, `"10x multiome"`, `"SHARE-seq"`, `"Parse SPLiT-seq"` |
-| **Perturbation** | `"CRISPRi followed by RNA-seq"`, `"shRNA knockdown followed by RNA-seq"` |
+| **Single Cell** | `"scRNA-seq"`, `"snATAC-seq"`, `"snRNA-seq"`, `"long read scRNA-seq"` |
+| **Perturbation** | `"CRISPRi RNA-seq"`, `"shRNA RNA-seq"`, `"siRNA RNA-seq"`, `"CRISPR RNA-seq"` |
 
 ### Organs
 
 ```
-adrenal gland, brain, breast, bronchus, connective tissue, embryo,
-esophagus, eye, gonad, heart, intestine, kidney, large intestine,
-limb, liver, lung, lymph node, mammary gland, mouth, musculature of body,
-nerve, nose, ovary, pancreas, placenta, prostate gland, skin of body,
-small intestine, spinal cord, spleen, stomach, testis, thymus,
-thyroid gland, tongue, tonsil, urinary bladder, uterus, vagina
+adipose tissue, adrenal gland, blood, blood vessel, bodily fluid,
+bone element, bone marrow, brain, breast, bronchus, colon,
+connective tissue, embryo, endocrine gland, epithelium, esophagus,
+exocrine gland, eye, gonad, heart, immune organ, intestine, kidney,
+large intestine, limb, liver, lung, lymph node, mammary gland, mouth,
+musculature of body, nerve, nose, ovary, pancreas, penis, placenta,
+prostate gland, skin of body, small intestine, spinal cord, spleen,
+stomach, testis, thymus, thyroid gland, tongue, tonsil, trachea,
+urinary bladder, uterus, vagina, vasculature, vein
 ```
 
 ### File Formats

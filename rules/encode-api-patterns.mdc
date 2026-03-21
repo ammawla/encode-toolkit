@@ -44,6 +44,6 @@ encode_batch_download(..., dry_run=True)
 - Never mix assemblies in a single analysis
 
 ## Key Concepts
-- Assay types: Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, RNA-seq, WGBS, Hi-C, CUT&RUN, CUT&Tag
+- Assay types: Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, total RNA-seq, polyA plus RNA-seq, WGBS, intact Hi-C, CUT&RUN, CUT&Tag
 - Biosample hierarchy: tissue > primary cell > cell line > in vitro differentiated > organoid
 - Tier 1 cell lines (most data): K562, GM12878, H1-hESC

@@ -91,7 +91,7 @@ Each gene maps to a distinct cell type: INS to beta cells, GCG to alpha cells, S
 ### Step 5: Cross-Validate with ENCODE Single-Cell Data
 
 ```
-encode_search_experiments(assay_title="scATAC-seq", organ="pancreas")
+encode_search_experiments(assay_title="snATAC-seq", organ="pancreas")
 ```
 
 If ENCODE scATAC-seq is available for pancreas, chromatin accessibility in beta cells at the INS locus should match the CellxGene expression data. Convergent evidence -- expression from CellxGene and accessibility from ENCODE scATAC-seq in the same cell type -- is the strongest form of cell-type attribution.

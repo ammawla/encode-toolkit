@@ -1,6 +1,6 @@
 {
   "name": "encode-toolkit",
-  "version": "0.3.0-beta.10",
+  "version": "0.3.0",
   "mcpName": "io.github.ammawla/encode-toolkit",
   "description": "ENCODE Toolkit — Genomics research infrastructure with 20 MCP tools, 47 skills, 14 database integrations, and 7 pipelines for Claude Code",
   "main": "index.js",
@@ -23,7 +23,7 @@
     "model-context-protocol"
   ],
   "author": "Dr. Alex M. Mawla, PhD <ammawla@ucdavis.edu>",
-  "license": "CC-BY-NC-4.0",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/ammawla/encode-toolkit"

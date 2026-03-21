@@ -171,7 +171,7 @@ Both measure chromatin accessibility. ATAC-seq is preferred for newer datasets d
 RNA-seq anchors the epigenomic data to functional output. Active enhancers (H3K27ac) near expressed genes have higher regulatory confidence.
 
 ```
-encode_search_experiments(assay_title="RNA-seq", organ="pancreas", organism="Homo sapiens")
+encode_search_experiments(assay_title="total RNA-seq", organ="pancreas", organism="Homo sapiens")
 encode_track_experiment(accession="ENCSR...", notes="RNA-seq pancreatic islets - gene expression baseline for enhancer-gene linking")
 ```
 

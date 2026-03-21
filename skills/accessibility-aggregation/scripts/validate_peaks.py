@@ -14,7 +14,6 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-
 VALID_CHROMS = {f"chr{i}" for i in range(1, 23)} | {"chrX", "chrY", "chrM"}
 NARROWPEAK_COLS = 10
 
@@ -119,10 +118,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
 
             # Accessibility peaks should always be narrowPeak
             if len(fields) < NARROWPEAK_COLS:
-                errors.append(
-                    f"Line {line_num}: expected {NARROWPEAK_COLS} columns (narrowPeak), "
-                    f"got {len(fields)}"
-                )
+                errors.append(f"Line {line_num}: expected {NARROWPEAK_COLS} columns (narrowPeak), got {len(fields)}")
                 bad_lines += 1
                 if bad_lines > 5:
                     if bad_lines == 6:
@@ -182,7 +178,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
             # pValue and qValue validation
             for col_idx, col_name in [(7, "pValue"), (8, "qValue")]:
                 try:
-                    val = float(fields[col_idx])
+                    float(fields[col_idx])
                 except (ValueError, IndexError):
                     errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
 
@@ -202,11 +198,11 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
     print(f"Assay: {assay}")
     print()
 
-    print(f"--- Summary ---")
+    print("--- Summary ---")
     print(f"Total peaks: {total_lines:,}")
     print(f"Malformed lines: {bad_lines}")
     if blacklist_path:
-        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100*blacklist_overlaps/max(total_lines,1):.1f}%)")
+        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(total_lines, 1):.1f}%)")
     print()
 
     if peak_sizes:
@@ -218,11 +214,11 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
         in_range = sum(1 for s in peak_sizes if 100 <= s <= 500)
         in_range_pct = 100 * in_range / max(n, 1)
 
-        print(f"--- Peak Size Distribution ---")
+        print("--- Peak Size Distribution ---")
         print(f"Min:    {sorted_sizes[0]:,} bp")
-        print(f"25th:   {sorted_sizes[n//4]:,} bp")
+        print(f"25th:   {sorted_sizes[n // 4]:,} bp")
         print(f"Median: {median_size:,} bp")
-        print(f"75th:   {sorted_sizes[3*n//4]:,} bp")
+        print(f"75th:   {sorted_sizes[3 * n // 4]:,} bp")
         print(f"Max:    {sorted_sizes[-1]:,} bp")
         print(f"In typical range (100-500bp): {in_range:,} ({in_range_pct:.1f}%)")
         print()
@@ -230,15 +226,15 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
     if signal_values:
         sorted_sig = sorted(signal_values)
         n_sig = len(sorted_sig)
-        print(f"--- SignalValue Distribution ---")
+        print("--- SignalValue Distribution ---")
         print(f"Min:    {sorted_sig[0]:.2f}")
-        print(f"25th:   {sorted_sig[n_sig//4]:.2f}")
-        print(f"Median: {sorted_sig[n_sig//2]:.2f}")
-        print(f"75th:   {sorted_sig[3*n_sig//4]:.2f}")
+        print(f"25th:   {sorted_sig[n_sig // 4]:.2f}")
+        print(f"Median: {sorted_sig[n_sig // 2]:.2f}")
+        print(f"75th:   {sorted_sig[3 * n_sig // 4]:.2f}")
         print(f"Max:    {sorted_sig[-1]:.2f}")
         print()
 
-    print(f"--- Chromosome Distribution ---")
+    print("--- Chromosome Distribution ---")
     for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
         count = chrom_counts[chrom]
         pct = 100 * count / max(total_lines, 1)
@@ -278,8 +274,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
 
     if blacklist_overlaps > 0:
         msg = (
-            f"WARNING: {blacklist_overlaps:,} peaks overlap ENCODE blacklist regions. "
-            f"Remove these before aggregation."
+            f"WARNING: {blacklist_overlaps:,} peaks overlap ENCODE blacklist regions. Remove these before aggregation."
         )
         print(msg, file=sys.stderr)
 
@@ -298,7 +293,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
     if has_errors:
         print(f"\nRESULT: FAIL -- {len(errors)} error(s) found", file=sys.stderr)
     else:
-        print(f"\nRESULT: PASS -- file is valid narrowPeak")
+        print("\nRESULT: PASS -- file is valid narrowPeak")
 
     return 1 if has_errors else 0
 

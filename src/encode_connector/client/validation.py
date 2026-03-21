@@ -176,6 +176,44 @@ def validate_data_export_format(value: str) -> str:
     return value
 
 
+# Pre-built case-insensitive lookup maps (keyed by tuple for stable identity)
+_LOWER_MAPS: dict[tuple[str, ...], dict[str, str]] = {}
+
+
+def _get_lower_map(valid_values: list[str]) -> dict[str, str]:
+    """Get or build a cached lowercase→original map for a constants list."""
+    key = tuple(valid_values)
+    if key not in _LOWER_MAPS:
+        _LOWER_MAPS[key] = {v.lower(): v for v in valid_values}
+    return _LOWER_MAPS[key]
+
+
+def check_filter_value(value: str, valid_values: list[str], filter_name: str) -> str | None:
+    """Check if a filter value is in the known valid values.
+
+    Returns a warning message if the value doesn't match any known value,
+    or None if it's valid. Does NOT raise — unknown values may be valid
+    if ENCODE has added new values since the constants were last updated.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    if value in valid_values:
+        return None
+    # Case-insensitive check using cached map
+    lower_map = _get_lower_map(valid_values)
+    lower_value = value.lower()
+    if lower_value in lower_map:
+        correct = lower_map[lower_value]
+        return (
+            f"Filter '{filter_name}' value '{value}' has wrong case. "
+            f"ENCODE API is case-sensitive — use '{correct}' instead."
+        )
+    return (
+        f"Filter '{filter_name}' value '{value}' not found in known ENCODE values. "
+        f"This may cause empty results. Check encode_get_metadata for valid values."
+    )
+
+
 def validate_redirect_url(url: str) -> str:
     """Validate that a redirect URL points to an allowed ENCODE/S3 host."""
     from urllib.parse import urlparse

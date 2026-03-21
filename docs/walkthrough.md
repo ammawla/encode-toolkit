@@ -76,7 +76,7 @@ You can do this for any filter dimension:
 
 > **You:** What organs have data on ENCODE?
 
-Returns: `pancreas, liver, brain, heart, kidney, lung, intestine, spleen, thymus, ...`
+Returns: `blood, brain, liver, lung, heart, kidney, pancreas, intestine, spleen, thymus, ...`
 
 > **You:** What genome assemblies are available?
 
@@ -153,7 +153,7 @@ life_stage="adult"
 > **You:** Find all RNA-seq experiments on GM12878 cells.
 
 ```
-assay_title="RNA-seq"
+assay_title="total RNA-seq"
 biosample_term_name="GM12878"
 ```
 

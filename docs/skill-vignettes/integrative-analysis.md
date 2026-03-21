@@ -21,7 +21,7 @@ A scientist wants to identify active enhancers driving tissue-specific gene expr
 ```
 encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K27ac", organ="liver", biosample_type="tissue", limit=50)
 encode_search_experiments(assay_title="ATAC-seq", organ="liver", biosample_type="tissue", limit=50)
-encode_search_experiments(assay_title="RNA-seq", organ="liver", biosample_type="tissue", limit=50)
+encode_search_experiments(assay_title="total RNA-seq", organ="liver", biosample_type="tissue", limit=50)
 ```
 
 | Layer | Accession | Biosample | Lab | Audit |

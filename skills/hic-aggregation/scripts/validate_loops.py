@@ -14,7 +14,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 VALID_CHROMS = {f"chr{i}" for i in range(1, 23)} | {"chrX", "chrY", "chrM"}
 MIN_BEDPE_COLS = 6
 
@@ -77,10 +76,7 @@ def validate_loops(input_path, min_distance, expected_resolution):
 
             # BEDPE requires at least 6 columns
             if len(fields) < MIN_BEDPE_COLS:
-                errors.append(
-                    f"Line {line_num}: expected >= {MIN_BEDPE_COLS} columns (BEDPE), "
-                    f"got {len(fields)}"
-                )
+                errors.append(f"Line {line_num}: expected >= {MIN_BEDPE_COLS} columns (BEDPE), got {len(fields)}")
                 bad_lines += 1
                 if bad_lines > 5:
                     if bad_lines == 6:
@@ -95,9 +91,7 @@ def validate_loops(input_path, min_distance, expected_resolution):
             for chrom_label, chrom_val in [("anchor1", chr1), ("anchor2", chr2)]:
                 if chrom_val not in VALID_CHROMS:
                     if not chrom_val.startswith("chr"):
-                        errors.append(
-                            f"Line {line_num}: invalid {chrom_label} chromosome '{chrom_val}'"
-                        )
+                        errors.append(f"Line {line_num}: invalid {chrom_label} chromosome '{chrom_val}'")
                         bad_lines += 1
 
             # Coordinate validation
@@ -151,14 +145,10 @@ def validate_loops(input_path, min_distance, expected_resolution):
             if expected_resolution is not None:
                 if a1_size != expected_resolution:
                     if len(warnings) < 10:
-                        warnings.append(
-                            f"Line {line_num}: anchor1 size {a1_size} != expected {expected_resolution}"
-                        )
+                        warnings.append(f"Line {line_num}: anchor1 size {a1_size} != expected {expected_resolution}")
                 if a2_size != expected_resolution:
                     if len(warnings) < 10:
-                        warnings.append(
-                            f"Line {line_num}: anchor2 size {a2_size} != expected {expected_resolution}"
-                        )
+                        warnings.append(f"Line {line_num}: anchor2 size {a2_size} != expected {expected_resolution}")
 
     # --- Detect resolution from anchor sizes ---
     detected_resolution = None
@@ -171,40 +161,40 @@ def validate_loops(input_path, min_distance, expected_resolution):
             detected_resolution = most_common_size
 
     # --- Report Statistics ---
-    print(f"=== Hi-C BEDPE Loop Validation Report ===")
+    print("=== Hi-C BEDPE Loop Validation Report ===")
     print(f"File: {input_path}")
     print()
 
-    print(f"--- Summary ---")
+    print("--- Summary ---")
     print(f"Total loops: {total_lines:,}")
     print(f"Malformed lines: {bad_lines}")
-    print(f"Cis loops (same chromosome): {cis_loops:,} ({100*cis_loops/max(total_lines,1):.1f}%)")
-    print(f"Trans loops (inter-chromosomal): {trans_loops:,} ({100*trans_loops/max(total_lines,1):.1f}%)")
+    print(f"Cis loops (same chromosome): {cis_loops:,} ({100 * cis_loops / max(total_lines, 1):.1f}%)")
+    print(f"Trans loops (inter-chromosomal): {trans_loops:,} ({100 * trans_loops / max(total_lines, 1):.1f}%)")
     print(f"Non-canonical ordering (anchor1 > anchor2): {non_canonical:,}")
-    print(f"Short-range loops (<{min_distance//1000}kb): {short_range:,}")
+    print(f"Short-range loops (<{min_distance // 1000}kb): {short_range:,}")
     print()
 
     if detected_resolution:
-        print(f"--- Resolution ---")
-        print(f"Detected resolution: {detected_resolution:,} bp ({detected_resolution//1000}kb)")
+        print("--- Resolution ---")
+        print(f"Detected resolution: {detected_resolution:,} bp ({detected_resolution // 1000}kb)")
         print(f"Anchor size consistency: {size_pct:.1f}% of anchors match detected resolution")
     elif anchor1_sizes:
-        print(f"--- Resolution ---")
-        print(f"WARNING: No consistent resolution detected. Anchor sizes vary.")
+        print("--- Resolution ---")
+        print("WARNING: No consistent resolution detected. Anchor sizes vary.")
         top3 = size_counts.most_common(3)
         for sz, cnt in top3:
-            print(f"  {sz:>8,} bp: {cnt:,} anchors ({100*cnt/len(all_sizes):.1f}%)")
+            print(f"  {sz:>8,} bp: {cnt:,} anchors ({100 * cnt / len(all_sizes):.1f}%)")
     print()
 
     if loop_distances:
         sorted_dist = sorted(loop_distances)
         n = len(sorted_dist)
-        print(f"--- Loop Distance Distribution (cis only) ---")
-        print(f"Min:    {sorted_dist[0]:>12,} bp ({sorted_dist[0]//1000}kb)")
-        print(f"25th:   {sorted_dist[n//4]:>12,} bp ({sorted_dist[n//4]//1000}kb)")
-        print(f"Median: {sorted_dist[n//2]:>12,} bp ({sorted_dist[n//2]//1000}kb)")
-        print(f"75th:   {sorted_dist[3*n//4]:>12,} bp ({sorted_dist[3*n//4]//1000}kb)")
-        print(f"Max:    {sorted_dist[-1]:>12,} bp ({sorted_dist[-1]//1000}kb)")
+        print("--- Loop Distance Distribution (cis only) ---")
+        print(f"Min:    {sorted_dist[0]:>12,} bp ({sorted_dist[0] // 1000}kb)")
+        print(f"25th:   {sorted_dist[n // 4]:>12,} bp ({sorted_dist[n // 4] // 1000}kb)")
+        print(f"Median: {sorted_dist[n // 2]:>12,} bp ({sorted_dist[n // 2] // 1000}kb)")
+        print(f"75th:   {sorted_dist[3 * n // 4]:>12,} bp ({sorted_dist[3 * n // 4] // 1000}kb)")
+        print(f"Max:    {sorted_dist[-1]:>12,} bp ({sorted_dist[-1] // 1000}kb)")
 
         # Distance buckets
         buckets = [
@@ -214,14 +204,14 @@ def validate_loops(input_path, min_distance, expected_resolution):
             ("1Mb - 5Mb", 1_000_000, 5_000_000),
             ("> 5Mb", 5_000_000, float("inf")),
         ]
-        print(f"\n  Distance buckets:")
+        print("\n  Distance buckets:")
         for label, lo, hi in buckets:
             count = sum(1 for d in loop_distances if lo <= d < hi)
-            print(f"    {label:<15} {count:>8,}  ({100*count/n:.1f}%)")
+            print(f"    {label:<15} {count:>8,}  ({100 * count / n:.1f}%)")
         print()
 
     if cis_loops > 0:
-        print(f"--- Chromosome Distribution (cis loops) ---")
+        print("--- Chromosome Distribution (cis loops) ---")
         for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
             count = chrom_counts[chrom]
             pct = 100 * count / max(cis_loops, 1)
@@ -231,14 +221,14 @@ def validate_loops(input_path, min_distance, expected_resolution):
     # --- Warnings ---
     if trans_loops > total_lines * 0.05:
         msg = (
-            f"WARNING: {100*trans_loops/max(total_lines,1):.1f}% of loops are trans "
+            f"WARNING: {100 * trans_loops / max(total_lines, 1):.1f}% of loops are trans "
             f"(inter-chromosomal). Expect <5% for typical Hi-C data."
         )
         print(msg, file=sys.stderr)
 
     if short_range > 0:
         msg = (
-            f"WARNING: {short_range:,} loops have anchors <{min_distance//1000}kb apart. "
+            f"WARNING: {short_range:,} loops have anchors <{min_distance // 1000}kb apart. "
             f"These may be self-ligation artifacts."
         )
         print(msg, file=sys.stderr)
@@ -265,7 +255,7 @@ def validate_loops(input_path, min_distance, expected_resolution):
     if has_errors:
         print(f"\nRESULT: FAIL -- {len(errors)} error(s) found", file=sys.stderr)
     else:
-        print(f"\nRESULT: PASS -- file is valid BEDPE")
+        print("\nRESULT: PASS -- file is valid BEDPE")
 
     return 1 if has_errors else 0
 

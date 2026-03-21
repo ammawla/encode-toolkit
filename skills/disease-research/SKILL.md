@@ -173,7 +173,7 @@ encode_search_experiments(assay_title="ATAC-seq", organ="...", biosample_type="t
 encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K27ac", organ="...")
 encode_search_experiments(assay_title="TF ChIP-seq", organ="...")
 encode_search_experiments(assay_title="Hi-C", organ="...")
-encode_search_experiments(assay_title="RNA-seq", organ="...", biosample_type="tissue")
+encode_search_experiments(assay_title="total RNA-seq", organ="...", biosample_type="tissue")
 ```
 
 ## Step 6: Identify Therapeutic Targets

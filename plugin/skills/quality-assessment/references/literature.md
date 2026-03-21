@@ -114,7 +114,7 @@ indicators and provide systematic benchmarks for quantitative evaluation.
   and high signal-to-noise ratio at known open chromatin regions. ATAC-seq requires only
   500-50,000 cells (vs. millions for DNase-seq), making it the preferred accessibility assay
   for limited-material samples. The quality-assessment skill checks for the nucleosomal ladder
-  and TSS enrichment score (>= 6 per ENCODE standards) as primary quality indicators.
+  and TSS enrichment score (>= 5 GRCh38 / >= 6 hg19 / >= 10 mm10 per ENCODE data standards) as primary quality indicators.
 
 ---
 
@@ -127,7 +127,7 @@ indicators and provide systematic benchmarks for quantitative evaluation.
 - **Citations:** ~400
 - **Key findings:** Provided a comprehensive benchmarking framework for ATAC-seq QC, establishing
   quantitative thresholds:
-  - TSS enrichment score >= 6 (ENCODE standard, >= 10 is excellent)
+  - TSS enrichment score >= 5 GRCh38 / >= 6 hg19 / >= 10 mm10 (ENCODE data standards)
   - Mitochondrial read fraction < 20% (ideally < 5%)
   - Duplicate rate < 30%
   - Unique alignment rate > 80%
@@ -158,7 +158,7 @@ gene body coverage uniformity, and replicate concordance rather than peak-based 
 - **PMID:** 26813401 | **PMC:** PMC4728800
 - **Citations:** ~4,500
 - **Key findings:** Established the consensus RNA-seq quality framework:
-  - Mapping rate > 80% to reference genome
+  - Mapping rate 70-90% to reference genome
   - Ribosomal RNA fraction < 10% (< 5% ideal for poly-A libraries)
   - Gene body coverage uniformity (5'-to-3' bias ratio < 2)
   - Replicate Spearman correlation >= 0.9
@@ -186,19 +186,19 @@ computationally distinguished from true methylation.
 
 - **Citation:** Foox J, Nordlund J, Lalancette C, Gong T, Samber M, Gaggiotti K, Bhatt V,
   Buber DCE, Mundt F, Butler DJ, Mozsary C, Fehlmann T, Holley J, Prill RJ, Keller A,
-  Mason CE. The SEQC2 epigenomics quality control (EpiQC) study. *Nature Biotechnology*,
-  39, 1088-1096, 2021.
-- **DOI:** [10.1038/s41587-021-00993-6](https://doi.org/10.1038/s41587-021-00993-6)
-- **PMID:** 34312500 | **PMC:** PMC9839987
+  Mason CE. The SEQC2 epigenomics quality control (EpiQC) study. *Genome Biology*,
+  22, 307, 2021.
+- **DOI:** [10.1186/s13059-021-02529-2](https://doi.org/10.1186/s13059-021-02529-2)
+- **PMID:** 34872606 | **PMC:** PMC8650396
 - **Citations:** ~300
 - **Key findings:** Benchmarked WGBS performance across 18 laboratories, establishing minimum
   quality thresholds:
-  - Bisulfite conversion rate > 99% (measured by lambda spike-in or non-CpG methylation)
+  - Bisulfite conversion rate ≥ 98% (measured by lambda spike-in or non-CpG methylation)
   - CpG coverage >= 10x for reliable methylation calling (>= 30x for DMR detection)
   - Mapping rate > 60% (lower than standard due to reduced sequence complexity)
   - Concordance > 0.95 between technical replicates at covered CpGs
 
-  Demonstrated that conversion rates below 99% introduce systematic false positives that
+  Demonstrated that conversion rates below 98% introduce systematic false positives that
   cannot be computationally corrected. The quality-assessment skill flags WGBS experiments
   with conversion rates below this threshold and recommends minimum coverage depths based
   on intended analysis type (global profiling vs. DMR detection vs. allele-specific methylation).
@@ -239,7 +239,7 @@ efficiency, ligation specificity, and sequencing depth relative to the resolutio
   Noble WS, Mirny LA. Measuring the reproducibility and quality of Hi-C data.
   *Genome Biology*, 20(1), 57, 2019.
 - **DOI:** [10.1186/s13059-019-1658-7](https://doi.org/10.1186/s13059-019-1658-7)
-- **PMID:** 30890174 | **PMC:** PMC6423884
+- **PMID:** 30890172 | **PMC:** PMC6423771
 - **Citations:** ~200
 - **Key findings:** Established quantitative quality metrics for Hi-C data:
   - Cis/trans ratio > 60% (higher indicates better ligation specificity)
@@ -270,7 +270,7 @@ distinct set of artifact regions must be filtered.
 - **Citation:** Nordin A, Zambanini G, Pagella P, Cantu C. The CUT&RUN suspect list of
   problematic regions of the genome. *Genome Biology*, 24(1), 185, 2023.
 - **DOI:** [10.1186/s13059-023-03027-3](https://doi.org/10.1186/s13059-023-03027-3)
-- **PMID:** 37580814 | **PMC:** PMC10424364
+- **PMID:** 37563719 | **PMC:** PMC10416431
 - **Citations:** ~150
 - **Key findings:** Identified a set of genomic regions (~1.5% of the genome) that produce
   systematic artifact signals specifically in CUT&RUN and CUT&Tag experiments, distinct from

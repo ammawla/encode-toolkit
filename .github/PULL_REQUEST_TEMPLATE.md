@@ -22,7 +22,7 @@
 
 <!-- How was this tested? -->
 
-- [ ] All 506 existing tests pass (`pytest tests/ -v`)
+- [ ] All 540 existing tests pass (`pytest tests/ -v`)
 - [ ] New tests added for new functionality
 - [ ] Lint passes (`ruff check src/`)
 - [ ] Format passes (`ruff format --check src/`)

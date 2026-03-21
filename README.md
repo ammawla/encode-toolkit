@@ -4,13 +4,13 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.3.0--beta.10-yellow)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-green)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
 [![Skills](https://img.shields.io/badge/skills-47-orange)](docs/skill-vignettes/)
 [![Tools](https://img.shields.io/badge/MCP_tools-20-purple)](src/encode_connector/server/main.py)
 [![Pipelines](https://img.shields.io/badge/pipelines-7-green)](skills/pipeline-chipseq/)
 [![Databases](https://img.shields.io/badge/databases-14-teal)](docs/SHOWCASE.md)<br>
-[![Tests](https://img.shields.io/badge/tests-506_passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-568_passing-brightgreen)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)](tests/)
 [![Security](https://img.shields.io/badge/security-no_telemetry-blue)]()
 [![Claude Code](https://img.shields.io/badge/Claude_Code-plugin-blueviolet)](https://claude.com/claude-code)
@@ -805,6 +805,6 @@ pytest
 
 ## License
 
-**Restrictive Non-Commercial License.** Free for personal, educational, and academic research. No derivative works without written permission. Commercial use requires a separate license. See [LICENSE](LICENSE) for full terms.
+AGPL-3.0. See [LICENSE](LICENSE) for full terms.
 
 For commercial licensing inquiries: ammawla@ucdavis.edu

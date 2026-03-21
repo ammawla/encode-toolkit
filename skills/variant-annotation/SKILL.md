@@ -137,7 +137,7 @@ encode_search_experiments(assay_title="ChIA-PET", organ="...")
 
 ### Layer 5: Gene Expression (for target gene validation)
 ```
-encode_search_experiments(assay_title="RNA-seq", organ="...", biosample_type="tissue")
+encode_search_experiments(assay_title="total RNA-seq", organ="...", biosample_type="tissue")
 ```
 
 For each experiment, get peak files:
