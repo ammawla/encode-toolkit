@@ -120,7 +120,7 @@ Peaks were called using MACS2 (v[version]; Zhang et al. 2008) with
 parameters --nomodel --shift -75 --extsize 150 --keep-dup all -q 0.05.
 Nucleosome-free fragments (< 150 bp) were used for peak calling. Signal
 tracks were generated as fold change over background. TSS enrichment
-score was [value] (threshold >= 6; Buenrostro et al. 2013). Of [N]
+score was [value] (threshold >= 6; ENCODE data standards; Yan et al. 2020). Of [N]
 called peaks, [N] ([%]) passed quality filtering.
 ```
 
@@ -142,8 +142,8 @@ with Trim Galore (v[version]; Krueger 2015). Reads were aligned to
 quantification was performed using RSEM (v[version]; Li & Dewey 2011)
 for expected counts and TPM values. Transcript-level quantification was
 obtained with Kallisto (v[version]; Bray et al. 2016). Mapping rate was
-[%] and rRNA contamination was [%] (thresholds: mapping > 80%, rRNA <
-10%; Conesa et al. 2016). Replicate Pearson correlation was [r value]
+[%] and rRNA contamination was [%] (thresholds: mapping 70-90%, rRNA <
+10%; Conesa et al. 2016; ENCODE data standards). Replicate Pearson correlation was [r value]
 (threshold >= 0.9).
 
 Differential expression analysis was performed using DESeq2 (v[version];
@@ -172,7 +172,7 @@ Bowtie2 as the underlying aligner. Duplicate reads were removed using
 Bismark deduplicate_bismark. Methylation calls were extracted using
 MethylDackel (v[version]; https://github.com/dpryan79/MethylDackel)
 with parameters [--minDepth X --mergeContext]. Bisulfite conversion
-efficiency was [%] (threshold > 99%; Foox et al. 2021). CpG sites with
+efficiency was [%] (threshold >= 98%; ENCODE data standards). CpG sites with
 coverage >= [X]x were retained for analysis ([N] CpGs, [%] of all
 genomic CpGs).
 
@@ -421,9 +421,9 @@ Assay-specific QC metrics for all experiments. Columns depend on the assay type.
 
 **QC thresholds** (include as table footnotes):
 - ChIP-seq: FRiP >= 1%, NSC > 1.05, RSC > 0.8, NRF >= 0.8 (Landt et al. 2012)
-- ATAC-seq: TSS enrichment >= 6, nucleosomal ladder visible (Buenrostro et al. 2013)
-- RNA-seq: Mapping > 80%, rRNA < 10%, replicate r >= 0.9 (Conesa et al. 2016)
-- WGBS: Conversion > 99%, CpG coverage >= 10x for DMRs (Foox et al. 2021)
+- ATAC-seq: TSS enrichment >= 5 (GRCh38), >= 6 (hg19), >= 10 (mm10); nucleosomal ladder visible (ENCODE data standards; Yan et al. 2020)
+- RNA-seq: Mapping 70-90%, rRNA < 10%, replicate r >= 0.9 (Conesa et al. 2016; ENCODE data standards)
+- WGBS: Conversion >= 98%, CpG coverage >= 10x for DMRs (ENCODE data standards)
 - Hi-C: Cis/trans > 60%, long-range cis > 40% (Yardimci et al. 2019)
 
 ### Table S3: Differential Results
@@ -764,9 +764,9 @@ yielding 34,198 peaks (99.1% of filtered set) for downstream analysis.
 | Baker | 2016 | Nature | 1,500 scientists lift the lid on reproducibility; established scale of reproducibility crisis | ~3,200 |
 | Amemiya et al. | 2019 | Scientific Reports | ENCODE Blacklist: identification and exclusion of artifact regions across genome assemblies | ~1,372 |
 | Buenrostro et al. | 2013 | Nature Methods | ATAC-seq method development; defined TSS enrichment and nucleosomal fragment thresholds | ~5,000 |
-| Foox et al. | 2021 | Nature Biotechnology | WGBS benchmarking and quality standards; bisulfite conversion thresholds | ~200 |
+| Foox et al. | 2021 | Genome Biology | WGBS benchmarking and quality standards; bisulfite conversion thresholds | ~200 |
 | Yardimci et al. | 2019 | Genome Biology | Hi-C quality metrics; cis/trans ratio and long-range cis thresholds | ~150 |
-| Nordin et al. | 2023 | Epigenetics & Chromatin | CUT&RUN/CUT&Tag QC: different profiles from ChIP-seq; suspect list regions | ~50 |
+| Nordin et al. | 2023 | Genome Biology | CUT&RUN/CUT&Tag QC: different profiles from ChIP-seq; suspect list regions | ~50 |
 
 ## Integration
 

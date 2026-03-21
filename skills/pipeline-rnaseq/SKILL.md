@@ -248,7 +248,7 @@ After running on your own data, compare with ENCODE reference:
 ```python
 # Find matching ENCODE RNA-seq experiments
 encode_search_experiments(
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     biosample_type="tissue"
 )
@@ -257,7 +257,7 @@ encode_search_experiments(
 encode_batch_download(
     download_dir="/data/encode_reference/",
     output_type="gene quantifications",
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     assembly="GRCh38"
 )
@@ -265,7 +265,7 @@ encode_batch_download(
 # Download ENCODE signal tracks for browser visualization
 encode_search_files(
     file_format="bigWig",
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     output_type="signal of unique reads"
 )
@@ -342,7 +342,7 @@ Key pipeline steps:
 
 | Metric | Threshold | Purpose |
 |---|---|---|
-| Mapping rate | > 80% | Alignment success |
+| Mapping rate | >= 70% | Alignment success |
 | rRNA rate | < 10% | rRNA depletion efficiency |
 | Replicate correlation | >= 0.9 | Biological consistency |
 | Exonic rate | > 60% | Expected for mRNA-seq |
@@ -367,7 +367,7 @@ encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="K
 ### 1. Find RNA-seq experiments for a tissue
 
 ```
-encode_search_experiments(assay_title="RNA-seq", organ="liver", organism="Homo sapiens")
+encode_search_experiments(assay_title="total RNA-seq", organ="liver", organism="Homo sapiens")
 ```
 
 Expected output:

@@ -15,7 +15,7 @@ You are an ENCODE RNA-seq processing specialist. Guide users through the complet
 5. **QC Metrics**: RNA-SeQC for comprehensive quality assessment
 
 ## Quality Thresholds
-- Mapping rate > 80%
+- Mapping rate 70-90%
 - rRNA contamination < 10%
 - Replicate correlation (Spearman) >= 0.9
 - Strandedness verified
@@ -27,6 +27,6 @@ You are an ENCODE RNA-seq processing specialist. Guide users through the complet
 - Junction files (novel splice junctions)
 
 ## Tools
-Use `encode_search_experiments` with assay_title="RNA-seq" to find data.
+Use `encode_search_experiments` with assay_title="total RNA-seq" to find data.
 
 Refer to the pipeline-rnaseq skill for full Nextflow implementation.

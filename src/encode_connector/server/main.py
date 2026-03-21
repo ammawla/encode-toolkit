@@ -19,6 +19,11 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from encode_connector.client.auth import CredentialManager
+from encode_connector.client.constants import (
+    ASSAY_TITLES,
+    BIOSAMPLE_CLASSIFICATIONS,
+    ORGAN_SLIMS,
+)
 from encode_connector.client.downloader import FileDownloader
 from encode_connector.client.encode_client import EncodeClient
 from encode_connector.client.models import _human_size
@@ -28,6 +33,7 @@ from encode_connector.client.tracker import (
     parse_encode_publications,
 )
 from encode_connector.client.validation import (
+    check_filter_value,
     clamp_limit,
     validate_accession,
     validate_data_export_format,
@@ -82,6 +88,32 @@ _CREDENTIAL_MGMT = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
+
+
+def _validate_filters(
+    assay_title: str | None = None,
+    organ: str | None = None,
+    biosample_type: str | None = None,
+) -> list[str]:
+    """Validate common filter parameters against known ENCODE values.
+
+    Returns a list of warning strings (empty if all values are valid).
+    """
+    warnings: list[str] = []
+    if assay_title:
+        warning = check_filter_value(assay_title, ASSAY_TITLES, "assay_title")
+        if warning:
+            warnings.append(warning)
+    if organ:
+        warning = check_filter_value(organ, ORGAN_SLIMS, "organ")
+        if warning:
+            warnings.append(warning)
+    if biosample_type:
+        warning = check_filter_value(biosample_type, BIOSAMPLE_CLASSIFICATIONS, "biosample_type")
+        if warning:
+            warnings.append(warning)
+    return warnings
+
 
 # Global client instances (managed via lifespan)
 _client: EncodeClient | None = None
@@ -191,7 +223,7 @@ async def encode_search_experiments(
     - Find ATAC-seq on human brain:
       assay_title="ATAC-seq", organ="brain"
     - Find RNA-seq on GM12878 cell line:
-      assay_title="RNA-seq", biosample_term_name="GM12878"
+      assay_title="total RNA-seq", biosample_term_name="GM12878"
     - Find ChIP-seq targeting H3K27me3:
       assay_title="Histone ChIP-seq", target="H3K27me3"
     - Find all mouse liver experiments:
@@ -200,8 +232,8 @@ async def encode_search_experiments(
       search_term="CRISPR screen pancreatic"
 
     Common assay_title values: "Histone ChIP-seq", "TF ChIP-seq", "ATAC-seq",
-    "DNase-seq", "RNA-seq", "total RNA-seq", "WGBS", "Hi-C", "CUT&RUN",
-    "CUT&Tag", "STARR-seq", "MPRA", "eCLIP", "CRISPR screen"
+    "DNase-seq", "total RNA-seq", "polyA plus RNA-seq", "WGBS", "intact Hi-C",
+    "CUT&RUN", "CUT&Tag", "STARR-seq", "MPRA", "eCLIP", "CRISPR screen"
 
     Common organ values: "pancreas", "liver", "brain", "heart", "kidney",
     "lung", "intestine", "skin of body", "blood", "spleen", "thymus"
@@ -214,7 +246,7 @@ async def encode_search_experiments(
     RELATED TOOLS: encode_get_facets, encode_get_metadata, encode_search_files
 
     Args:
-        assay_title: Assay type (e.g., "Histone ChIP-seq", "ATAC-seq", "RNA-seq")
+        assay_title: Assay type (e.g., "Histone ChIP-seq", "ATAC-seq", "total RNA-seq")
         organism: Species (default: "Homo sapiens"). Also: "Mus musculus"
         organ: Organ/tissue system (e.g., "pancreas", "brain", "liver")
         biosample_type: Sample classification ("tissue", "cell line", "primary cell", "organoid")
@@ -241,6 +273,9 @@ async def encode_search_experiments(
     """
     client = await _get_client()
     limit = clamp_limit(limit)
+
+    filter_warnings = _validate_filters(assay_title, organ, biosample_type)
+
     result = await client.search_experiments(
         assay_title=assay_title,
         organism=organism,
@@ -268,6 +303,8 @@ async def encode_search_experiments(
     serialized = _serialize(result)
     serialized["has_more"] = total > (offset + limit)
     serialized["next_offset"] = offset + limit if total > (offset + limit) else None
+    if filter_warnings:
+        serialized["filter_warnings"] = filter_warnings
     if not result.get("results"):
         serialized["suggestion"] = (
             "Try broadening your search filters. Use encode_get_facets to see what data is available for your criteria."
@@ -402,7 +439,7 @@ async def encode_search_files(
     - All BED files from human pancreas ChIP-seq:
       file_format="bed", assay_title="Histone ChIP-seq", organ="pancreas"
     - FASTQs from mouse liver RNA-seq:
-      file_format="fastq", assay_title="RNA-seq", organ="liver", organism="Mus musculus"
+      file_format="fastq", assay_title="total RNA-seq", organ="liver", organism="Mus musculus"
     - All IDR peak files for H3K27me3:
       output_type="IDR thresholded peaks", target="H3K27me3"
     - BigWig signal tracks from ATAC-seq on brain tissue:
@@ -434,6 +471,7 @@ async def encode_search_files(
     """
     client = await _get_client()
     limit = clamp_limit(limit)
+    filter_warnings = _validate_filters(assay_title, organ, biosample_type)
     result = await client.search_files(
         file_format=file_format,
         file_type=file_type,
@@ -455,6 +493,8 @@ async def encode_search_files(
     serialized = _serialize(result)
     serialized["has_more"] = total > (offset + limit)
     serialized["next_offset"] = offset + limit if total > (offset + limit) else None
+    if filter_warnings:
+        serialized["filter_warnings"] = filter_warnings
     if not result.get("results"):
         serialized["suggestion"] = (
             "Verify assembly and file_format values. Use encode_get_metadata('file_formats') to see valid options."
@@ -485,7 +525,7 @@ async def encode_download_files(
 
     Args:
         file_accessions: List of file accessions to download (e.g., ["ENCFF635JIA", "ENCFF388RZD"])
-        download_dir: Local directory path to save files (e.g., "/Users/you/data/encode")
+        download_dir: Local directory path to save files (e.g., "./data/encode")
         organize_by: How to organize downloaded files:
             - "flat": All files in download_dir (default)
             - "experiment": download_dir/ENCSR.../filename
@@ -562,7 +602,7 @@ async def encode_get_metadata(
 
     Args:
         metadata_type: Type of metadata to retrieve. Options:
-            - "assays": Available assay types (Histone ChIP-seq, ATAC-seq, RNA-seq, etc.)
+            - "assays": Available assay types (Histone ChIP-seq, ATAC-seq, total RNA-seq, etc.)
             - "organisms": Available organisms (Homo sapiens, Mus musculus, etc.)
             - "organs": Available organ/tissue systems (pancreas, brain, liver, etc.)
             - "biosample_types": Biosample classifications (tissue, cell line, primary cell, etc.)
@@ -624,7 +664,7 @@ async def encode_batch_download(
       file_format="bed", assay_title="Histone ChIP-seq", organ="pancreas",
       download_dir="/data/encode", dry_run=False
     - Preview FASTQ downloads for mouse brain RNA-seq:
-      file_format="fastq", assay_title="RNA-seq", organ="brain",
+      file_format="fastq", assay_title="total RNA-seq", organ="brain",
       organism="Mus musculus", download_dir="/data/encode"
     - Download IDR peaks for H3K27me3 in GRCh38:
       output_type="IDR thresholded peaks", target="H3K27me3", assembly="GRCh38",
@@ -636,7 +676,7 @@ async def encode_batch_download(
         output_type: Output type filter ("reads", "peaks", "signal", etc.)
         output_category: Output category ("raw data", "alignment", "annotation", etc.)
         assembly: Genome assembly ("GRCh38", "mm10", etc.)
-        assay_title: Assay type ("Histone ChIP-seq", "ATAC-seq", "RNA-seq", etc.)
+        assay_title: Assay type ("Histone ChIP-seq", "ATAC-seq", "total RNA-seq", etc.)
         organism: Organism (default: "Homo sapiens")
         organ: Organ/tissue ("pancreas", "brain", "liver", etc.)
         biosample_type: Biosample type ("tissue", "cell line", "primary cell", etc.)
@@ -654,6 +694,7 @@ async def encode_batch_download(
     downloader = _get_downloader()
     validate_organize_by(organize_by)
     limit = clamp_limit(limit)
+    filter_warnings = _validate_filters(assay_title, organ, biosample_type)
 
     # Search for files
     search_result = await client.search_files(
@@ -674,16 +715,16 @@ async def encode_batch_download(
     files = search_result["results"]
 
     if not files:
-        return json.dumps(
-            {
-                "message": "No files found matching the search criteria.",
-                "total": 0,
-                "has_more": False,
-                "next_offset": None,
-                "suggestion": "Try broadening your search filters. Use encode_get_facets to see what data is available for your criteria.",
-            },
-            indent=2,
-        )
+        empty_result = {
+            "message": "No files found matching the search criteria.",
+            "total": 0,
+            "has_more": False,
+            "next_offset": None,
+            "suggestion": "Try broadening your search filters. Use encode_get_facets to see what data is available for your criteria.",
+        }
+        if filter_warnings:
+            empty_result["filter_warnings"] = filter_warnings
+        return json.dumps(empty_result, indent=2)
 
     if dry_run:
         # Preview mode
@@ -695,6 +736,8 @@ async def encode_batch_download(
         preview["search_total"] = search_total
         preview["has_more"] = search_total > limit
         preview["next_offset"] = limit if search_total > limit else None
+        if filter_warnings:
+            preview["filter_warnings"] = filter_warnings
         return json.dumps(_serialize(preview), indent=2)
 
     # Actually download
@@ -714,6 +757,8 @@ async def encode_batch_download(
         "has_more": search_total > limit,
         "next_offset": limit if search_total > limit else None,
     }
+    if filter_warnings:
+        output["filter_warnings"] = filter_warnings
     return json.dumps(output, indent=2)
 
 
@@ -797,8 +842,8 @@ async def encode_manage_credentials(
         _credential_manager.clear_credentials()
         # Reset client
         async with _get_client_lock():
-            if _client:
-                await _client.close()
+            if _client:  # type: ignore[used-before-def]
+                await _client.close()  # type: ignore[used-before-def]
             _client = EncodeClient(credential_manager=_credential_manager)
 
         return json.dumps(
@@ -859,6 +904,7 @@ async def encode_get_facets(
         JSON with facet names and their term counts.
     """
     client = await _get_client()
+    filter_warnings = _validate_filters(assay_title, organ, biosample_type)
     filters = {}
     if assay_title:
         filters["assay_title"] = assay_title
@@ -878,7 +924,10 @@ async def encode_get_facets(
         if len(terms) <= 200:
             useful_facets[field] = terms[:50]  # Cap at 50 terms per facet
 
-    return json.dumps(useful_facets, indent=2)
+    result: dict = dict(useful_facets)
+    if filter_warnings:
+        result["filter_warnings"] = filter_warnings
+    return json.dumps(result, indent=2)
 
 
 # ======================================================================

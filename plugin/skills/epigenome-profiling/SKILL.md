@@ -157,8 +157,8 @@ encode_get_facets(assay_title="TF ChIP-seq", organ="pancreas")
 Gene expression data links chromatin states to functional output.
 
 ```
-# Poly-A selected RNA-seq (mRNA)
-encode_search_experiments(assay_title="RNA-seq", biosample_term_name="...")
+# Poly-A plus RNA-seq (mRNA)
+encode_search_experiments(assay_title="polyA plus RNA-seq", biosample_term_name="...")
 
 # Total RNA-seq (includes non-coding RNAs, intronic transcripts)
 encode_search_experiments(assay_title="total RNA-seq", biosample_term_name="...")

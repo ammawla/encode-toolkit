@@ -176,7 +176,7 @@ wget "https://ftp.ncbi.nlm.nih.gov/geo/series/GSE12nnn/GSE12345/suppl/GSE12345_R
 
 ```
 1. Find ENCODE experiments of interest:
-   encode_search_experiments(assay_title="RNA-seq", organ="pancreas")
+   encode_search_experiments(assay_title="total RNA-seq", organ="pancreas")
 
 2. For each experiment, check for GEO accession:
    encode_get_experiment(accession="ENCSR...")
@@ -292,7 +292,7 @@ Expected output:
 ### Step 4: Check for ENCODE RNA-seq in same biosample
 
 ```
-encode_search_experiments(assay_title="RNA-seq", biosample_term_name="HepG2", organism="Homo sapiens")
+encode_search_experiments(assay_title="total RNA-seq", biosample_term_name="HepG2", organism="Homo sapiens")
 ```
 
 Expected output:

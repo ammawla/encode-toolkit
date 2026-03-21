@@ -266,7 +266,7 @@ encode_batch_download(
 - **Tn5 shift is critical**: ATAC-seq reads must be shifted +4/-5 bp to center on the Tn5 insertion site. Without this correction, footprinting analysis will be offset by ~5 bp and motif enrichment will be degraded.
 - **Mitochondrial reads dominate**: Expect 30-80% mitochondrial reads in ATAC-seq. Filter chrM reads AFTER alignment, BEFORE peak calling. High mitoChRM (>80%) indicates dead/dying cells or poor nuclei isolation.
 - **Fragment size distribution is diagnostic**: A nucleosomal ladder (sub-nucleosomal <150bp, mono-nucleosomal ~200bp, di-nucleosomal ~400bp) confirms successful transposition. Absence of the ladder suggests incomplete or failed transposition.
-- **TSS enrichment threshold**: ENCODE requires TSS enrichment ≥6 for ATAC-seq. Values below 4 indicate poor signal-to-noise. This is the single most informative QC metric for ATAC-seq.
+- **TSS enrichment threshold**: ENCODE requires TSS enrichment ≥5 (GRCh38), ≥6 (hg19), or ≥10 (mm10) for ATAC-seq (ENCODE data standards). Values below 4 indicate poor signal-to-noise. This is the single most informative QC metric for ATAC-seq.
 - **Peak caller choice matters**: MACS2 with `--nomodel --shift -100 --extsize 200` is standard for ATAC-seq. Do NOT use the ChIP-seq default MACS2 settings — they assume sonicated fragment distributions.
 - **Paired-end vs single-end**: ATAC-seq should always be paired-end to capture fragment sizes. Single-end ATAC-seq cannot distinguish nucleosome-free from nucleosomal fragments.
 
@@ -332,7 +332,7 @@ Key pipeline steps:
 
 | Metric | Threshold | Purpose |
 |---|---|---|
-| TSS enrichment | >= 6 | Signal enrichment at transcription start sites |
+| TSS enrichment | >= 5 (GRCh38), >= 6 (hg19), >= 10 (mm10) | Signal enrichment at transcription start sites |
 | Fragment size distribution | Nucleosomal ladder | ~200bp, ~400bp, ~600bp periodicity |
 | Mitochondrial reads | < 20% | Excessive = failed library |
 | FRiP | >= 0.2 | Fraction of reads in peaks |

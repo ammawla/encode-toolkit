@@ -85,7 +85,7 @@ For multi-omic designs, search each assay layer separately:
 encode_search_experiments(assay_title="ATAC-seq", organ="pancreas", limit=50)
 
 # Expression layer
-encode_search_experiments(assay_title="RNA-seq", organ="pancreas", limit=50)
+encode_search_experiments(assay_title="total RNA-seq", organ="pancreas", limit=50)
 
 # Histone layer
 encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K27ac", organ="pancreas", limit=50)

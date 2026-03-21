@@ -14,7 +14,6 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-
 VALID_CHROMS = {f"chr{i}" for i in range(1, 23)} | {"chrX", "chrY", "chrM"}
 VALID_STRANDS = {"+", "-", "."}
 
@@ -134,11 +133,11 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             break
 
     if detected_format == "encode_bedmethyl":
-        cov_col = 9   # Column 10 (0-indexed: 9)
+        cov_col = 9  # Column 10 (0-indexed: 9)
         meth_col = 10  # Column 11 (0-indexed: 10)
     elif detected_format == "minimal":
-        cov_col = 6   # Column 7
-        meth_col = 7   # Column 8
+        cov_col = 6  # Column 7
+        meth_col = 7  # Column 8
     else:
         print(
             f"ERROR: Could not detect bedMethyl format. "
@@ -160,8 +159,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
 
             if len(fields) < expected_cols:
                 errors.append(
-                    f"Line {line_num}: expected {expected_cols} columns "
-                    f"({detected_format}), got {len(fields)}"
+                    f"Line {line_num}: expected {expected_cols} columns ({detected_format}), got {len(fields)}"
                 )
                 bad_lines += 1
                 if bad_lines > 5:
@@ -200,10 +198,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             if len(fields) > strand_field_idx:
                 strand = fields[strand_field_idx]
                 if strand not in VALID_STRANDS:
-                    errors.append(
-                        f"Line {line_num}: invalid strand '{strand}' "
-                        f"(expected +, -, or .)"
-                    )
+                    errors.append(f"Line {line_num}: invalid strand '{strand}' (expected +, -, or .)")
                 strand_counts[strand] += 1
 
             # Coverage validation
@@ -226,9 +221,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
                         if coverage < min_coverage:
                             low_coverage += 1
                 except (ValueError, IndexError):
-                    errors.append(
-                        f"Line {line_num}: invalid coverage in column {cov_col + 1}"
-                    )
+                    errors.append(f"Line {line_num}: invalid coverage in column {cov_col + 1}")
 
             # Methylation value validation
             try:
@@ -251,26 +244,24 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
                 else:
                     methylation_values.append(meth)
             except (ValueError, IndexError):
-                errors.append(
-                    f"Line {line_num}: invalid methylation value in column {meth_col + 1}"
-                )
+                errors.append(f"Line {line_num}: invalid methylation value in column {meth_col + 1}")
 
             # Blacklist overlap check
             if blacklist and overlaps_blacklist(chrom, start, end, blacklist):
                 blacklist_overlaps += 1
 
     # --- Report Statistics ---
-    print(f"=== bedMethyl Validation Report ===")
+    print("=== bedMethyl Validation Report ===")
     print(f"File: {input_path}")
     print(f"Detected format: {detected_format} ({expected_cols} columns)")
     print()
 
-    print(f"--- Summary ---")
+    print("--- Summary ---")
     print(f"Total CpGs: {total_lines:,}")
     print(f"Malformed lines: {bad_lines}")
-    print(f"Low-coverage CpGs (<{min_coverage}x): {low_coverage:,} ({100*low_coverage/max(total_lines,1):.1f}%)")
+    print(f"Low-coverage CpGs (<{min_coverage}x): {low_coverage:,} ({100 * low_coverage / max(total_lines, 1):.1f}%)")
     if blacklist_path:
-        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100*blacklist_overlaps/max(total_lines,1):.1f}%)")
+        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(total_lines, 1):.1f}%)")
     print()
 
     # Methylation format detection
@@ -282,19 +273,19 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
         )
         print(msg, file=sys.stderr)
     elif fraction_format_detected:
-        print(f"Methylation format: fraction (0-1)")
+        print("Methylation format: fraction (0-1)")
     else:
-        print(f"Methylation format: percentage (0-100)")
+        print("Methylation format: percentage (0-100)")
     print()
 
     if coverage_values:
         sorted_cov = sorted(coverage_values)
         n = len(sorted_cov)
-        print(f"--- Coverage Distribution ---")
+        print("--- Coverage Distribution ---")
         print(f"Min:    {sorted_cov[0]:>6}")
-        print(f"25th:   {sorted_cov[n//4]:>6}")
-        print(f"Median: {sorted_cov[n//2]:>6}")
-        print(f"75th:   {sorted_cov[3*n//4]:>6}")
+        print(f"25th:   {sorted_cov[n // 4]:>6}")
+        print(f"Median: {sorted_cov[n // 2]:>6}")
+        print(f"75th:   {sorted_cov[3 * n // 4]:>6}")
         print(f"Max:    {sorted_cov[-1]:>6}")
 
         # Coverage buckets
@@ -306,20 +297,20 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             ("20-50x", 20, 50),
             (">50x", 50, float("inf")),
         ]
-        print(f"\n  Coverage buckets:")
+        print("\n  Coverage buckets:")
         for label, lo, hi in buckets:
             count = sum(1 for c in coverage_values if lo <= c < hi)
-            print(f"    {label:<8} {count:>10,}  ({100*count/n:.1f}%)")
+            print(f"    {label:<8} {count:>10,}  ({100 * count / n:.1f}%)")
         print()
 
     if methylation_values:
         sorted_meth = sorted(methylation_values)
         n_m = len(sorted_meth)
-        print(f"--- Methylation Distribution (as %) ---")
+        print("--- Methylation Distribution (as %) ---")
         print(f"Min:    {sorted_meth[0]:>6.1f}%")
-        print(f"25th:   {sorted_meth[n_m//4]:>6.1f}%")
-        print(f"Median: {sorted_meth[n_m//2]:>6.1f}%")
-        print(f"75th:   {sorted_meth[3*n_m//4]:>6.1f}%")
+        print(f"25th:   {sorted_meth[n_m // 4]:>6.1f}%")
+        print(f"Median: {sorted_meth[n_m // 2]:>6.1f}%")
+        print(f"75th:   {sorted_meth[3 * n_m // 4]:>6.1f}%")
         print(f"Max:    {sorted_meth[-1]:>6.1f}%")
 
         # Methylation state buckets
@@ -330,20 +321,20 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             ("High (70-90%)", 70, 90),
             ("Methylated (90-100%)", 90, 100.01),
         ]
-        print(f"\n  Methylation state distribution:")
+        print("\n  Methylation state distribution:")
         for label, lo, hi in buckets:
             count = sum(1 for m in methylation_values if lo <= m < hi)
-            print(f"    {label:<30} {count:>10,}  ({100*count/n_m:.1f}%)")
+            print(f"    {label:<30} {count:>10,}  ({100 * count / n_m:.1f}%)")
         print()
 
-    print(f"--- Strand Breakdown ---")
+    print("--- Strand Breakdown ---")
     for strand in ["+", "-", "."]:
         count = strand_counts.get(strand, 0)
         pct = 100 * count / max(total_lines, 1)
         print(f"  {strand:<3} {count:>10,}  ({pct:5.1f}%)")
     print()
 
-    print(f"--- Chromosome Distribution ---")
+    print("--- Chromosome Distribution ---")
     for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
         count = chrom_counts[chrom]
         pct = 100 * count / max(total_lines, 1)
@@ -353,7 +344,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
     # --- Warnings ---
     if low_coverage > total_lines * 0.3:
         msg = (
-            f"WARNING: {100*low_coverage/max(total_lines,1):.0f}% of CpGs have "
+            f"WARNING: {100 * low_coverage / max(total_lines, 1):.0f}% of CpGs have "
             f"coverage <{min_coverage}x. Consider filtering these for reliable "
             f"methylation estimates."
         )
@@ -377,10 +368,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             print(msg, file=sys.stderr)
 
     if blacklist_overlaps > 0:
-        msg = (
-            f"WARNING: {blacklist_overlaps:,} CpGs overlap ENCODE blacklist regions. "
-            f"Remove these before aggregation."
-        )
+        msg = f"WARNING: {blacklist_overlaps:,} CpGs overlap ENCODE blacklist regions. Remove these before aggregation."
         print(msg, file=sys.stderr)
 
     for w in warnings[:20]:

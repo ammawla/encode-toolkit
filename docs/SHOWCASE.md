@@ -76,8 +76,8 @@ Assay-specific, literature-backed QC thresholds -- not generic "check quality" a
 | ChIP-seq | FRiP | >= 1% | Landt et al. 2012 |
 | ChIP-seq | NSC | > 1.05 | Landt et al. 2012 |
 | ATAC-seq | TSS enrichment | >= 6 | Yan et al. 2020 |
-| RNA-seq | Mapping rate | > 80% | Conesa et al. 2016 |
-| WGBS | Bisulfite conversion | > 99% | Foox et al. 2021 |
+| RNA-seq | Mapping rate | 70-90% | Conesa et al. 2016; ENCODE |
+| WGBS | Bisulfite conversion | >= 98% | ENCODE data standards |
 | Hi-C | Cis/trans ratio | > 60% | Yardimci et al. 2019 |
 | CUT&RUN | Suspect list | Required | Nordin et al. 2023 |
 

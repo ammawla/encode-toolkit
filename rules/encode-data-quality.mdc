@@ -15,20 +15,20 @@ globs: "**/*.{py,R,r,sh,nf,wdl}"
 - NRF (Non-Redundant Fraction): >= 0.8
 - Require 2+ biological replicates with IDR analysis
 
-### ATAC-seq (Buenrostro et al. 2013)
+### ATAC-seq (ENCODE data standards; Yan et al. 2020)
 - TSS enrichment: >= 6
 - Fragment size distribution: nucleosomal ladder pattern
 - Mitochondrial reads: < 20% after filtering
 - Require Tn5 transposase bias correction
 
-### RNA-seq (Conesa et al. 2016)
-- Mapping rate: > 80%
+### RNA-seq (Conesa et al. 2016; ENCODE data standards)
+- Mapping rate: 70-90%
 - rRNA contamination: < 10%
 - Replicate correlation (Spearman): >= 0.9
 - Strandedness verification required
 
-### WGBS (Foox et al. 2021)
-- Bisulfite conversion rate: > 99%
+### WGBS (ENCODE data standards)
+- Bisulfite conversion rate: >= 98%
 - CpG coverage for DMR calling: >= 10x
 - Lambda/pUC19 spike-in for conversion QC
 

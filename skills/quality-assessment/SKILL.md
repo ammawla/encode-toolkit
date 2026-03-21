@@ -25,13 +25,13 @@ Help the user evaluate whether ENCODE experiments meet quality standards for the
 | 3 | Buenrostro et al. 2013, Nat Methods, DOI:10.1038/nmeth.2688 (~7,000 cit) | Introduced ATAC-seq; established fragment size and TSS enrichment as key QC |
 | 4 | Ou et al. 2018, BMC Genomics, DOI:10.1186/s12864-018-4559-3 | ATACseqQC R package; systematic quality metrics for ATAC-seq |
 | 5 | Conesa et al. 2016, Genome Biol, DOI:10.1186/s13059-016-0881-8 (~2,363 cit) | RNA-seq best practices survey; defined mapping rate, rRNA, gene body coverage |
-| 6 | Foox et al. 2021, Nat Biotechnol, DOI:10.1038/s41587-021-00993-6 | SEQC2 EpiQC consortium; multi-platform WGBS benchmarking |
+| 6 | Foox et al. 2021, Genome Biol, DOI:10.1186/s13059-021-02529-2 | SEQC2 EpiQC consortium; multi-platform WGBS benchmarking |
 | 7 | Yardimci et al. 2019, Genome Biol, DOI:10.1186/s13059-019-1658-7 | Hi-C quality measures; cis/trans ratio, distance-dependent decay, resolution |
 | 8 | Skene & Henikoff 2017, eLife, DOI:10.7554/eLife.21856 (~1,800 cit) | CUT&RUN method; established spike-in normalization and low-background QC |
 | 9 | Kaya-Okur et al. 2019, Nat Commun, DOI:10.1038/s41467-019-09982-5 (~1,200 cit) | CUT&Tag method; tagmentation-based profiling with distinct QC profile |
 | 10 | Li et al. 2011, Ann Appl Stat, DOI:10.1214/11-AOAS466 (~1,500 cit) | Irreproducible Discovery Rate (IDR); principled replicate concordance |
 | 11 | Hitz et al. 2023, Nucleic Acids Res, DOI:10.1093/nar/gkad243 | ENCODE uniform processing pipelines; standardized QC across all assays |
-| 12 | Nordin et al. 2023, Epigenetics Chromatin, DOI:10.1186/s13072-023-00507-9 | CUT&RUN suspect list; identified artifact-prone regions specific to CUT&RUN/CUT&Tag |
+| 12 | Nordin et al. 2023, Genome Biol, DOI:10.1186/s13059-023-03027-3 | CUT&RUN suspect list; identified artifact-prone regions specific to CUT&RUN/CUT&Tag |
 | 13 | Amemiya et al. 2019, Sci Rep, DOI:10.1038/s41598-019-45839-z (~1,372 cit) | ENCODE Blacklist v2; artifact regions to exclude from all analyses |
 
 ## Step 1: Retrieve Experiment Details and Audit Status
@@ -129,7 +129,7 @@ ATAC-seq has a distinct quality profile driven by the transposase insertion mech
 
 | Metric | Good | Concern | What It Measures |
 |--------|------|---------|-----------------|
-| **TSS enrichment** | ≥6 (ENCODE 2020 standard) | <4 | Signal enrichment at transcription start sites. The single most informative ATAC-seq QC metric. |
+| **TSS enrichment** | ≥5 GRCh38 / ≥6 hg19 / ≥10 mm10 (ENCODE data standards) | <4 | Signal enrichment at transcription start sites. The single most informative ATAC-seq QC metric. |
 | **FRiP** | ≥20% | <10% | Higher expected FRiP than ChIP-seq because accessible chromatin = true signal |
 | **Fragment size distribution** | Clear nucleosomal ladder | Monotonic decay | Should show peaks at <150bp (NFR), ~200bp (mono-nuc), ~400bp (di-nuc), ~600bp (tri-nuc) |
 | **NFR ratio** | >2× mono-nucleosomal | <1× | Ratio of sub-nucleosomal to mono-nucleosomal fragments |
@@ -160,7 +160,7 @@ A clean ATAC-seq library shows a clear nucleosomal ladder. Monotonic decay (no p
 
 | Metric | Good | Concern | What It Measures |
 |--------|------|---------|-----------------|
-| **Mapping rate** | >80% uniquely mapped | <70% | Alignment success. Low rate = contamination, adapter issues, or wrong reference |
+| **Mapping rate** | 70-90% uniquely mapped | <70% | Alignment success. Low rate = contamination, adapter issues, or wrong reference |
 | **rRNA contamination** | <10% | >20% | Ribosomal RNA depletion efficiency. High = failed ribo-depletion |
 | **Gene body coverage** | Uniform 5'→3' | Strong 3' bias | Even coverage across gene bodies. 3' bias = degraded RNA or poly-A capture bias |
 | **Duplication rate** | <50% | >70% | PCR amplification artifacts |
@@ -184,19 +184,19 @@ ENCODE RNA-seq data may be stranded or unstranded:
 - **Stranded**: Can distinguish sense vs antisense transcription. Required for accurate quantification of overlapping genes.
 - **Unstranded**: Cannot resolve strand of origin. Check `run_type` and `library_strand_specificity` in metadata.
 
-## Step 6: Evaluate WGBS Quality (Foox et al. 2021)
+## Step 6: Evaluate WGBS Quality (ENCODE data standards)
 
 ### Core Metrics
 
 | Metric | Good | Concern | What It Measures |
 |--------|------|---------|-----------------|
-| **Bisulfite conversion rate** | >99% | <98% | Efficiency of C→U conversion of unmethylated cytosines. Measured from spike-in controls (lambda phage DNA). |
+| **Bisulfite conversion rate** | ≥98% | <98% | Efficiency of C→U conversion of unmethylated cytosines. Measured from spike-in controls (lambda phage DNA). |
 | **CpG coverage** | >80% of CpGs at ≥1× | <50% | Fraction of CpG sites covered by at least one read |
 | **Mean CpG coverage** | ≥10× for DMR analysis | <5× | Average sequencing depth at CpG sites. 10× needed for reliable methylation calls. |
 | **Mapping rate** | >60% unique | <40% | Lower than standard WGS due to reduced complexity after bisulfite conversion |
 | **Duplication rate** | <30% | >50% | PCR duplicates |
 | **CpG methylation distribution** | Bimodal (near 0% and near 100%) | Unimodal | Healthy cells show bimodal: most CpGs are either fully methylated or unmethylated |
-| **Lambda/pUC19 conversion** | >99% conversion rate | <98% | Spike-in controls for bisulfite conversion efficiency |
+| **Lambda/pUC19 conversion** | ≥98% conversion rate | <98% | Spike-in controls for bisulfite conversion efficiency |
 
 ### Platform Considerations (Foox et al. 2021)
 

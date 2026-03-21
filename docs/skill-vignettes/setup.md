@@ -93,15 +93,14 @@ The setup skill helps new users install the ENCODE MCP server, verify their conn
     "in vitro differentiated cells",
     "organoid",
     "whole organisms",
-    "single cell",
-    "induced pluripotent stem cell line",
-    "stem cell"
+    "cell-free sample",
+    "technical sample"
   ],
-  "count": 9
+  "count": 8
 }
 ```
 
-**What this means:** ENCODE classifies biosamples into 9 categories. For pancreas research, "tissue" provides in vivo context, "primary cell" captures sorted islet populations, and "in vitro differentiated cells" includes stem-cell-derived beta cells.
+**What this means:** ENCODE classifies biosamples into 8 categories. For pancreas research, "tissue" provides in vivo context, "primary cell" captures sorted islet populations, and "in vitro differentiated cells" includes stem-cell-derived beta cells.
 
 ## Key Concepts
 

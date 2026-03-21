@@ -83,7 +83,7 @@ All metrics pass. Low rRNA confirms successful depletion. Gene body coverage nea
 
 ```
 encode_search_experiments(
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     biosample_type="tissue"
 )
@@ -91,7 +91,7 @@ encode_search_experiments(
 encode_batch_download(
     download_dir="/data/encode_ref/",
     output_type="gene quantifications",
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     assembly="GRCh38"
 )

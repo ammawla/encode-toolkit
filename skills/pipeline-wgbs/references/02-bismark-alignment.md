@@ -101,7 +101,7 @@ bismark \
 ```
 
 The lambda genome is fully unmethylated, so any detected methylation represents
-incomplete bisulfite conversion. Expect conversion rate >99%.
+incomplete bisulfite conversion. Expect conversion rate ≥98%.
 
 ## Alignment QC Checks
 

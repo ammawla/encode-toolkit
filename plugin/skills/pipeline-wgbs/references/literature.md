@@ -35,7 +35,7 @@
 - **DOI:** [10.1038/s41586-020-2493-4](https://doi.org/10.1038/s41586-020-2493-4)
 - **PMID:** 32728249 | **PMC:** PMC7410828
 - **Citations:** ~2,500
-- **Key findings:** ENCODE Phase 3 paper establishing DNA methylation as a core epigenomic layer alongside histone modifications and chromatin accessibility. WGBS data is used to identify methylation valleys (large UMRs) at key developmental genes and to classify candidate cis-Regulatory Elements (cCREs) by their methylation status. Established the ENCODE WGBS pipeline standards: bisulfite conversion rate >99%, minimum 30x CpG coverage for reliable DMR calling, and GRCh38/mm10 as reference assemblies.
+- **Key findings:** ENCODE Phase 3 paper establishing DNA methylation as a core epigenomic layer alongside histone modifications and chromatin accessibility. WGBS data is used to identify methylation valleys (large UMRs) at key developmental genes and to classify candidate cis-Regulatory Elements (cCREs) by their methylation status. Established the ENCODE WGBS pipeline standards: bisulfite conversion rate ≥98%, minimum 30x CpG coverage for reliable DMR calling, and GRCh38/mm10 as reference assemblies.
 
 ---
 
@@ -44,7 +44,7 @@
 - **Citation:** Hitz BC, Lee JW, Jolanki O, et al. The ENCODE Uniform Analysis Pipelines. Research Square (preprint), 2023.
 - **DOI:** [10.21203/rs.3.rs-311127/v1](https://doi.org/10.21203/rs.3.rs-311127/v1)
 - **Citations:** ~84
-- **Key findings:** Documents the official ENCODE WGBS pipeline specification: Bismark for bisulfite-aware alignment, deduplication with Picard MarkDuplicates, MethylDackel for methylation extraction, and lambda phage spike-in for conversion rate quality control. Specifies bedMethyl as the standard output format and defines QC thresholds: bisulfite conversion >99%, mapping rate >70%, and sufficient CpG coverage depth for downstream DMR analysis. Pipeline infrastructure uses Docker containers and WDL for reproducible execution.
+- **Key findings:** Documents the official ENCODE WGBS pipeline specification: Bismark for bisulfite-aware alignment, deduplication with Picard MarkDuplicates, MethylDackel for methylation extraction, and lambda phage spike-in for conversion rate quality control. Specifies bedMethyl as the standard output format and defines QC thresholds: bisulfite conversion ≥98%, mapping rate >70%, and sufficient CpG coverage depth for downstream DMR analysis. Pipeline infrastructure uses Docker containers and WDL for reproducible execution.
 
 ---
 
@@ -54,7 +54,7 @@
 - **DOI:** [10.1038/s41587-021-01049-5](https://doi.org/10.1038/s41587-021-01049-5)
 - **PMID:** 34504353
 - **Citations:** ~200
-- **Key findings:** Multi-site benchmarking of sequencing platforms for WGBS applications. Demonstrated that bisulfite conversion rate is the most critical QC parameter, with rates below 99% introducing thousands of false-positive methylation calls across the genome. Platform-specific biases in GC-rich regions affect CpG island coverage. Supports the ENCODE requirement for >99% conversion rate and provides the evidence base for this pipeline's stringent QC thresholds.
+- **Key findings:** Multi-site benchmarking of sequencing platforms for WGBS applications. Demonstrated that bisulfite conversion rate is the most critical QC parameter, with rates below 99% introducing thousands of false-positive methylation calls across the genome. Platform-specific biases in GC-rich regions affect CpG island coverage. Supports the ENCODE requirement for ≥98% conversion rate and provides the evidence base for this pipeline's QC thresholds.
 
 ---
 

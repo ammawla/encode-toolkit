@@ -77,7 +77,7 @@ For each data layer, search ENCODE systematically:
 ### RNA-seq (Expression Layer)
 ```
 encode_search_experiments(
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     organ="pancreas",
     biosample_type="tissue",
     limit=50
@@ -87,7 +87,7 @@ encode_search_experiments(
 For cell type-resolved expression, also check:
 ```
 encode_search_experiments(
-    assay_title="RNA-seq",
+    assay_title="total RNA-seq",
     biosample_term_name="GM12878",  # specific cell line if applicable
     limit=50
 )
@@ -499,7 +499,7 @@ Expected output:
 ```
 encode_search_experiments(assay_title="Histone ChIP-seq", organ="heart", target="H3K27ac", organism="Homo sapiens")
 encode_search_experiments(assay_title="ATAC-seq", organ="heart", organism="Homo sapiens")
-encode_search_experiments(assay_title="RNA-seq", organ="heart", organism="Homo sapiens")
+encode_search_experiments(assay_title="total RNA-seq", organ="heart", organism="Homo sapiens")
 encode_search_experiments(assay_title="Hi-C", organ="heart", organism="Homo sapiens")
 ```
 

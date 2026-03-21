@@ -150,7 +150,7 @@ These tools are shared with the ChIP-seq pipeline and other genomics workflows. 
 - **Citation:** Ramírez F, et al. deepTools2: a next generation web server for deep-sequencing data analysis. Nucleic Acids Research, 44(W1):W160-W165, 2016.
 - **DOI:** [10.1093/nar/gkw257](https://doi.org/10.1093/nar/gkw257)
 - **PMID:** 27079975 | **Citations:** ~6,100
-- **ATAC-seq role:** Generates normalized signal tracks (bigWig), fingerprint plots, and TSS enrichment heatmaps. The TSS enrichment score (computed via computeMatrix + plotProfile at RefSeq TSS annotations) is the primary ENCODE QC metric for ATAC-seq, with a threshold of >= 6 for acceptable quality.
+- **ATAC-seq role:** Generates normalized signal tracks (bigWig), fingerprint plots, and TSS enrichment heatmaps. The TSS enrichment score (computed via computeMatrix + plotProfile at RefSeq TSS annotations) is the primary ENCODE QC metric for ATAC-seq, with assembly-dependent thresholds: >= 5 GRCh38 / >= 6 hg19 / >= 10 mm10 (ENCODE data standards).
 
 ---
 

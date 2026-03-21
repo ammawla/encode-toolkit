@@ -7,7 +7,7 @@ MCP server for the ENCODE Project (encodeproject.org) — the largest public cat
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest                    # 506 tests, 98% coverage
+pytest                    # 568 tests, 98% coverage
 ruff check src/           # lint
 ruff format src/          # auto-format
 encode-toolkit            # run MCP server
@@ -21,12 +21,12 @@ src/encode_connector/
   client/encode_client.py # Async ENCODE API client, ~585 lines, 1-hour TTL cache
   client/downloader.py    # File download manager, ~305 lines, MD5 verification
   client/auth.py          # OS keyring + Fernet credential storage, ~262 lines
-  client/models.py        # Pydantic models for API responses, ~332 lines
-  client/constants.py     # API URLs, filter values, ~348 lines
+  client/models.py        # Pydantic models for API responses, ~367 lines
+  client/constants.py     # API URLs, filter values, ~450 lines
   client/tracker.py       # SQLite experiment tracker, ~1129 lines
-  client/validation.py    # Input validation, ~188 lines
+  client/validation.py    # Input validation, ~226 lines
 skills/                   # 47 skills, each with SKILL.md + references/ + scripts/
-tests/                    # 506 tests (pytest-asyncio, asyncio_mode=auto), 98% coverage
+tests/                    # 568 tests (pytest-asyncio, asyncio_mode=auto), 98% coverage
 ```
 
 ## Package Identity
@@ -57,7 +57,7 @@ Provides 20 tools to search, download, and track ENCODE data:
 
 ## Key Concepts
 
-**Assay types**: Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, RNA-seq, WGBS, Hi-C, scRNA-seq, scATAC-seq, CRISPR screen, STARR-seq, MPRA, eCLIP, CUT&RUN, CUT&Tag
+**Assay types**: Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, total RNA-seq, polyA plus RNA-seq, WGBS, intact Hi-C, scRNA-seq, snATAC-seq, snRNA-seq, CRISPR screen, STARR-seq, MPRA, eCLIP, CUT&RUN, CUT&Tag
 
 **Biosample hierarchy**: tissue > primary cell > cell line > in vitro differentiated > organoid
 
@@ -133,9 +133,9 @@ Provides 20 tools to search, download, and track ENCODE data:
 
 - ENCODE audits: ERROR > NOT_COMPLIANT > WARNING > INTERNAL_ACTION
 - ChIP-seq metrics: FRiP ≥1%, NSC >1.05, RSC >0.8, NRF ≥0.8 (Landt et al. 2012)
-- ATAC-seq metrics: TSS enrichment ≥6, fragment size nucleosomal ladder (Buenrostro et al. 2013)
-- RNA-seq: Mapping rate >80%, rRNA <10%, replicate correlation ≥0.9 (Conesa et al. 2016)
-- WGBS: Bisulfite conversion >99%, CpG coverage ≥10× for DMRs (Foox et al. 2021)
+- ATAC-seq metrics: TSS enrichment ≥5 (GRCh38), ≥6 (hg19), ≥10 (mm10), fragment size nucleosomal ladder (ENCODE data standards)
+- RNA-seq: Mapping rate 70-90% expected (Conesa et al. 2016), rRNA <10% (community standard), replicate correlation ≥0.9 isogenic / ≥0.8 anisogenic (ENCODE data standards)
+- WGBS: Bisulfite conversion ≥98%, CpG coverage ≥10× for DMRs (ENCODE data standards)
 - Hi-C: Cis/trans ratio >60%, long-range cis >40% (Yardimci et al. 2019)
 - CUT&RUN/CUT&Tag: Different QC profiles from ChIP-seq; use suspect list (Nordin et al. 2023)
 - Always use 2+ biological replicates

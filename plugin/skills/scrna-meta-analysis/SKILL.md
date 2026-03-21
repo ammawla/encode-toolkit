@@ -61,7 +61,7 @@ Search for all single-cell RNA-seq data for the target tissue:
 
 ```
 encode_search_experiments(
-    assay_title="scRNA-seq",    # Note: also try "single-cell RNA sequencing"
+    assay_title="scRNA-seq",
     organ="pancreas",            # user's tissue of interest
     limit=100
 )

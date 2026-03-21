@@ -156,12 +156,12 @@ coverage, methylation_percentage
 
 | Metric | Pass | Warning | Fail |
 |--------|------|---------|------|
-| Bisulfite conversion rate | >99.5% | 99.0-99.5% | <99.0% |
+| Bisulfite conversion rate | ≥98% | 95-98% | <95% |
 | CpG coverage (genome-wide) | >10x | 5-10x | <5x |
 | Mapping rate | >70% | 50-70% | <50% |
 | Duplication rate | <30% | 30-50% | >50% |
 | CpG sites covered (>=5x) | >80% | 60-80% | <60% |
-| Lambda spike-in conversion | >99% | 98-99% | <98% |
+| Lambda spike-in conversion | ≥98% | 95-98% | <95% |
 
 ## Critical Pitfalls
 
@@ -182,8 +182,8 @@ complementary CpG strands:
 ### Incomplete Bisulfite Conversion
 Conversion artifacts produce false methylation calls:
 - Always include lambda phage or pUC19 spike-in DNA
-- Unmethylated spike-in should show >99% conversion
-- If conversion <99%, the library has systematic artifacts -- do NOT proceed
+- Unmethylated spike-in should show ≥98% conversion
+- If conversion <98%, the library has systematic artifacts -- do NOT proceed
 
 ### M-bias Plots
 MethylDackel generates M-bias plots showing methylation level by read position:
@@ -226,7 +226,7 @@ Detailed step-by-step documentation is provided in the `references/` directory:
 ## Walkthrough: Processing ENCODE WGBS from FASTQ to Methylation Calls
 
 **Goal**: Process whole-genome bisulfite sequencing FASTQ files through the ENCODE pipeline to generate per-CpG methylation calls for epigenomic analysis.
-**Context**: WGBS requires bisulfite-aware alignment (Bismark) and per-CpG methylation extraction (MethylDackel), with >99% bisulfite conversion required.
+**Context**: WGBS requires bisulfite-aware alignment (Bismark) and per-CpG methylation extraction (MethylDackel), with ≥98% bisulfite conversion required.
 
 ### Step 1: Find WGBS experiment
 
@@ -280,13 +280,13 @@ Key pipeline steps:
 3. Deduplication (Bismark deduplicate)
 4. Methylation extraction (MethylDackel)
 5. CpG coverage and beta-value calculation
-6. Bisulfite conversion rate check (>99% required)
+6. Bisulfite conversion rate check (≥98% required)
 
 ### Step 4: Validate output quality
 
 | Metric | Threshold | Purpose |
 |---|---|---|
-| Bisulfite conversion | > 99% | Library quality |
+| Bisulfite conversion | >= 98% | Library quality |
 | CpG coverage | >= 10x for DMR calling | Statistical power |
 | Mapping rate | > 40% (BS-aware) | Alignment success |
 | Duplication rate | < 30% | Library complexity |
@@ -381,7 +381,7 @@ Expected output:
 
 When reporting WGBS pipeline results:
 
-- **Bisulfite conversion rate**: Report the lambda/pUC19 spike-in conversion rate prominently (>99.5% pass, 99.0-99.5% warning, <99.0% fail). This is the most critical QC metric for WGBS
+- **Bisulfite conversion rate**: Report the lambda/pUC19 spike-in conversion rate prominently (≥98% pass, 95-98% warning, <95% fail). This is the most critical QC metric for WGBS
 - **CpG coverage depth**: Report genome-wide mean CpG coverage and fraction of CpGs meeting the minimum depth threshold (>=5x for reporting, >=10x for DMR analysis)
 - **Global methylation level**: Report the genome-wide average CpG methylation percentage and note any non-CpG (CHG/CHH) methylation if relevant to the tissue
 - **bedMethyl output paths**: Provide paths to the primary CpG bedMethyl files and any CHG/CHH context files generated

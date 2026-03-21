@@ -15,7 +15,6 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-
 VALID_CHROMS = {f"chr{i}" for i in range(1, 23)} | {"chrX", "chrY", "chrM"}
 NARROW_COLS = 10
 BROAD_COLS = 9
@@ -118,10 +117,7 @@ def validate_peaks(input_path, blacklist_path, peak_format):
 
             # Column count check
             if len(fields) < expected_cols:
-                errors.append(
-                    f"Line {line_num}: expected {expected_cols} columns ({format_name}), "
-                    f"got {len(fields)}"
-                )
+                errors.append(f"Line {line_num}: expected {expected_cols} columns ({format_name}), got {len(fields)}")
                 bad_lines += 1
                 if bad_lines <= 5:
                     continue
@@ -138,8 +134,7 @@ def validate_peaks(input_path, blacklist_path, peak_format):
                     continue
                 else:
                     warnings.append(
-                        f"Line {line_num}: non-standard chromosome '{chrom}' "
-                        f"(not in chr1-22, chrX, chrY, chrM)"
+                        f"Line {line_num}: non-standard chromosome '{chrom}' (not in chr1-22, chrX, chrY, chrM)"
                     )
                     if len(warnings) > 20:
                         warnings = warnings[:20]
@@ -159,9 +154,7 @@ def validate_peaks(input_path, blacklist_path, peak_format):
             if end < 0:
                 errors.append(f"Line {line_num}: negative end coordinate ({end})")
             if start >= end:
-                errors.append(
-                    f"Line {line_num}: start ({start}) >= end ({end})"
-                )
+                errors.append(f"Line {line_num}: start ({start}) >= end ({end})")
 
             peak_size = end - start
             peak_sizes.append(peak_size)
@@ -205,36 +198,36 @@ def validate_peaks(input_path, blacklist_path, peak_format):
     print(f"Format: {format_name} (expected {expected_cols} columns)")
     print()
 
-    print(f"--- Summary ---")
+    print("--- Summary ---")
     print(f"Total peaks: {total_lines:,}")
     print(f"Malformed lines: {bad_lines}")
     if blacklist_path:
-        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100*blacklist_overlaps/max(total_lines,1):.1f}%)")
+        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(total_lines, 1):.1f}%)")
     print()
 
     if peak_sizes:
         sorted_sizes = sorted(peak_sizes)
         median_idx = len(sorted_sizes) // 2
-        print(f"--- Peak Size Distribution ---")
+        print("--- Peak Size Distribution ---")
         print(f"Min:    {sorted_sizes[0]:,} bp")
-        print(f"25th:   {sorted_sizes[len(sorted_sizes)//4]:,} bp")
+        print(f"25th:   {sorted_sizes[len(sorted_sizes) // 4]:,} bp")
         print(f"Median: {sorted_sizes[median_idx]:,} bp")
-        print(f"75th:   {sorted_sizes[3*len(sorted_sizes)//4]:,} bp")
+        print(f"75th:   {sorted_sizes[3 * len(sorted_sizes) // 4]:,} bp")
         print(f"Max:    {sorted_sizes[-1]:,} bp")
         print()
 
     if signal_values:
         sorted_sig = sorted(signal_values)
         sig_median = sorted_sig[len(sorted_sig) // 2]
-        print(f"--- SignalValue Distribution ---")
+        print("--- SignalValue Distribution ---")
         print(f"Min:    {sorted_sig[0]:.2f}")
-        print(f"25th:   {sorted_sig[len(sorted_sig)//4]:.2f}")
+        print(f"25th:   {sorted_sig[len(sorted_sig) // 4]:.2f}")
         print(f"Median: {sig_median:.2f}")
-        print(f"75th:   {sorted_sig[3*len(sorted_sig)//4]:.2f}")
+        print(f"75th:   {sorted_sig[3 * len(sorted_sig) // 4]:.2f}")
         print(f"Max:    {sorted_sig[-1]:.2f}")
         print()
 
-    print(f"--- Chromosome Distribution ---")
+    print("--- Chromosome Distribution ---")
     for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
         count = chrom_counts[chrom]
         pct = 100 * count / max(total_lines, 1)
@@ -243,10 +236,7 @@ def validate_peaks(input_path, blacklist_path, peak_format):
 
     # --- Warnings ---
     if chrm_peaks > 0:
-        msg = (
-            f"WARNING: {chrm_peaks:,} peaks on chrM. Mitochondrial peaks are "
-            f"often artifacts in ChIP-seq data."
-        )
+        msg = f"WARNING: {chrm_peaks:,} peaks on chrM. Mitochondrial peaks are often artifacts in ChIP-seq data."
         print(msg, file=sys.stderr)
     if large_peaks > 0:
         threshold_label = "10kb" if peak_format == "narrow" else "500kb"

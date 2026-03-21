@@ -421,7 +421,7 @@ encode_batch_download(
 encode_batch_download(
   download_dir="/Users/you/data/encode/rnaseq_brain",
   output_type="gene quantifications",
-  assay_title="RNA-seq",
+  assay_title="total RNA-seq",
   organ="brain",
   assembly="GRCh38",
   organize_by="experiment",

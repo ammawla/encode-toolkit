@@ -34,7 +34,7 @@ Initial public beta release.
 - **OS keyring credential management** with Fernet-encrypted file fallback
 - **Thread-safe SQLite tracker** with full transaction safety
 - **Streaming downloads** with 64KB chunks and SSRF-safe redirect validation
-- **506 tests** with 98% code coverage
+- **568 tests** with 98% code coverage
 - **34 literature reference documents** (~320 papers cataloged with DOI, PMID, key findings)
 - **9 scientist-facing vignettes** with real ENCODE API output
 - **GitHub Actions CI/CD** (pytest across Python 3.10–3.13, ruff lint, plugin validation)

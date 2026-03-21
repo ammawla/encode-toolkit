@@ -129,7 +129,7 @@ For chromatin accessibility profiling via ATAC-seq following ENCODE standards
 
 **Key ATAC-seq parameters**: Tn5 transposase introduces a +4/-5 bp offset that must be corrected.
 Fragment size distribution should show nucleosomal ladder (sub-nucleosomal, mono-, di-, tri-).
-TSS enrichment score should be >= 6 for high-quality data.
+TSS enrichment score should be >= 5 (GRCh38), >= 6 (hg19), or >= 10 (mm10) for high-quality data (ENCODE data standards).
 
 **Environment file**: `environments/atacseq-env.yml`
 
@@ -204,7 +204,7 @@ For whole-genome bisulfite sequencing (DNA methylation) following ENCODE standar
 | tabix | 1.19 | Index methylation BED files for random access |
 | bgzip | 1.19 | Block-gzip compression for indexed access |
 
-**Key WGBS parameters**: Bisulfite conversion rate > 99% (check unmethylated spike-in lambda DNA).
+**Key WGBS parameters**: Bisulfite conversion rate ≥ 98% (check unmethylated spike-in lambda DNA).
 CpG coverage >= 10x for reliable DMR calling. M-bias plots should be checked for end-repair artifacts.
 
 **Environment file**: `environments/wgbs-env.yml`

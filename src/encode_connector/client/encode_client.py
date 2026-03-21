@@ -442,6 +442,7 @@ class EncodeClient:
                 biosample_type=biosample_type,
                 target=target,
                 status=status or "released",
+                search_term=search_term,
                 limit=200,
             )
             if not exp_result["results"]:

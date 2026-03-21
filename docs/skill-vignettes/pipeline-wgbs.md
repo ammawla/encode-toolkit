@@ -60,7 +60,7 @@ Since lambda DNA is unmethylated, all methylation calls on lambda represent conv
 | Pancreas Donor 1 | 0.3% | 99.7% | Pass |
 | Pancreas Donor 2 | 1.4% | 98.6% | Fail |
 
-Donor 1 passes at 99.7% -- well above the 99% threshold. Donor 2 at 98.6% fails. At 1.4% false positive rate across ~28 million CpGs, that contaminates hundreds of thousands of sites. Donor 2 must be excluded or re-prepared.
+Donor 1 passes at 99.7% -- well above the 98% threshold. Donor 2 at 98.6% fails. At 1.4% false positive rate across ~28 million CpGs, that contaminates hundreds of thousands of sites. Donor 2 must be excluded or re-prepared.
 
 If no lambda spike-in is available, check CHH context methylation as a proxy. Somatic tissues should show CHH below 1%. Values above that indicate conversion problems (exception: neurons and ESCs have genuine non-CpG methylation at 2--5%).
 
