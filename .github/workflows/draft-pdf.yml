@@ -2,8 +2,6 @@ name: Draft PDF
 on:
   push:
     branches: [joss_submission]
-    paths:
-      - 'joss/**'
 
 jobs:
   paper:
