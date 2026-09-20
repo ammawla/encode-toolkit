@@ -1,6 +1,6 @@
-# Contributing to ENCODE MCP Connector
+# Contributing to ENCODE Toolkit
 
-Thank you for your interest in contributing to the ENCODE MCP Connector! This guide covers how to add new skills, improve existing ones, and submit changes.
+Thank you for your interest in contributing to ENCODE Toolkit! This guide covers how to add new skills, improve existing ones, and submit changes.
 
 ## Skill Architecture
 
@@ -91,7 +91,7 @@ Pipeline skills are children of `pipeline-guide` (the parent):
 1. Create a feature branch: `git checkout -b add-{skill-name}`
 2. Run verification: `python -m encode_connector.server.main` (must start)
 3. Check skill completeness: all required sections present
-4. Update CLAUDE.md skill count and table
+4. Update the skill count and table in README.md
 5. Update CHANGELOG.md with your additions
 6. Submit PR with description of what the skill enables
 

@@ -1,12 +1,12 @@
-# ENCODE MCP Connector -- Showcase
+# ENCODE Toolkit -- Showcase
 
-> 43 skills. 20 live MCP tools. 7 executable Nextflow pipelines. 100+ literature references. Not a documentation wrapper -- a working genomics laboratory inside Claude Code.
+> 47 skills. 20 live MCP tools. 7 executable Nextflow pipelines. 100+ literature references. Not a documentation wrapper -- a working genomics laboratory inside Claude Code.
 
 ---
 
 ## What This Is
 
-The ENCODE MCP Connector gives Claude direct, live access to the ENCODE Project REST API and orchestrates queries across 14 databases. It ships with 43 expert skills that encode deep knowledge about assay-specific QC, data aggregation, pipeline execution, and publication workflow. Every operation is logged with tool versions, parameters, and checksums. When you say "write me a methods section," the plugin reads that log and generates publication-ready text with every accession number, every version, every statistic -- automatically.
+ENCODE Toolkit gives Claude direct, live access to the ENCODE Project REST API and orchestrates queries across 14 databases. It ships with 47 expert skills that encode deep knowledge about assay-specific QC, data aggregation, pipeline execution, and publication workflow. Every operation is logged with tool versions, parameters, and checksums. When you say "write me a methods section," the plugin reads that log and generates publication-ready text with every accession number, every version, every statistic -- automatically.
 
 Other genomics tools give you documentation. This one gives you a working laboratory.
 
@@ -1115,7 +1115,7 @@ Multi-track visualization of the top-ranked UCNE region was generated using R v4
 
 ##### Data availability
 
-All ChIP-seq and ATAC-seq data used in this study are publicly available from the ENCODE Project (https://www.encodeproject.org). Specific experiment accessions are listed in Table 1. Ultraconserved non-coding elements were obtained from the UCSC Genome Browser (https://genome.ucsc.edu, hg19, ucneUcscDb track; Kent et al., 2002). The ENCODE Blacklist v2 was obtained from Amemiya et al. (2019). Derived files, processing scripts, and complete provenance logs are available at [repository URL]. All processing was performed using the ENCODE MCP Connector v0.2.0 with full operation logging.
+All ChIP-seq and ATAC-seq data used in this study are publicly available from the ENCODE Project (https://www.encodeproject.org). Specific experiment accessions are listed in Table 1. Ultraconserved non-coding elements were obtained from the UCSC Genome Browser (https://genome.ucsc.edu, hg19, ucneUcscDb track; Kent et al., 2002). The ENCODE Blacklist v2 was obtained from Amemiya et al. (2019). Derived files, processing scripts, and complete provenance logs are available at [repository URL]. All processing was performed using ENCODE Toolkit with full operation logging.
 
 ##### Generated analysis scripts
 
@@ -1238,7 +1238,7 @@ And the BibTeX for all citations:
 ## Architecture
 
 ```
-ENCODE MCP Connector
+ENCODE Toolkit
   |
   +-- 19 MCP Tools (live ENCODE REST API)
   |     |-- Search: search_experiments, search_files, get_facets, get_metadata
@@ -1288,7 +1288,7 @@ ENCODE MCP Connector
 
 ## What Static Documentation Wrappers Cannot Do
 
-| Capability | ENCODE MCP Connector | Documentation wrappers |
+| Capability | ENCODE Toolkit | Documentation wrappers |
 |-----------|---------------------|----------------------|
 | Live API queries | Real-time results from ENCODE REST API | Static text about how to query |
 | File download with MD5 | Verified downloads in one command | Instructions to use curl |
