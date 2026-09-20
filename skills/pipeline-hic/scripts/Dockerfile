@@ -20,11 +20,11 @@ RUN wget -q https://github.com/samtools/samtools/releases/download/1.19/samtools
     ./configure --prefix=/usr/local && make -j4 && make install && \
     cd .. && rm -rf samtools-1.19*
 
-# BWA 0.7.17
-RUN wget -q https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2 && \
-    tar xjf bwa-0.7.17.tar.bz2 && cd bwa-0.7.17 && \
+# BWA 0.7.18 (0.7.17 does not link with GCC 10 or newer)
+RUN wget -q https://github.com/lh3/bwa/archive/refs/tags/v0.7.18.tar.gz && \
+    tar xzf v0.7.18.tar.gz && cd bwa-0.7.18 && \
     make -j4 && cp bwa /usr/local/bin/ && \
-    cd .. && rm -rf bwa-0.7.17*
+    cd .. && rm -rf bwa-0.7.18 v0.7.18.tar.gz
 
 # pairtools 1.0.3
 RUN pip3 install --no-cache-dir pairtools==1.0.3

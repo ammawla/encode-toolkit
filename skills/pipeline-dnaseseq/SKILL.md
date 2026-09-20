@@ -35,7 +35,7 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 
 | Tool | Version | Purpose | Citation |
 |------|---------|---------|----------|
-| BWA-MEM | 0.7.17 | Alignment | Li & Durbin 2009 |
+| BWA-MEM | 0.7.18 | Alignment | Li & Durbin 2009 |
 | samtools | 1.19 | BAM operations | Li et al. 2009 |
 | Picard | 3.1.1 | Duplicate marking | Broad Institute |
 | Hotspot2 | 2.1.2 | DHS calling (ENCODE standard) | John et al. 2011 |
@@ -273,7 +273,7 @@ encode_log_derived_file(
     source_accessions=["ENCSR...", "ENCFF..."],
     description="DNase hypersensitive sites from ENCODE DNase-seq pipeline",
     file_type="DHS_peaks",
-    tool_used="BWA 0.7.17 + Hotspot2 2.1.2",
+    tool_used="BWA 0.7.18 + Hotspot2 2.1.2",
     parameters="FDR 0.05, blacklist filtered, ENCODE hg38 mappability index"
 )
 ```

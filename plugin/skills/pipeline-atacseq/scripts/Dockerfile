@@ -12,8 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python tools
 RUN pip3 install --no-cache-dir \
-    macs2==2.2.9.1 idr==2.0.4.2 multiqc==1.14 cutadapt==4.4 \
+    numpy==1.23.5 macs2==2.2.9.1 multiqc==1.14 cutadapt==4.4 \
     deeptools==3.5.4
+
+# IDR 2.0.4.2 is not on PyPI (the PyPI package named idr is unrelated). Install the release
+# ENCODE uses from its GitHub tag. It imports numpy in setup.py and uses numpy.int at
+# runtime, so numpy is installed first and held below 1.24.
+RUN pip3 install --no-cache-dir --no-build-isolation \
+    https://github.com/kundajelab/idr/archive/refs/tags/2.0.4.2.tar.gz
 
 # Bowtie2
 RUN wget -qO- https://github.com/BenLangmead/bowtie2/releases/download/v2.5.1/bowtie2-2.5.1-linux-x86_64.zip > bowtie2.zip && \
