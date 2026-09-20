@@ -41,7 +41,7 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 | Hotspot2 | 2.1.2 | DHS calling (ENCODE standard) | John et al. 2011 |
 | modwt | 1.0 | Wavelet smoothing used by Hotspot2 | Stam Lab |
 | bedtools | 2.31.0 | Genomic arithmetic | Quinlan & Hall 2010 |
-| HINT-ATAC | 0.13.2 | TF footprinting | Li et al. 2019 |
+| HINT (RGT) | 1.0.2 | TF footprinting | Li et al. 2019 |
 | FastQC | 0.12.1 | Read quality | Andrews (Babraham) |
 | MultiQC | 1.21 | Aggregated QC | Ewels et al. 2016 |
 

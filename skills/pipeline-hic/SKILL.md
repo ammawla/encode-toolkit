@@ -126,6 +126,7 @@ nextflow run main.nf \
 | `--outdir` | `./results` | Output directory |
 | `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions |
 | `--min_mapq` | `30` | Minimum MAPQ for pair filtering |
+| `--hiccups_gpu` | `false` | Run HiCCUPS on an NVIDIA GPU. By default the CPU mode is used, which only searches within 8 Mb of the diagonal |
 | `--assembly` | `hg38` | Genome assembly name for .hic header |
 
 ## Output Files

@@ -16,6 +16,7 @@ params.outdir           = './results'
 params.resolutions      = '1000,5000,10000,25000,50000,100000,250000,500000,1000000'
 params.min_mapq         = 30
 params.assembly         = 'hg38'
+params.hiccups_gpu      = false   // HiCCUPS runs its CPU mode unless an NVIDIA GPU and CUDA are available
 
 // ---- Processes ----
 
@@ -77,6 +78,8 @@ process PAIRTOOLS_PARSE_SORT {
 
     script:
     """
+    mkdir -p tmp   # pairtools sort hands --tmpdir to GNU sort, which does not create it
+
     pairtools parse \\
         --chroms-path ${chrom_sizes} \\
         --min-mapq ${params.min_mapq} \\
@@ -223,8 +226,12 @@ process HICCUPS {
     path("${sample_id}.hiccups_loops.bedpe"), emit: loops
 
     script:
+    // The image has no CUDA runtime, so use HiCCUPS' CPU mode unless a GPU is requested.
+    // CPU mode only searches near the diagonal (8 Mb by default).
+    def cpu_flag = params.hiccups_gpu ? '' : '--cpu'
     """
     java -Xmx${task.memory.toGiga()}g -jar /opt/juicer_tools.jar hiccups \\
+        ${cpu_flag} \\
         --threads ${task.cpus} \\
         -r 5000,10000,25000 \\
         -f 0.1,0.1,0.1 \\

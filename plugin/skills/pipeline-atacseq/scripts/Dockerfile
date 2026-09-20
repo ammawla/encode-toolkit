@@ -5,7 +5,7 @@ FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential wget curl git ca-certificates unzip \
+    build-essential wget curl git ca-certificates unzip bc \
     zlib1g-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev \
     python3 python3-pip python3-dev default-jre \
     && rm -rf /var/lib/apt/lists/*

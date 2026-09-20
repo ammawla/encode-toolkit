@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gzip pigz unzip \
     python3 python3-pip python3-dev \
-    default-jre \
+    openjdk-17-jre-headless \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     build-essential libboost-dev \
     bc \
@@ -64,8 +64,9 @@ RUN pip3 install --no-cache-dir cutadapt==4.6 && \
     tar xzf 0.6.10.tar.gz && ln -s /TrimGalore-0.6.10/trim_galore /usr/local/bin/ && \
     rm 0.6.10.tar.gz
 
-# HINT-ATAC (RGT)
-RUN pip3 install --no-cache-dir RGT==0.13.2
+# HINT (RGT). 0.13.2 depends on PyVCF, which no longer installs with current setuptools;
+# 1.0.2 dropped that dependency and keeps the rgt-hint options the workflow uses.
+RUN pip3 install --no-cache-dir RGT==1.0.2
 
 # FastQC + MultiQC
 RUN wget -q https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip && \

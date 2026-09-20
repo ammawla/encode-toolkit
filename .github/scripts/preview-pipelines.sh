@@ -55,6 +55,7 @@ done
 echo "== nextflow run -preview =="
 preview atacseq "defaults" pass --reads "$READS" --blacklist "$REF/blacklist.bed"
 preview atacseq "unsupported genome is rejected" fail --reads "$READS" --genome hg19
+preview atacseq "single-end input is rejected" fail --reads "$READS" --blacklist "$REF/blacklist.bed" --single_end
 preview chipseq "samples with control" pass --reads "$READS" --control "$WORK/ctl/*_R{1,2}.fastq.gz" \
     --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed"
 preview chipseq "no control, broad peaks" pass --reads "$READS" --peak_type broad \

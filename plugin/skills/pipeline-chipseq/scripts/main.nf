@@ -191,6 +191,9 @@ process IDR_ANALYSIS {
     !params.skip_idr && params.peak_type == 'narrow'
 
     script:
+    if (peak_files.size() > 2) {
+        log.warn "IDR compares two replicates: using ${peak_files[0]} and ${peak_files[1]} of ${peak_files.size()} peak files"
+    }
     """
     idr --samples ${peak_files[0]} ${peak_files[1]} \\
       --input-file-type narrowPeak --rank p.value \\
@@ -291,7 +294,12 @@ workflow {
 
     // IDR (optional, narrow peaks with 2+ replicates)
     if (!params.skip_idr && params.peak_type == 'narrow') {
-        ch_peaks = MACS2_CALLPEAK.out.peaks.map { _sample_id, peaks -> peaks }.collect()
+        // IDR compares two replicates. Sort by name so the pair is the same on every run,
+        // and skip IDR when fewer than two peak files exist.
+        ch_peaks = MACS2_CALLPEAK.out.peaks
+            .map { _sample_id, peaks -> peaks }
+            .toSortedList { a, b -> a.name <=> b.name }
+            .filter { peaks -> peaks.size() >= 2 }
         IDR_ANALYSIS(ch_peaks)
     }
 

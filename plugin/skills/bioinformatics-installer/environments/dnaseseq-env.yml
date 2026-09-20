@@ -6,19 +6,15 @@ name: encode-dnaseseq
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.11
   # Alignment
   - bwa=0.7.17
   # BAM processing
   - samtools=1.19
-  # Hotspot detection
-  - hotspot2=2.3.1
-  # Footprinting
-  - hint=0.13.2
-  # Feature density peak calling
-  - f-seq2=2.0.3
+  # Hotspot detection: Hotspot2 and its modwt dependency are not packaged for conda.
+  # Build them from source (see pipeline-dnaseseq/scripts/Dockerfile) or use that image.
+  - bedops
   # Interval operations
   - bedtools=2.31.0
   # QC and trimming
@@ -29,3 +25,10 @@ dependencies:
   - ucsc-bedgraphtobigwig
   # Utilities
   - pigz
+  - pip
+  # bioconda only builds RGT for Python 3.7 and does not package F-Seq2, so both come from PyPI
+  - pip:
+      # Footprinting (HINT is part of RGT)
+      - RGT==1.0.2
+      # Feature density peak calling
+      - fseq2==2.0.3

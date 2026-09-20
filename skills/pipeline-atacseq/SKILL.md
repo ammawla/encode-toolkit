@@ -75,7 +75,7 @@ FASTQ ──> FastQC / Trim Galore ──> Bowtie2 ──> Mito Removal + Tn5 Sh
 ## Input Requirements
 
 ### Required Files
-- **ATAC-seq FASTQ**: Paired-end reads (strongly recommended; single-end supported)
+- **ATAC-seq FASTQ**: Paired-end reads (required: Tn5 shifting, nucleosome-free selection, and BAMPE peak calling depend on fragment length)
 - **Reference genome**: Bowtie2-indexed genome (GRCh38 for human, mm10 for mouse)
 
 ### Sample Sheet Format

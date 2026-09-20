@@ -33,8 +33,23 @@ Pipeline skills release. The Python package (MCP server) is functionally identic
   `--no_overlap` toggled `--mergeContext`, which is unrelated to mate overlap (renamed
   `--merge_context`). bedMethyl score and strand now follow the ENCODE format.
 - **RNA-seq**: the RSEM reference is a file prefix but was required to be a directory.
-- **Hi-C, WGBS, ATAC-seq images** could not build (missing `build-essential`, `unzip`, or a dead
-  download URL). Index prefixes are now resolved from staged files, so cloud executors work.
+- **ATAC-seq**: the BAM index was not passed to the Tn5 shift step, which `alignmentSieve`
+  requires; the mitochondrial fraction used `bc`, which the image lacked, and silently wrote an
+  empty value; duplication metrics were never published. The workflow now states that it needs
+  paired-end reads instead of filtering every single-end read away.
+- **Hi-C**: `pairtools sort` was given a temporary directory that was never created. HiCCUPS
+  now runs its CPU mode by default, because the image has no CUDA runtime (`--hiccups_gpu`).
+- **IDR** (ChIP-seq, ATAC-seq) picked two peak files in arbitrary order and crashed with a
+  single replicate. The pair is now sorted, and IDR is skipped below two replicates.
+- **Pipeline images had never been built.** Beyond missing `build-essential`, `unzip`, `bc`, and
+  Boost: `idr`, `trim-galore`, and `phantompeakqualtools` are not PyPI packages; `deeptools
+  3.5.4` was never published; BWA 0.7.17 does not link with current GCC (now 0.7.18); Picard 3
+  needs Java 17; MethylDackel needs libBigWig; SEACR could not find its R script through a
+  symlink; RGT 0.13.2 and pairtools 1.0.3 no longer install (now 1.0.2 and 1.1.2). Index
+  prefixes are resolved from staged files, so cloud executors work.
+- **Conda environment files** pinned packages that do not exist (`hotspot2`, `hint`, `f-seq2`)
+  or cannot be installed together. All seven now solve, and the Anaconda `defaults` channel is
+  no longer used.
 - Pipelines referenced container images that do not exist. Each config now uses an image built
   from the skill's own Dockerfile, with a fixed tag and a `--container` override.
 - `gcp` profiles used the retired `google-lifesciences` executor; they now use `google-batch`.
@@ -58,9 +73,9 @@ Pipeline skills release. The Python package (MCP server) is functionally identic
 ### Added
 
 - `Pipelines` CI workflow: `nextflow lint`, `nextflow run -preview` across parameter
-  combinations, profile resolution, a Docker build of every pipeline image with a check that
-  the tools each workflow calls are present, shellcheck, and a `skills/` vs `plugin/skills/`
-  identity check.
+  combinations, profile resolution, a Docker build of every pipeline image with checks that
+  the tools each workflow calls are present and actually start, a dry-run solve of every conda
+  environment, shellcheck, and a `skills/` vs `plugin/skills/` identity check.
 
 ## [0.3.2] - 2026-09-20
 
