@@ -8,8 +8,25 @@
 #   --hic          cooler, cooltools, hic-straw, pyGenomeTracks
 #   --deeptools    deeptools, pyBigWig, pysam, pybedtools
 #   --genomics     Core genomics (numpy, pandas, scipy, matplotlib, seaborn)
+#
+# Every install is constrained by constraints.txt, a lock file with exact versions for the
+# full dependency tree (Python 3.10+), so the same command gives the same environment.
+# The direct dependencies live in requirements.in. To refresh the lock:
+#   uv pip compile --universal --python-version 3.10 requirements.in -o constraints.txt
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONSTRAINTS="$SCRIPT_DIR/constraints.txt"
+
+if [ ! -f "$CONSTRAINTS" ]; then
+    echo "ERROR: $CONSTRAINTS not found. It must sit next to this script."
+    exit 1
+fi
+
+pip_install() {
+    pip3 install --constraint "$CONSTRAINTS" "$@"
+}
 
 echo "============================================"
 echo "ENCODE Bioinformatics Python Package Installer"
@@ -23,7 +40,7 @@ CATEGORY="${1:---all}"
 
 install_genomics() {
     echo "--- Installing Core Genomics packages ---"
-    pip3 install --upgrade \
+    pip_install \
         numpy \
         pandas \
         scipy \
@@ -37,7 +54,7 @@ install_genomics() {
 
 install_singlecell() {
     echo "--- Installing Single-Cell packages ---"
-    pip3 install --upgrade \
+    pip_install \
         scanpy \
         anndata \
         scvi-tools \
@@ -55,7 +72,7 @@ install_singlecell() {
 
 install_hic() {
     echo "--- Installing Hi-C Analysis packages ---"
-    pip3 install --upgrade \
+    pip_install \
         cooler \
         cooltools \
         hic-straw \
@@ -65,7 +82,7 @@ install_hic() {
 
 install_deeptools() {
     echo "--- Installing Genomics / Signal Processing packages ---"
-    pip3 install --upgrade \
+    pip_install \
         deeptools \
         pyBigWig \
         pysam \

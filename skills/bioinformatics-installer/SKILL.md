@@ -219,7 +219,7 @@ For DNase I hypersensitive site mapping following ENCODE standards
 | Tool | Version | Purpose |
 |------|---------|---------|
 | BWA-MEM | 0.7.17 | Read alignment to reference genome |
-| Hotspot2 | 2.3.1 | DNase-seq hotspot detection (John et al. 2011) |
+| Hotspot2 | 2.1.2 | DNase-seq hotspot detection (John et al. 2011) |
 | HINT-ATAC | 0.13.2 | TF footprinting from DNase-seq data (Li et al. 2019) |
 | F-Seq2 | 2.0.3 | Feature density estimation for peak calling (Boyle et al. 2008, Zhao et al. 2020) |
 | samtools | 1.19 | BAM handling and filtering |
@@ -427,9 +427,9 @@ ENCODE pipeline execution requires Nextflow DSL2 and a container runtime (Docker
 ### Nextflow Installation
 
 ```bash
-# Install Nextflow (requires Java 11+)
-curl -s https://get.nextflow.io | bash
-mv nextflow /usr/local/bin/
+# Install the pinned Nextflow release (requires Java 17+). The script downloads the
+# self-contained release from GitHub, verifies its SHA-256, and only then installs it.
+bash scripts/install-nextflow.sh --docker
 
 # Verify
 nextflow -version
@@ -657,7 +657,7 @@ Expected output:
 - **R/Bioconductor version mismatch**: R packages from CRAN and Bioconductor must match the R version. Installing Bioconductor 3.18 packages with R 4.4 will fail silently or produce errors. Use BiocManager::install() to ensure version compatibility.
 - **Python 2 vs Python 3**: Some legacy bioinformatics tools (MACS 1.x, old HOMER) require Python 2. Never install Python 2 tools in the same environment as Python 3 tools — use separate conda environments.
 - **ARM Mac (M1/M2/M3) compatibility**: Many bioinformatics tools lack native ARM builds. Use `CONDA_SUBDIR=osx-64` or Rosetta 2 emulation for x86_64 packages. Some tools (samtools, BWA) have ARM-native builds.
-- **Nextflow requires Java 11+**: Nextflow will not run on Java 8. Check `java -version` before running pipelines. Install with `curl -s https://get.nextflow.io | bash` for correct Java bundling.
+- **Nextflow requires Java 17+**: check `java -version` before running pipelines. Install Nextflow with `scripts/install-nextflow.sh`, which pins the release the pipelines are validated against and verifies its checksum; avoid piping a remote installer straight into a shell.
 - **Docker vs Singularity on HPC**: Most HPC clusters do not allow Docker (requires root). Use Singularity instead. Nextflow supports both via `-profile singularity` or `-profile docker`.
 
 ## Literature Foundation
