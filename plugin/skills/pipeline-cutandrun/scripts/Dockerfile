@@ -22,11 +22,11 @@ RUN wget -q https://github.com/samtools/samtools/releases/download/1.19/samtools
     ./configure --prefix=/usr/local && make -j4 && make install && \
     cd .. && rm -rf samtools-1.19*
 
-# Bowtie2 2.5.3
-RUN wget -q https://github.com/BenLangmead/bowtie2/releases/download/v2.5.3/bowtie2-2.5.3-linux-x86_64.zip && \
-    unzip -q bowtie2-2.5.3-linux-x86_64.zip -d /opt/ && \
-    ln -s /opt/bowtie2-2.5.3-linux-x86_64/bowtie2* /usr/local/bin/ && \
-    rm bowtie2-2.5.3-linux-x86_64.zip
+# Bowtie2 2.5.4
+RUN wget -q https://github.com/BenLangmead/bowtie2/releases/download/v2.5.4/bowtie2-2.5.4-linux-x86_64.zip && \
+    unzip -q bowtie2-2.5.4-linux-x86_64.zip -d /opt/ && \
+    ln -s /opt/bowtie2-2.5.4-linux-x86_64/bowtie2* /usr/local/bin/ && \
+    rm bowtie2-2.5.4-linux-x86_64.zip
 
 # bedtools 2.31.0
 RUN wget -q https://github.com/arq5x/bedtools2/releases/download/v2.31.0/bedtools-2.31.0.tar.gz && \

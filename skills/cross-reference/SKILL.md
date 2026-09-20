@@ -110,7 +110,10 @@ Step 1: Track the experiment to extract publications
 
 Step 2: Get the PMIDs
   encode_get_references(experiment_accession="ENCSR133RZO", reference_type="pmid")
-  -> Returns: [{"reference_id": "32728249", "reference_type": "pmid"}]
+  -> Returns: {"references": [{"id": 3, "experiment_accession": "ENCSR133RZO",
+       "reference_type": "pmid", "reference_id": "32728249",
+       "description": "Auto-extracted from ENCODE dbxrefs", "linked_at": 1739452800.22}],
+       "count": 1}   (linked_at is epoch seconds)
 
 Step 3: Fetch full article metadata from PubMed
   get_article_metadata(pmids=["32728249"])
@@ -126,7 +129,8 @@ Step 4: Find related papers
 ```
 Step 1: Get experiment details
   encode_get_experiment(accession="ENCSR000AKS")
-  -> Note the target (e.g., H3K27me3), biosample, and any linked DOIs
+  -> Note the target (e.g., H3K27me3), biosample_summary, and description
+  -> (the response carries no DOIs; use encode_get_references for linked identifiers)
 
 Step 2: Search bioRxiv for related preprints
   search_preprints(category="genomics", recent_days=90, limit=20)
@@ -145,8 +149,9 @@ Step 3: Link discovered preprint
 
 ```
 Step 1: Check experiment metadata for GEO cross-references
-  encode_get_experiment(accession="ENCSR133RZO")
-  -> Look in dbxrefs for "GEO:GSExxxxxx"
+  encode_search_experiments(search_term="ENCSR133RZO")
+  -> Look in the result's dbxrefs for "GEO:GSExxxxxx"
+     (dbxrefs is a search-result field; encode_get_experiment does not return it)
 
 Step 2: Link the GEO accession
   encode_link_reference(
@@ -265,7 +270,7 @@ Step 1: Find ENCODE H3K27ac experiments in liver
     organism="Homo sapiens"
   )
   -> Returns liver H3K27ac experiments
-  -> Prefer experiments with status="released" and audit_category free of ERROR
+  -> Prefer experiments with status="released" and audit_error_count of 0
 
 Step 2: Download the peak file
   encode_list_files(

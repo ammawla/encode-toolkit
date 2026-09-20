@@ -473,12 +473,14 @@ ENCODE increasingly includes CUT&RUN and CUT&Tag data alongside traditional ChIP
 encode_get_facets(organ="pancreas", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {
-    "assay_title": {"Histone ChIP-seq": 25, "ATAC-seq": 6, "RNA-seq": 12, "WGBS": 4, "Hi-C": 2, "TF ChIP-seq": 8}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 25},
+    {"term": "RNA-seq", "count": 12},
+    {"term": "ATAC-seq", "count": 6}
+  ]
 }
 ```
 
@@ -498,9 +500,17 @@ encode_search_experiments(assay_title="ATAC-seq", organ="pancreas", organism="Ho
 encode_track_experiment(accession="ENCSR100PAN", notes="Pancreas H3K27ac for epigenome profiling")
 ```
 
-Expected output:
+Expected output (the `notes` you pass are stored, not echoed back; read them with `encode_list_tracked`):
 ```json
-{"status": "tracked", "accession": "ENCSR100PAN", "notes": "Pancreas H3K27ac for epigenome profiling"}
+{
+  "tracking": {"accession": "ENCSR100PAN", "action": "tracked"},
+  "publications_found": 1,
+  "publications": [
+    {"pmid": "32728249", "doi": "10.1038/s41586-020-2493-4", "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes", "authors": "ENCODE Project Consortium", "journal": "Nature", "year": "2020", "abstract": ""}
+  ],
+  "pipelines_found": 0,
+  "pipelines": []
+}
 ```
 
 ### Step 4: Generate collection summary
@@ -512,9 +522,16 @@ encode_summarize_collection()
 Expected output:
 ```json
 {
-  "total_tracked": 6,
+  "total_experiments": 6,
+  "total_publications": 2,
+  "total_derived_files": 0,
+  "total_external_references": 3,
   "by_assay": {"Histone ChIP-seq": 3, "ATAC-seq": 1, "WGBS": 1, "Hi-C": 1},
-  "by_target": {"H3K27ac": 1, "H3K4me3": 1, "H3K27me3": 1}
+  "by_target": {"H3K27ac": 1, "H3K4me3": 1, "H3K27me3": 1, "none": 3},
+  "by_organism": {"Homo sapiens": 6},
+  "by_organ": {"pancreas": 6},
+  "by_biosample_type": {"tissue": 6},
+  "by_lab": {"Bing Ren, UCSD": 6}
 }
 ```
 
@@ -531,10 +548,14 @@ Expected output:
 encode_get_facets(organ="pancreas", assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {"target.label": {"H3K27ac": 5, "H3K4me3": 4, "H3K27me3": 3, "H3K4me1": 3, "H3K36me3": 2}}
+  "target.label": [
+    {"term": "H3K27ac", "count": 5},
+    {"term": "H3K4me3", "count": 4},
+    {"term": "H3K27me3", "count": 3}
+  ]
 }
 ```
 
@@ -543,14 +564,16 @@ Expected output:
 encode_get_experiment(accession="ENCSR100PAN")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
   "accession": "ENCSR100PAN",
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac",
   "biosample_summary": "pancreas",
-  "replicates": 2
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
+  "tech_replicate_count": 2
 }
 ```
 
@@ -559,11 +582,19 @@ Expected output:
 encode_summarize_collection()
 ```
 
-Expected output:
+Expected output (aggregates only; `by_*` keys are values from your own tracked rows):
 ```json
 {
-  "total_tracked": 6,
-  "by_assay": {"Histone ChIP-seq": 3, "ATAC-seq": 1, "WGBS": 1, "Hi-C": 1}
+  "total_experiments": 6,
+  "total_publications": 2,
+  "total_derived_files": 0,
+  "total_external_references": 3,
+  "by_assay": {"Histone ChIP-seq": 3, "ATAC-seq": 1, "WGBS": 1, "Hi-C": 1},
+  "by_target": {"H3K27ac": 1, "H3K4me3": 1, "H3K27me3": 1, "none": 3},
+  "by_organism": {"Homo sapiens": 6},
+  "by_organ": {"pancreas": 6},
+  "by_biosample_type": {"tissue": 6},
+  "by_lab": {"Bing Ren, UCSD": 6}
 }
 ```
 

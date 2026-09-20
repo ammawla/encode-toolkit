@@ -403,12 +403,15 @@ encode_search_experiments(assay_title="WGBS", organism="Homo sapiens", limit=50)
 Expected output:
 ```json
 {
-  "total": 147,
   "results": [
-    {"accession": "ENCSR765JPC", "assay_title": "WGBS", "biosample_summary": "liver", "status": "released"},
-    {"accession": "ENCSR832HMR", "assay_title": "WGBS", "biosample_summary": "brain", "status": "released"},
-    {"accession": "ENCSR091ENJ", "assay_title": "WGBS", "biosample_summary": "lung", "status": "released"}
-  ]
+    {"accession": "ENCSR765JPC", "assay_title": "WGBS", "organ": "liver", "biosample_summary": "liver tissue male adult (54 years)", "status": "released"},
+    {"accession": "ENCSR832HMR", "assay_title": "WGBS", "organ": "brain", "biosample_summary": "brain tissue female adult (53 years)", "status": "released"}
+  ],
+  "total": 147,
+  "limit": 50,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 50
 }
 ```
 
@@ -420,13 +423,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR765JPC", file_format="bed", output_type="methylation state at CpG", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF123BED", "output_type": "methylation state at CpG", "file_format": "bed bedMethyl", "file_size_mb": 245.0}
-  ]
-}
+[
+  {"accession": "ENCFF123BED", "output_type": "methylation state at CpG", "file_format": "bed", "file_type": "bed bedMethyl", "assembly": "GRCh38", "file_size": 256901120, "file_size_human": "245.0 MB", "status": "released"}
+]
 ```
 
 ### Step 3: Download methylation files
@@ -468,9 +469,14 @@ encode_get_facets(assay_title="WGBS", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 32, "liver": 18, "heart": 12, "lung": 10, "blood": 8, "kidney": 6}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 32},
+    {"term": "liver", "count": 18},
+    {"term": "heart", "count": 12},
+    {"term": "lung", "count": 10},
+    {"term": "blood", "count": 8},
+    {"term": "kidney", "count": 6}
+  ]
 }
 ```
 
@@ -484,11 +490,12 @@ Expected output:
 {
   "accession": "ENCSR765JPC",
   "assay_title": "WGBS",
-  "biosample_summary": "liver",
-  "replicates": 2,
+  "biosample_summary": "liver tissue male adult (54 years)",
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
   "status": "released",
-  "audit": {"WARNING": 0, "ERROR": 0},
-  "pipeline": "WGBS (GRCh38)"
+  "audit_error_count": 0,
+  "audit_warning_count": 0
 }
 ```
 
@@ -500,10 +507,13 @@ encode_track_experiment(accession="ENCSR765JPC", notes="Liver WGBS for cross-tis
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR765JPC",
-  "notes": "Liver WGBS for cross-tissue methylation atlas",
-  "tracked_at": "2025-03-08T12:00:00Z"
+  "tracking": {"accession": "ENCSR765JPC", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "WGBS paired-end pipeline", "version": "1.1.6", "software": [{"name": "bismark", "version": "0.22.3"}], "status": "released"}
+  ]
 }
 ```
 

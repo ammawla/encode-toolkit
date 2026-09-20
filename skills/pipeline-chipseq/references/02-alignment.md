@@ -2,7 +2,7 @@
 
 ## Tools
 - **BWA-MEM 0.7.18** (image version): Primary aligner for ChIP-seq (Li & Durbin, 2009)
-- **Samtools 1.17** (image version): BAM conversion, sorting, indexing, and statistics
+- **Samtools 1.19** (image version): BAM conversion, sorting, indexing, and statistics
 
 ## Reference Genome
 

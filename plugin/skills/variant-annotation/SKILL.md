@@ -381,10 +381,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="pancreas", organism="Ho
 Expected output:
 ```json
 {
-  "total": 6,
   "results": [
     {"accession": "ENCSR400PAN", "assay_title": "ATAC-seq", "biosample_summary": "islet of Langerhans", "status": "released"}
-  ]
+  ],
+  "total": 6,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -464,10 +468,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="pancreas", organism="Ho
 Expected output:
 ```json
 {
-  "total": 6,
   "results": [
     {"accession": "ENCSR400PAN", "assay_title": "ATAC-seq", "biosample_summary": "islet of Langerhans"}
-  ]
+  ],
+  "total": 6,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -476,13 +484,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR400PAN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF500ISL", "output_type": "IDR thresholded peaks", "file_format": "bed narrowPeak", "file_size_mb": 0.8}
-  ]
-}
+[
+  {"accession": "ENCFF500ISL", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "file_size_human": "0.8 MB"}
+]
 ```
 
 ### 3. Track variant annotation experiments
@@ -490,12 +496,16 @@ Expected output:
 encode_track_experiment(accession="ENCSR400PAN", notes="Islet ATAC-seq for multi-source variant annotation pipeline")
 ```
 
-Expected output:
+Expected output (the `notes` you pass are stored, not echoed back; read them with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR400PAN",
-  "notes": "Islet ATAC-seq for multi-source variant annotation pipeline"
+  "tracking": {"accession": "ENCSR400PAN", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "ATAC-seq (replicated)", "version": "2.2.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
 }
 ```
 

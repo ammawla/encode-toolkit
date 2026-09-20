@@ -99,6 +99,34 @@ class TestTrackExperiment:
         result = tracker.track_experiment(sample_experiment)
         assert result["action"] == "updated"
 
+    def test_track_accepts_the_assembly_list_the_server_passes(self, tracker):
+        # encode_track_experiment hands over ExperimentDetail.model_dump(), where assembly is a
+        # list. SQLite cannot bind a list, so tracking used to fail for every real experiment.
+        from encode_connector.client.models import ExperimentDetail
+
+        detail = ExperimentDetail(accession="ENCSR133RZO", assay_title="ATAC-seq", assembly=["GRCh38", "hg19"])
+
+        result = tracker.track_experiment(detail.model_dump())
+
+        assert result["action"] == "tracked"
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38, hg19"
+
+    def test_track_update_accepts_an_assembly_list(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        sample_experiment["assembly"] = ["GRCh38"]
+
+        result = tracker.track_experiment(sample_experiment)
+
+        assert result["action"] == "updated"
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38"
+
+    def test_track_stores_an_empty_assembly_list_as_empty_text(self, tracker, sample_experiment):
+        sample_experiment["assembly"] = []
+
+        tracker.track_experiment(sample_experiment)
+
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == ""
+
     def test_get_tracked_experiment(self, tracker, sample_experiment):
         tracker.track_experiment(sample_experiment)
         exp = tracker.get_tracked_experiment("ENCSR133RZO")
@@ -486,6 +514,27 @@ class TestCompatibility:
         # Assembly mismatch creates a NOT_COMPATIBLE verdict
         assert result["verdict"] == "NOT_COMPATIBLE"
         assert any("assembl" in i.lower() for i in result["issues"]), f"Expected assembly issue, got: {result}"
+
+    def test_experiments_that_share_one_assembly_are_not_flagged(self, tracker, sample_experiment, sample_experiment2):
+        sample_experiment["assembly"] = ["GRCh38", "hg19"]
+        sample_experiment2["assembly"] = ["GRCh38"]
+        tracker.track_experiment(sample_experiment)
+        tracker.track_experiment(sample_experiment2)
+
+        result = tracker.analyze_compatibility("ENCSR133RZO", "ENCSR000AKS")
+
+        assert not any("assembl" in i.lower() for i in result["issues"]), result
+
+    def test_experiments_with_no_common_assembly_are_flagged(self, tracker, sample_experiment, sample_experiment2):
+        sample_experiment["assembly"] = ["GRCh38", "hg19"]
+        sample_experiment2["assembly"] = ["mm10"]
+        tracker.track_experiment(sample_experiment)
+        tracker.track_experiment(sample_experiment2)
+
+        result = tracker.analyze_compatibility("ENCSR133RZO", "ENCSR000AKS")
+
+        assert result["verdict"] == "NOT_COMPATIBLE"
+        assert any("assembl" in i.lower() for i in result["issues"]), result
 
     def test_caveats_different_organ(self, tracker, sample_experiment, sample_experiment2):
         tracker.track_experiment(sample_experiment)

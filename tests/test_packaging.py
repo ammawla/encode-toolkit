@@ -18,3 +18,12 @@ class TestMcpDependencyBounds:
 
     def test_allows_mcp_1x(self):
         assert _mcp_requirement().specifier.contains("1.30.0")
+
+
+def test_package_version_matches_the_distribution():
+    """encode_connector.__version__ used to be a hard-coded string that drifted from the release."""
+    from importlib.metadata import version
+
+    import encode_connector
+
+    assert encode_connector.__version__ == version("encode-toolkit")

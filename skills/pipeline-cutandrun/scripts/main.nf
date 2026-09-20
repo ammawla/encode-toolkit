@@ -349,6 +349,8 @@ process FRAGMENT_SIZES {
 process FRIP {
     tag "$sample_id"
     publishDir "${params.outdir}/qc", mode: 'copy'
+    cpus 2
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai), path(peaks)

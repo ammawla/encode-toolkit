@@ -20,8 +20,8 @@ implementation following ENCODE uniform analysis standards.
 
 The pipeline processes chromatin immunoprecipitation sequencing data through
 quality control, adapter trimming, alignment to a reference genome, filtering and
-duplicate removal, blacklist filtering, peak calling with MACS2, a single IDR comparison
-between two replicates, and signal track generation.
+duplicate removal, blacklist filtering, peak calling with MACS2, an IDR comparison for
+every pair of replicates, FRiP calculation, and signal track generation.
 
 The same workflow handles transcription factor (TF) ChIP-seq and histone modification
 ChIP-seq. The peak mode is chosen once per run with `--peak_type narrow|broad`; it applies
@@ -47,10 +47,10 @@ FASTQ ──> FastQC / Trim Galore ──> BWA-MEM ──> Samtools Filter ─�
   │                                                                       │
   │           ┌───────────────────────────────────────────────────────────┘
   │           v
-  │     Blacklist Filter ──> MACS2 Peak Calling ──> IDR (narrow runs only)
+  │     Blacklist Filter ──> MACS2 Peak Calling ──> IDR (narrow runs only, every pair)
   │       (applied to BAM)          │
-  │                                 v
-  │                    Signal Tracks (bdgcmp + bedGraphToBigWig)
+  │                                 ├──> Signal Tracks (bdgcmp + bedGraphToBigWig)
+  │                                 └──> FRiP (bedtools intersect + samtools view -c)
   v
  QC reports ──────────────────────────────────> MultiQC
 ```
@@ -66,8 +66,8 @@ with `-c`.
 | 1. QC & Trimming | FastQC, Trim Galore | Raw FASTQ | Trimmed FASTQ, FastQC reports | references/01-qc-trimming.md |
 | 2. Alignment | BWA-MEM, samtools | Trimmed FASTQ | Sorted BAM, flagstat | references/02-alignment.md |
 | 3. Filtering | samtools, Picard, bedtools | Sorted BAM | Deduplicated, blacklist-filtered BAM | references/03-filtering.md |
-| 4. Peak Calling & IDR | MACS2, IDR | Filtered BAM | narrowPeak/broadPeak, idr_peaks.txt | references/04-analysis.md |
-| 5. Signal & QC report | MACS2 bdgcmp, bedGraphToBigWig, MultiQC | MACS2 bedGraphs, QC logs | bigWig, multiqc_report.html | references/05-qc-metrics.md |
+| 4. Peak Calling & IDR | MACS2, IDR | Filtered BAM | narrowPeak/broadPeak, one `<sampleA>_vs_<sampleB>.idr_peaks.txt` per replicate pair | references/04-analysis.md |
+| 5. Signal, FRiP & QC report | MACS2 bdgcmp, bedGraphToBigWig, bedtools, samtools, MultiQC | MACS2 bedGraphs, final BAM, peaks, QC logs | bigWig, `<sample>.frip_mqc.tsv`, multiqc_report.html | references/05-qc-metrics.md |
 
 ## Input Requirements
 
@@ -151,13 +151,13 @@ manual steps documented in `references/05-qc-metrics.md`.
 | Total sequenced reads | >=20M (TF), >=45M (histone) | workflow (FastQC, flagstat) | Landt 2012 |
 | Mapping rate | >80% | workflow (`samtools flagstat`) | ENCODE |
 | Duplication rate | <30% | workflow (Picard `dup_metrics.txt`) | ENCODE |
-| IDR peaks at 0.05 | >20,000 (TF) | workflow (`peaks/idr/idr_peaks.txt`) | ENCODE |
+| IDR peaks at 0.05 | >20,000 (TF) | workflow (`peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt`) | ENCODE |
 | NRF (non-redundant fraction) | >=0.8 | manual | ENCODE |
 | PBC1 (PCR bottleneck coeff 1) | >=0.8 | manual | ENCODE |
 | PBC2 (PCR bottleneck coeff 2) | >=3 | manual | ENCODE |
 | NSC (normalized strand coeff) | >1.05 | manual (phantompeakqualtools) | phantompeakqualtools |
 | RSC (relative strand corr) | >0.8 | manual (phantompeakqualtools) | phantompeakqualtools |
-| FRiP (fraction reads in peaks) | >=1% | manual (bedtools + samtools) | Landt 2012 |
+| FRiP (fraction reads in peaks) | >=1%, i.e. >=0.01 in the file | workflow (`qc/<sample>.frip_mqc.tsv`) | Landt 2012 |
 | Mitochondrial fraction | <5% | manual (`samtools idxstats`) | ENCODE |
 
 ### Interpreting QC: Traffic Light System
@@ -269,23 +269,27 @@ results/
                                 #   _peaks.xls, _treat_pileup.bdg, _control_lambda.bdg
     broad/                      # --peak_type broad: _peaks.broadPeak, _peaks.gappedPeak,
                                 #   _peaks.xls, the same bedGraphs
-    idr/                        # idr_peaks.txt (+ idr_peaks.txt.png); narrow runs only
+    idr/                        # <sampleA>_vs_<sampleB>.idr_peaks.txt (+ .png), one file
+                                #   per replicate pair; narrow runs only
   signal/                       # <sample>.fc.bw, <sample>.pval.bw
   qc/
+    <sample>.frip_mqc.tsv       # Peak set / FRiP / reads_in_peaks / total_reads
     multiqc/                    # multiqc_report.html, multiqc_data/
   pipeline_info/                # timeline.html, report.html, trace.txt
 ```
 
 Only one of `peaks/narrow/` and `peaks/broad/` exists per run, matching `--peak_type`.
 When `--control` is given, the control libraries also appear in `aligned/`, `filtered/` and
-`fastqc/` under a `CONTROL_<name>` prefix.
+`fastqc/` under a `CONTROL_<name>` prefix. They are not peak-called, so no
+`CONTROL_<name>.frip_mqc.tsv` is written.
 
 ## Common Pitfalls
 
 ### 1. Overlapping `--reads` and `--control` globs
 The most common silent failure. If both globs match the same FASTQ, the control is also
-treated as a ChIP sample: MACS2 calls peaks on the input library and IDR may pair those
-peaks with a real replicate. Nothing errors. Use non-overlapping globs.
+treated as a ChIP sample: MACS2 calls peaks on the input library, IDR pairs those peaks
+with every real replicate, and a FRiP row is written for it. Nothing errors. Use
+non-overlapping globs.
 
 ### 2. Missing Input Control
 ChIP-seq is far more interpretable with a matched input (or IgG) control. Without one,
@@ -324,11 +328,11 @@ The hg38-blacklist.v2.bed contains ~900 regions covering ~40 Mb.
 
 The image is pinned to `linux/amd64`; on an arm64 host it runs under emulation.
 
-Tool versions in the image: BWA 0.7.18, samtools 1.17, bedtools 2.31.0, Picard 2.27.5,
-Trim Galore 0.6.7, FastQC 0.11.9, MACS2 2.2.9.1, IDR 2.0.4.2, MultiQC 1.14,
-deeptools 3.5.5, UCSC `bedGraphToBigWig`. The conda environment
-`bioinformatics-installer/environments/chipseq-env.yml` is an alternative route for the
-manual steps and may ship different point releases of the same tools.
+Tool versions in the image: BWA 0.7.18, samtools 1.19, bedtools 2.31.0, Picard 3.1.1
+(Java 17), Trim Galore 0.6.10 with cutadapt 4.6, FastQC 0.12.1, MACS2 2.2.9.1,
+IDR 2.0.4.2, MultiQC 1.21, deepTools 3.5.5, UCSC `bedGraphToBigWig`. The conda environment
+`bioinformatics-installer/environments/chipseq-env.yml` pins the same versions of the
+tools it lists and adds `phantompeakqualtools=1.2.2`, which the image does not carry.
 
 ## ENCODE Data Integration
 
@@ -367,18 +371,19 @@ encode_batch_download(
   the BAM between deduplication and MACS2, so peaks are already blacklist-clean.
 - **Cross-correlation QC can mislead**: NSC/RSC values depend on fragment length
   distribution. Deeply sequenced libraries can have high NSC but poor enrichment. Check
-  FRiP alongside NSC/RSC. Neither is computed by this workflow.
-- **IDR here is a single two-replicate comparison**: the workflow sorts the per-sample peak
-  files by name, takes the first two, and runs `idr` once. There is no pooled peak call, no
-  pseudoreplicates, and no rescue or self-consistency ratio. With fewer than two peak files
-  IDR is skipped silently. Extra replicates beyond the first two are dropped with a warning.
+  FRiP, which the workflow computes, alongside NSC/RSC, which it does not.
+- **IDR compares every pair of replicates**: all samples matched by `--reads` are treated
+  as replicates of one experiment, and `idr` runs once per pair (two samples give one
+  comparison, three give three). No replicate is dropped, and with a single sample IDR is
+  skipped silently. There is still no pooled peak call, no pseudoreplicates, and no rescue
+  or self-consistency ratio.
 
 ## Walkthrough: Processing ENCODE H3K27ac ChIP-seq from FASTQ to Peaks
 
 **Goal**: Process raw H3K27ac ChIP-seq FASTQ files through this pipeline to generate peak
-calls, an IDR comparison and signal tracks.
-**Context**: BWA-MEM alignment, duplicate removal, blacklist filtering, MACS2 peak calling
-and one IDR comparison between two replicates.
+calls, IDR comparisons and signal tracks.
+**Context**: BWA-MEM alignment, duplicate removal, blacklist filtering, MACS2 peak calling,
+FRiP, and one IDR comparison per pair of replicates.
 
 ### Step 1: Find the experiment and download FASTQs
 
@@ -386,14 +391,16 @@ and one IDR comparison between two replicates.
 encode_get_experiment(accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (fields abridged; the full response also carries `files` and the four `audit_*_count` values):
 ```json
 {
   "accession": "ENCSR000AKA",
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac",
   "biosample_summary": "GM12878",
-  "replicates": 2,
+  "bio_replicate_count": 2,
+  "tech_replicate_count": 2,
+  "assembly": ["GRCh38"],
   "status": "released"
 }
 ```
@@ -404,20 +411,20 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF001FQ1", "output_type": "reads", "paired_end": "1", "biological_replicates": [1], "file_size_mb": 2400},
-    {"accession": "ENCFF002FQ2", "output_type": "reads", "paired_end": "2", "biological_replicates": [1], "file_size_mb": 2500},
-    {"accession": "ENCFF003FQ3", "output_type": "reads", "paired_end": "1", "biological_replicates": [2], "file_size_mb": 2200},
-    {"accession": "ENCFF004FQ4", "output_type": "reads", "paired_end": "2", "biological_replicates": [2], "file_size_mb": 2300}
-  ]
-}
+[
+  {"accession": "ENCFF001FQ1", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "2.3 GB"},
+  {"accession": "ENCFF002FQ2", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "2.4 GB"},
+  {"accession": "ENCFF003FQ3", "file_format": "fastq", "output_type": "reads", "biological_replicates": [2], "file_size_human": "2.1 GB"},
+  {"accession": "ENCFF004FQ4", "file_format": "fastq", "output_type": "reads", "biological_replicates": [2], "file_size_human": "2.2 GB"}
+]
 ```
 
-**Interpretation**: 2 biological replicates, each paired-end. Both replicates are needed for
-the IDR step.
+**Interpretation**: 2 biological replicates, two FASTQ files each. The listing does not say
+which file of a pair is read 1 and which is read 2 -- no `encode_*` tool reports that. Open
+each file's page on encodeproject.org, where `paired_end` is 1 or 2 and `paired_with` names
+the other accession. Both replicates are needed for the IDR step.
 
 ### Step 3: Download FASTQs
 
@@ -427,8 +434,10 @@ encode_download_files(file_accessions=["ENCFF001FQ1", "ENCFF002FQ2", "ENCFF003FQ
 
 ### Step 4: Name the files so a read-pair glob can find them
 
-ENCODE accessions do not share a prefix within a pair, and the workflow matches file pairs
-with a `{1,2}` glob. Link them into the shape the glob expects:
+ENCODE FASTQs are named by accession (`ENCFF123ABC.fastq.gz`) with no `_R1`/`_R2` in the
+name, so the `--reads` glob (`*_R{1,2}.fq.gz`) cannot pair them. Take the mate assignment
+from each file's page on encodeproject.org (`paired_end` is 1 or 2, `paired_with` names the
+other accession), then link them into the shape the glob expects:
 
 ```bash
 cd /data/chipseq/fastq
@@ -462,17 +471,21 @@ From the workflow:
 |---|---|
 | `qc/multiqc/multiqc_report.html` | Mapping rate (>80%), adapter content, per-base quality |
 | `filtered/<sample>.dup_metrics.txt` | Duplication rate (<30%) |
+| `qc/<sample>.frip_mqc.tsv` | FRiP (>=0.01 for ChIP-seq); also a MultiQC section |
 | `peaks/narrow/<sample>_peaks.narrowPeak` | Peak count per replicate |
-| `peaks/idr/idr_peaks.txt` | IDR peaks at 0.05 (>20,000 for TFs) |
+| `peaks/idr/chip_rep1_vs_chip_rep2.idr_peaks.txt` | IDR peaks at 0.05 (>20,000 for TFs) |
 
-Manual follow-ups (not run by this workflow): FRiP, NSC/RSC, NRF/PBC1/PBC2 and the
+With the two replicates above there is one IDR file; a third replicate would add
+`chip_rep1_vs_chip_rep3` and `chip_rep2_vs_chip_rep3`.
+
+Manual follow-ups (not run by this workflow): NSC/RSC, NRF/PBC1/PBC2 and the
 deeptools fingerprint. Commands are in `references/05-qc-metrics.md`.
 
 ### Step 7: Log provenance
 
 ```
 encode_log_derived_file(
-  file_path="/data/chipseq/results/peaks/idr/idr_peaks.txt",
+  file_path="/data/chipseq/results/peaks/idr/chip_rep1_vs_chip_rep2.idr_peaks.txt",
   source_accessions=["ENCFF001FQ1", "ENCFF002FQ2", "ENCFF003FQ3", "ENCFF004FQ4"],
   description="IDR peaks from the ENCODE ChIP-seq pipeline skill, H3K27ac GM12878",
   file_type="idr_peaks",
@@ -500,18 +513,24 @@ encode_search_experiments(
 )
 ```
 
-Expected output:
+Expected output (one entry per experiment; fields abridged):
 ```json
 {
-  "total": 15,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR456LIV",
-      "target": "H3K4me3-human",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K4me3",
       "biosample_summary": "liver tissue male adult (54 years)",
-      "status": "released"
+      "status": "released",
+      "assembly": ["GRCh38"]
     }
-  ]
+  ],
+  "total": 15,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -531,12 +550,12 @@ encode_download_files(
 Expected output:
 ```json
 {
-  "downloaded": 2,
-  "total_size_mb": 6220.5,
-  "files": [
-    {"accession": "ENCFF001REP1", "md5_verified": true, "paired_end": "1"},
-    {"accession": "ENCFF002REP1", "md5_verified": true, "paired_end": "2"}
-  ]
+  "downloaded": [
+    {"accession": "ENCFF001REP1", "file_path": "/data/chipseq/liver_h3k4me3/ENCFF001REP1.fastq.gz", "file_size_human": "3.0 GB", "success": true, "md5_verified": true},
+    {"accession": "ENCFF002REP1", "file_path": "/data/chipseq/liver_h3k4me3/ENCFF002REP1.fastq.gz", "file_size_human": "3.1 GB", "success": true, "md5_verified": true}
+  ],
+  "errors": [],
+  "summary": {"total_requested": 2, "successful": 2, "failed": 0, "total_size_human": "6.1 GB"}
 }
 ```
 
@@ -544,7 +563,7 @@ Expected output:
 
 | This skill produces... | Feed into... | Purpose |
 |---|---|---|
-| IDR peaks (`peaks/idr/idr_peaks.txt`) | **peak-annotation** | Assign peaks to nearest genes |
+| IDR peaks (`peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt`) | **peak-annotation** | Assign peaks to nearest genes |
 | MACS2 peaks (narrowPeak/broadPeak) | **histone-aggregation** | Cross-experiment union merge for histone marks |
 | Signal tracks (bigWig) | **visualization-workflow** | Genome browser visualization |
 | Peak coordinates (BED) | **motif-analysis** | De novo motif discovery in peak regions |
@@ -570,18 +589,20 @@ When reporting ChIP-seq pipeline results:
 - **Pipeline status**: Report completion status for each stage (QC, alignment, filtering,
   peak calling, IDR, signal generation) with pass/fail indicators
 - **Key QC metrics from the run**: mapping rate and read counts (`samtools flagstat`,
-  MultiQC), duplication rate (Picard `dup_metrics.txt`), peak counts per replicate, and
-  the IDR peak count. State plainly that FRiP, NSC/RSC and NRF/PBC were not computed unless
-  the user ran the manual steps
-- **Peak counts**: Report the per-replicate MACS2 peak count and the IDR peak count at the
-  0.05 threshold. Note the `--peak_type` used. There are no optimal/conservative/
-  pseudoreplicated peak sets in this workflow
+  MultiQC), duplication rate (Picard `dup_metrics.txt`), FRiP
+  (`qc/<sample>.frip_mqc.tsv`, a fraction: >=0.01 meets the >=1% standard), peak counts
+  per replicate, and the IDR peak count for each replicate pair. State plainly that
+  NSC/RSC, NRF/PBC and the fingerprint plot were not computed unless the user ran the
+  manual steps
+- **Peak counts**: Report the per-replicate MACS2 peak count and, for every replicate
+  pair, the IDR peak count at the 0.05 threshold. Note the `--peak_type` used. There are
+  no optimal/conservative/pseudoreplicated peak sets in this workflow
 - **Signal tracks**: Provide paths to the fold-enrichment (`signal/<sample>.fc.bw`) and
   p-value (`signal/<sample>.pval.bw`) tracks
 - **Traffic light summary**: Use green/yellow/red for overall sample quality, and say which
   metrics were unavailable
 - **Output paths**: List the key output directories (`peaks/idr/`, `peaks/<narrow|broad>/`,
-  `signal/`, `qc/multiqc/`, `pipeline_info/`)
+  `signal/`, `qc/` for the FRiP tables, `qc/multiqc/`, `pipeline_info/`)
 - **Next steps**: Suggest `quality-assessment` for deeper QC evaluation, or
   `visualization-workflow` for genome browser session generation
 

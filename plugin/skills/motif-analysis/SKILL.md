@@ -408,11 +408,17 @@ encode_search_files(
 )
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
+  "results": [
+    {"accession": "ENCFF345CTF", "file_format": "bed", "file_type": "bed narrowPeak", "output_type": "IDR thresholded peaks", "assembly": "GRCh38", "file_size": 2202009, "file_size_human": "2.1 MB", "experiment_accession": "ENCSR000DKB"}
+  ],
   "total": 3,
-  "files": [{"accession": "ENCFF345CTF", "output_type": "IDR thresholded peaks", "file_size_mb": 2.1}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -445,11 +451,17 @@ encode_search_files(
 )
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
+  "results": [
+    {"accession": "ENCFF789NKX", "file_format": "bed", "file_type": "bed narrowPeak", "output_type": "IDR thresholded peaks", "assembly": "GRCh38", "file_size": 1468006, "file_size_human": "1.4 MB", "experiment_accession": "ENCSR447NKX"}
+  ],
   "total": 1,
-  "files": [{"accession": "ENCFF789NKX", "output_type": "IDR thresholded peaks", "assembly": "GRCh38"}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

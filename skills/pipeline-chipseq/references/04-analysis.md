@@ -3,6 +3,7 @@
 ## Tools
 - **MACS2 2.2.9.1** (image version): Model-based Analysis of ChIP-Seq (Zhang et al. 2008, ~7,000 citations)
 - **IDR 2.0.4.2** (image version): Irreproducible Discovery Rate (Li et al. 2011, ~1,500 citations)
+- **bedtools 2.31.0 + samtools 1.19** (image versions): FRiP counting after peak calling
 
 ## MACS2 Parameters
 
@@ -44,14 +45,21 @@ macs2 callpeak -t treatment.bam -c control.bam \
   -f BAMPE -g hs -n sample \
   --qvalue 0.05 --nomodel --keep-dup all --broad --broad-cutoff 0.1 -B
 
-# IDR on the first two replicate peak files, sorted by name (narrow runs only)
+# IDR, once per pair of replicates, the two names sorted alphabetically (narrow runs only)
 idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
   --input-file-type narrowPeak \
   --rank p.value \
-  --output-file idr_peaks.txt \
+  --output-file rep1_vs_rep2.idr_peaks.txt \
   --plot \
   --idr-threshold 0.05
 ```
+
+## FRiP (workflow)
+
+After peak calling the workflow computes the fraction of reads in peaks for every
+treatment sample, in both narrow and broad mode, and publishes
+`qc/<sample>.frip_mqc.tsv`. The command and the output columns are in
+`references/05-qc-metrics.md`.
 
 ## What the workflow publishes
 
@@ -60,19 +68,22 @@ idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
 - `peaks/<narrow|broad>/<sample>_peaks.xls`
 - `peaks/<narrow|broad>/<sample>_treat_pileup.bdg` and `<sample>_control_lambda.bdg`
   (consumed by Stage 5)
-- `peaks/idr/idr_peaks.txt` and, when IDR emits it, `idr_peaks.txt.png`
+- `peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt` and, when IDR emits it,
+  `<sampleA>_vs_<sampleB>.idr_peaks.txt.png`, one pair of files per replicate pair
+- `qc/<sample>.frip_mqc.tsv` (see `references/05-qc-metrics.md`)
 
-`<sample>_summits.bed` is produced by `--call-summits` but is not declared as an output, so
-it stays in the Nextflow work directory.
+`<sample>_summits.bed` is produced by `--call-summits` and published to `peaks/narrow/`;
+broad runs do not produce it.
 
 ## What the IDR step does and does not do
 
-The workflow collects the per-sample peak files, sorts them by file name, and runs `idr`
-once on the first two. Consequently:
+All samples matched by `--reads` are treated as replicates of one experiment. The workflow
+sorts them by sample name and runs `idr` once for every pair. Consequently:
 
 - Only narrow runs get IDR (`--peak_type broad` produces no `peaks/idr/`).
-- With fewer than two peak files, IDR is skipped silently.
-- With more than two, the extra files are dropped and a warning is logged.
+- Two samples give one comparison, three give three, four give six. No replicate is
+  dropped.
+- With a single peak file there is no pair, so IDR is skipped silently.
 - There are **no** pooled-replicate calls, **no** pseudoreplicates, and **no** optimal /
   conservative peak sets.
 - Rescue ratio and self-consistency ratio are **not computed**. Computing them requires
@@ -89,7 +100,7 @@ idr --samples pr1_peaks.narrowPeak pr2_peaks.narrowPeak \
   --plot
 ```
 
-FRiP is also a manual calculation; see `references/05-qc-metrics.md`.
+Pooled peak calls across replicates are likewise outside this workflow.
 
 ## IDR Interpretation
 
@@ -104,15 +115,17 @@ FRiP is also a manual calculation; see `references/05-qc-metrics.md`.
 
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
-| FRiP (manual) | >=1% | Poor enrichment; check antibody |
+| FRiP (`qc/<sample>.frip_mqc.tsv`) | >=0.01 (1%) | Poor enrichment; check antibody |
 | IDR peaks | >20,000 (TF) | Low enrichment or poor replicates |
 | Peak count ratio | IDR = 30-70% of rep peaks | Replicate consistency issue |
 
 ## Notes
 
-- Peaks are called on individual replicates; the IDR step then compares two of them.
+- Peaks are called on individual replicates; the IDR step then compares every pair of them.
 - For broad marks, IDR is not standard practice, which matches the workflow: broad runs
   skip it. Use pooled replicate peak calls instead, produced manually.
 - The `--call-summits` flag identifies subpeak summits within broader peak regions,
   useful for motif analysis downstream.
-- FRiP is calculated as: reads overlapping peaks / total reads in the filtered BAM.
+- FRiP is calculated by the workflow as: alignments of `filtered/<sample>.final.bam` that
+  overlap a peak / all alignments of that BAM. Control libraries are not peak-called, so
+  they get no FRiP row.

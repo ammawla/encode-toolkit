@@ -5,6 +5,8 @@
    keyword arguments that the tool accepts (read from the server source with ``ast``).
 2. Every ``nextflow run`` example in a pipeline skill must use only parameters that the
    pipeline declares and only profiles that its nextflow.config defines.
+3. A JSON example that directly follows a tool call is that tool's output, so every field name
+   in it must be one the server can emit (a field of its models or a key it writes).
 """
 
 from __future__ import annotations
@@ -20,15 +22,30 @@ SERVER = ROOT / "src" / "encode_connector" / "server" / "main.py"
 
 CALL_RE = re.compile(r"\b(encode_[a-z_]+)\s*\(")
 KEYWORD_RE = re.compile(r"\s*([A-Za-z_]\w*)\s*=(?!=)")
+STRING_VALUE_RE = re.compile(r"""\s*[A-Za-z_]\w*\s*=\s*(["'])([^"']*)\1\s*$""")
 FENCE_RE = re.compile(r"```[^\n]*\n(.*?)```", re.S)
 FLAG_RE = re.compile(r"(?<![\w-])--([A-Za-z_]\w*)")
 PROFILE_RE = re.compile(r"(?<![\w-])-profile[ =]+([\w,]+)")
 
 
-def tool_signatures() -> dict[str, set[str]]:
+def literal_values(annotation: ast.expr | None) -> set[str]:
+    """String choices of a ``Literal[...]`` annotation (also inside ``Literal[...] | None``)."""
+    if annotation is None:
+        return set()
+    return {
+        constant.value
+        for node in ast.walk(annotation)
+        if isinstance(node, ast.Subscript) and getattr(node.value, "id", "") == "Literal"
+        for constant in ast.walk(node.slice)
+        if isinstance(constant, ast.Constant) and isinstance(constant.value, str)
+    }
+
+
+def tool_signatures() -> dict[str, dict[str, set[str]]]:
+    """Tool name -> parameter name -> allowed string values (empty when the parameter is free-form)."""
     tree = ast.parse(SERVER.read_text())
     return {
-        node.name: {arg.arg for arg in node.args.args + node.args.kwonlyargs}
+        node.name: {arg.arg: literal_values(arg.annotation) for arg in node.args.args + node.args.kwonlyargs}
         for node in ast.walk(tree)
         if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and node.name.startswith("encode_")
     }
@@ -79,7 +96,7 @@ def top_level_arguments(arguments: str) -> list[str]:
     return [*parts, current]
 
 
-def check_tool_calls(signatures: dict[str, set[str]]) -> list[str]:
+def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
     problems = []
     for doc in sorted(SKILLS.rglob("*.md")):
         text = doc.read_text()
@@ -95,9 +112,20 @@ def check_tool_calls(signatures: dict[str, set[str]]) -> list[str]:
                 continue
             for argument in top_level_arguments(arguments):
                 keyword = KEYWORD_RE.match(argument)
-                if keyword and keyword.group(1) not in signatures[tool]:
+                if not keyword:
+                    continue
+                name = keyword.group(1)
+                if name not in signatures[tool]:
                     accepted = ", ".join(sorted(signatures[tool]))
-                    problems.append(f"{where}: {tool}() has no parameter '{keyword.group(1)}' (accepts: {accepted})")
+                    problems.append(f"{where}: {tool}() has no parameter '{name}' (accepts: {accepted})")
+                    continue
+                value = STRING_VALUE_RE.match(argument)
+                choices = signatures[tool][name]
+                # placeholders such as "..." or "<type>" are not meant literally
+                if value and choices and value.group(2) not in choices and value.group(2).isidentifier():
+                    problems.append(
+                        f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {", ".join(sorted(choices))})'
+                    )
     return problems
 
 
@@ -165,8 +193,69 @@ def check_pipeline_examples() -> list[str]:
     return problems
 
 
+BLOCK_RE = re.compile(r"```([^\n`]*)\n(.*?)```", re.S)  # any info string: ```R, ```json, ```bash
+JSON_TOKEN_RE = re.compile(r'"((?:[^"\\]|\\.)*)"\s*(:)?|[{}]')
+FIELD_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
+
+
+def server_field_names() -> set[str]:
+    """Every name the server could use as a JSON key: string literals, model fields, keywords."""
+    names: set[str] = set()
+    for source in (ROOT / "src" / "encode_connector").rglob("*.py"):
+        text = source.read_text()
+        names |= set(re.findall(r"[\"']([A-Za-z_][\w.]*)[\"']", text))
+        names |= set(re.findall(r"^\s{4}([a-z_][a-z0-9_]*):\s", text, re.M))
+        names |= set(re.findall(r"\b([a-z_][a-z0-9_]*)=", text))
+        # rows read back from SQLite use the column names of the CREATE TABLE statements
+        names |= set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", text, re.M))
+    return names
+
+
+def example_keys(body: str):
+    """Yield (key, ancestors) for each object key in JSON-like text, tolerating ``...`` gaps."""
+    stack: list[str | None] = []
+    pending: str | None = None
+    for token in JSON_TOKEN_RE.finditer(body):
+        text = token.group(0)
+        if text == "{":
+            stack.append(pending)
+            pending = None
+        elif text == "}":
+            if stack:
+                stack.pop()
+        elif token.group(2):
+            pending = token.group(1)
+            yield pending, [name for name in stack if name]
+
+
+def check_output_examples(known: set[str]) -> list[str]:
+    problems = []
+    for doc in sorted(SKILLS.rglob("*.md")):
+        text = doc.read_text()
+        previous_tool, previous_end = None, 0
+        for block in BLOCK_RE.finditer(text):
+            language, body = block.groups()
+            # "directly follows": only a short lead-in such as "Expected output:" in between,
+            # and no new heading. JSON further away documents something else (a log format,
+            # another service's API).
+            gap = text[previous_end : block.start()]
+            if language.strip().lower() == "json" and previous_tool and len(gap) < 200 and "\n#" not in gap:
+                line = text.count("\n", 0, block.start()) + 1
+                for key, ancestors in example_keys(body):
+                    # counts keyed by data values (facets, by_assay, ...) are not field names
+                    if any(name == "facets" or name.startswith("by_") for name in ancestors):
+                        continue
+                    if FIELD_NAME_RE.fullmatch(key) and key not in known:
+                        where = f"{doc.relative_to(ROOT)}:{line}"
+                        problems.append(f"{where}: {previous_tool}() output has no field '{key}'")
+            calls = CALL_RE.findall(body)
+            previous_tool, previous_end = (calls[-1] if calls else None), block.end()
+    return problems
+
+
 def main() -> int:
     problems = check_tool_calls(tool_signatures()) + check_pipeline_examples()
+    problems += check_output_examples(server_field_names())
     for problem in problems:
         print(problem)
     print(f"{len(problems)} problem(s)")

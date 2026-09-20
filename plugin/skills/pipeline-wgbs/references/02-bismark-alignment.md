@@ -62,8 +62,9 @@ the later step.
 
 Bismark parallel mode runs several Bowtie2 instances, each holding its own copy of a
 converted genome index. `nextflow.config` allocates 48 GB to `BISMARK_ALIGN` with
-`--parallel 4` on a human genome, doubling on each retry up to `--max_memory` (64 GB by
-default). Budget for the 48 GB figure rather than a per-instance estimate.
+`--parallel 4` on a human genome, and multiplies it by the attempt number on a retry,
+capped by `--max_memory` (64 GB by default, so a retry gets 64 GB). Budget for the 48 GB
+figure rather than a per-instance estimate.
 
 ## Alternative: bwa-meth
 

@@ -46,10 +46,10 @@ The workflow applies exactly this mapping, matching ENCODE's `STAR_RSEM.sh`
 ## Unique vs UniqueMultiple
 
 `Signal.UniqueMultiple.*` includes multi-mapped reads (ENCODE standard) and is what the
-workflow converts. `Signal.Unique.*` counts only uniquely mapped reads and is a more
-conservative estimate, but it is not a declared process output, so it stays in the
-Nextflow work directory and is never published to `star/`. To keep it, copy it out of
-`work/` yourself or convert it manually with the commands below.
+workflow converts to bigWig. `Signal.Unique.*` counts only uniquely mapped reads and is a
+more conservative estimate; it is published as
+`star/<sample>.Signal.Unique.str*.out.bg` but is not converted, so run the commands below
+on it yourself if you want that track as a bigWig.
 
 ## bedGraph to bigWig Conversion
 

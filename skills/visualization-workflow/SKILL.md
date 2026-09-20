@@ -514,8 +514,14 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [
+    {"accession": "ENCFF234ACE", "file_format": "bigWig", "output_type": "fold change over control", "assembly": "GRCh38", "file_size": 149422080, "file_size_human": "142.5 MB", "experiment_accession": "ENCSR133RZO"}
+  ],
   "total": 6,
-  "files": [{"accession": "ENCFF234ACE", "output_type": "fold change over control", "file_size_mb": 142.5}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -553,10 +559,14 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [
+    {"accession": "ENCFF111BRN", "file_format": "bigWig", "output_type": "fold change over control", "assembly": "GRCh38", "file_size": 103488716, "file_size_human": "98.7 MB", "experiment_accession": "ENCSR800BRN"}
+  ],
   "total": 12,
-  "files": [
-    {"accession": "ENCFF111BRN", "file_format": "bigWig", "output_type": "fold change over control", "file_size_mb": 98.7}
-  ]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

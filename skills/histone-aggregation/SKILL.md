@@ -294,11 +294,15 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 5,
-  "experiments": [
+  "results": [
     {"accession": "ENCSR111PAN", "biosample_summary": "pancreas tissue male adult (44 years)"},
     {"accession": "ENCSR222PAN", "biosample_summary": "pancreas tissue female adult (51 years)"}
-  ]
+  ],
+  "total": 5,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -318,11 +322,15 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [
+    {"accession": "ENCFF100PK1", "output_type": "IDR thresholded peaks", "file_size_human": "1.2 MB"},
+    {"accession": "ENCFF200PK2", "output_type": "IDR thresholded peaks", "file_size_human": "1.5 MB"}
+  ],
   "total": 5,
-  "files": [
-    {"accession": "ENCFF100PK1", "output_type": "IDR thresholded peaks", "file_size_mb": 1.2},
-    {"accession": "ENCFF200PK2", "output_type": "IDR thresholded peaks", "file_size_mb": 1.5}
-  ]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -352,8 +360,12 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [{"accession": "ENCFF999LIV", "output_type": "IDR thresholded peaks", "assembly": "GRCh38"}],
   "total": 8,
-  "files": [{"accession": "ENCFF999LIV", "output_type": "IDR thresholded peaks", "assembly": "GRCh38"}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

@@ -84,7 +84,7 @@ jobs:
           - pipeline: rnaseq
             tools: fastqc trim_galore STAR rsem-calculate-expression kallisto samtools bedGraphToBigWig infer_experiment.py multiqc
             smoke: >-
-              shows 'FastQC v0.12.1' fastqc --version && shows 'version 0.6.10' trim_galore --version && shows '2.7.11b' STAR --version && shows 'RSEM' rsem-calculate-expression --version && shows '0.50.1' kallisto version && shows '5.0.3' infer_experiment.py --version && shows 'samtools 1.19' samtools --version
+              shows 'FastQC v0.12.1' fastqc --version && shows 'version 0.6.10' trim_galore --version && shows '2.7.11b' STAR --version && shows 'RSEM' rsem-calculate-expression --version && shows '0.50.1' kallisto version && shows 'infer_experiment.py 5.0' infer_experiment.py --version && shows 'samtools 1.19' samtools --version
           - pipeline: wgbs
             tools: fastqc trim_galore bismark deduplicate_bismark bowtie2 samtools MethylDackel bgzip tabix multiqc
             smoke: >-
@@ -118,7 +118,8 @@ jobs:
         env:
           PIPELINE: ${{ matrix.pipeline }}
           SMOKE: ${{ matrix.smoke }}
-          # Note: the IDR 2.0.4.2 release tag still reports itself as "IDR 2.0.3" upstream.
+          # Note: the IDR 2.0.4.2 release tag still reports itself as "IDR 2.0.3" upstream, and the
+          # RSeQC 5.0.3 release reports itself as 5.0.2, so those two patterns stop at the minor version.
           # shows PATTERN CMD...: run CMD, ignore its exit status (many tools exit non-zero for
           # --version or usage), and require PATTERN in its output. Output is captured first so
           # grep never closes a pipe early.

@@ -96,11 +96,11 @@ For each experiment, record in the log:
 | Target | H3K27ac | encode_get_experiment |
 | Biosample | pancreas tissue | encode_get_experiment |
 | Lab | Bing Ren, UCSD | encode_get_experiment |
-| Replicates | 2 biological | encode_get_experiment |
-| Sequencer | Illumina HiSeq 4000 | encode_get_experiment |
-| Read length | 76bp PE | encode_get_experiment |
+| Replicates | 2 biological | encode_get_experiment (`bio_replicate_count`) |
+| Sequencer | Illumina HiSeq 4000 | ENCODE portal |
+| Read length | 76bp PE | ENCODE portal |
 | Read count | 42.3M per rep | File metadata |
-| Library | TruSeq ChIP | encode_get_experiment |
+| Library | TruSeq ChIP | ENCODE portal |
 | Batch/date | 2019-06-15 | encode_get_experiment |
 
 ## Step 2: Log Every Operation
@@ -490,12 +490,31 @@ encode_track_experiment(accession="ENCSR000AKA", notes="H3K27ac ChIP-seq in GM12
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR000AKA",
-  "notes": "H3K27ac ChIP-seq in GM12878 for enhancer analysis",
-  "tracked_at": "2025-03-08T10:00:00Z"
+  "tracking": {
+    "accession": "ENCSR000AKA",
+    "action": "tracked"
+  },
+  "auto_linked_references": [
+    {"type": "geo_accession", "id": "GSE29611"}
+  ],
+  "publications_found": 1,
+  "publications": [
+    {
+      "pmid": "22955616",
+      "doi": "10.1038/nature11247",
+      "title": "An integrated encyclopedia of DNA elements in the human genome",
+      "authors": "ENCODE Project Consortium",
+      "journal": "Nature",
+      "year": "2012",
+      "abstract": ""
+    }
+  ],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
+
+The `notes` you pass are written to the tracker but not echoed here — read them back with `encode_list_tracked`.
 
 ### Step 2: Log file downloads with MD5 verification
 
@@ -506,9 +525,25 @@ encode_download_files(file_accessions=["ENCFF001ABC"], download_dir="/data/chips
 Expected output:
 ```json
 {
-  "downloaded": 1,
-  "md5_verified": true,
-  "files": ["/data/chipseq/ENCFF001ABC.bed.gz"]
+  "downloaded": [
+    {
+      "accession": "ENCFF001ABC",
+      "file_path": "/data/chipseq/ENCFF001ABC.bed.gz",
+      "file_size": 1258291,
+      "file_size_human": "1.2 MB",
+      "success": true,
+      "error": "",
+      "md5_verified": true
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "total_requested": 1,
+    "successful": 1,
+    "failed": 0,
+    "total_size": 1258291,
+    "total_size_human": "1.2 MB"
+  }
 }
 ```
 
@@ -527,10 +562,11 @@ encode_log_derived_file(
 Expected output:
 ```json
 {
-  "status": "logged",
-  "derived_file": "/data/analysis/gm12878_enhancers_filtered.bed",
-  "source_count": 2,
-  "logged_at": "2025-03-08T11:00:00Z"
+  "success": true,
+  "record_id": 7,
+  "file_path": "/data/analysis/gm12878_enhancers_filtered.bed",
+  "source_accessions": ["ENCFF001ABC", "ENCFF002DEF"],
+  "message": "Provenance logged. Use encode_get_provenance to view the full chain."
 }
 ```
 
@@ -540,17 +576,21 @@ Expected output:
 encode_get_provenance(file_path="/data/analysis/gm12878_enhancers_filtered.bed")
 ```
 
-Expected output:
+Expected output (the record also carries `created_at`, a float epoch timestamp):
 ```json
 {
-  "file": "/data/analysis/gm12878_enhancers_filtered.bed",
-  "description": "Filtered H3K27ac peaks",
-  "tool": "bedtools v2.31.0",
-  "sources": [
-    {"accession": "ENCFF001ABC", "type": "encode_file"},
-    {"accession": "ENCFF002DEF", "type": "encode_file"}
-  ],
-  "logged_at": "2025-03-08T11:00:00Z"
+  "id": 7,
+  "file_path": "/data/analysis/gm12878_enhancers_filtered.bed",
+  "source_accessions": ["ENCFF001ABC", "ENCFF002DEF"],
+  "description": "Filtered H3K27ac peaks: removed blacklist regions, merged within 500bp, filtered signalValue > 5",
+  "file_type": "",
+  "tool_used": "bedtools v2.31.0",
+  "parameters": "intersect -v (blacklist), merge -d 500, filter signalValue > 5",
+  "notes": "",
+  "source_experiments": [
+    {"accession": "ENCFF001ABC", "tracked": false},
+    {"accession": "ENCFF002DEF", "tracked": false}
+  ]
 }
 ```
 
@@ -578,9 +618,14 @@ encode_track_experiment(accession="ENCSR000AKA", notes="GM12878 H3K27ac for enha
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR000AKA",
-  "notes": "GM12878 H3K27ac for enhancer catalog"
+  "tracking": {
+    "accession": "ENCSR000AKA",
+    "action": "tracked"
+  },
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
 
@@ -597,9 +642,11 @@ encode_log_derived_file(
 Expected output:
 ```json
 {
-  "status": "logged",
-  "derived_file": "/data/peaks_filtered.bed",
-  "source_count": 1
+  "success": true,
+  "record_id": 8,
+  "file_path": "/data/peaks_filtered.bed",
+  "source_accessions": ["ENCFF001ABC"],
+  "message": "Provenance logged. Use encode_get_provenance to view the full chain."
 }
 ```
 
@@ -611,9 +658,15 @@ encode_get_provenance(file_path="/data/peaks_filtered.bed")
 Expected output:
 ```json
 {
-  "file": "/data/peaks_filtered.bed",
-  "tool": "bedtools v2.31.0",
-  "sources": [{"accession": "ENCFF001ABC", "type": "encode_file"}]
+  "id": 8,
+  "file_path": "/data/peaks_filtered.bed",
+  "source_accessions": ["ENCFF001ABC"],
+  "description": "Blacklist-filtered peaks",
+  "file_type": "",
+  "tool_used": "bedtools v2.31.0",
+  "parameters": "",
+  "notes": "",
+  "source_experiments": [{"accession": "ENCFF001ABC", "tracked": false}]
 }
 ```
 

@@ -150,6 +150,11 @@ error if it or the project/queue is missing.
 | HiCCUPS | 4 | 16 GB | 1-2 hours |
 | **Total** | **8** | **64 GB** | **8-16 hours** |
 
+The RAM column is each step's first-attempt request. Every process asks for that
+much memory per attempt, so a task killed for exceeding it is retried with more
+(at most two retries, capped by `--max_memory`). Failures with any other exit
+status stop the run.
+
 ## Pipeline Parameters
 
 | Parameter | Default | Description |
@@ -158,7 +163,8 @@ error if it or the project/queue is missing.
 | `--bwa_index` | required | BWA index prefix: the genome FASTA path whose `.amb .ann .bwt .pac .sa` files sit beside it (every file starting with this prefix is staged) |
 | `--chrom_sizes` | required | Chromosome sizes file |
 | `--outdir` | `./results` | Output directory |
-| `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions for `juicer_tools pre` and `cooler zoomify`. The cooler base bin is fixed at 1000, so every value must be a multiple of 1000; keep 5000, 10000 and 25000 because HiCCUPS runs at exactly those resolutions |
+| `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions for `juicer_tools pre` and `cooler zoomify`. The smallest value is the cooler base bin, and every other value must be a multiple of it; the workflow stops with an error otherwise |
+| `--hiccups_resolutions` | `5000,10000,25000` | Resolutions HiCCUPS calls loops at. Only 5000, 10000 and 25000 are accepted, and each must also be listed in `--resolutions`; the workflow stops with an error otherwise. Peak width (`-p`), window width (`-i`) and FDR (`-f`) follow Juicer's published per-resolution defaults |
 | `--min_mapq` | `30` | Minimum MAPQ passed to `pairtools parse` |
 | `--hiccups_gpu` | `false` | Run HiCCUPS on an NVIDIA GPU. By default the CPU mode is used, which only searches within 8 Mb of the diagonal |
 | `--assembly` | `hg38` | Assembly name recorded in the `.mcool` metadata (`cooler cload --assembly`). The `.hic` file is built from the chrom.sizes file only |
@@ -284,7 +290,9 @@ Different normalization methods yield different results:
 Do not call features at resolutions unsupported by sequencing depth:
 - Calling 1 kb loops from 100M contacts will produce noise
 - Check the Juicer resolution QC to determine achievable resolution
-- HiCCUPS here runs at 5 kb, 10 kb and 25 kb, so `--resolutions` must keep those values
+- HiCCUPS runs at the resolutions in `--hiccups_resolutions` (default 5 kb, 10 kb
+  and 25 kb); each of them must also be listed in `--resolutions`, because HiCCUPS
+  reads them out of the `.hic` file
 
 ### Ligation Artifacts
 Monitor the pair-type breakdown in `pairs/{sample}.parse_stats.txt`:
@@ -336,7 +344,7 @@ Expected output:
   "accession": "ENCSR000AKA",
   "assay_title": "Hi-C",
   "biosample_summary": "GM12878",
-  "replicates": 2,
+  "bio_replicate_count": 2,
   "status": "released"
 }
 ```
@@ -347,19 +355,31 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF500HI1", "output_type": "reads", "paired_end": "1", "file_size_mb": 35000},
-    {"accession": "ENCFF501HI2", "output_type": "reads", "paired_end": "2", "file_size_mb": 36000}
-  ]
-}
+[
+  {"accession": "ENCFF500HI1", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "34.2 GB", "status": "released"},
+  {"accession": "ENCFF501HI2", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "35.2 GB", "status": "released"}
+]
 ```
 
 **Interpretation**: Hi-C paired-end reads represent chimeric ligation junctions. Each read pair captures a 3D contact.
 
-### Step 3: Run the Hi-C pipeline
+### Step 3: Name the files so a read-pair glob can find them
+
+ENCODE FASTQs are named by accession, so the two mates of a pair share no
+prefix, and the workflow matches file pairs with a `{1,2}` glob. Which mate a
+file is comes from its page on encodeproject.org (`paired_end` 1 or 2, and
+`paired_with` naming the other accession), not from any tool here. Link the
+files into the shape the glob expects:
+
+```bash
+mkdir -p fastq
+ln -s "$PWD/ENCFF500HI1.fastq.gz" fastq/ENCSR000AKA_R1.fastq.gz
+ln -s "$PWD/ENCFF501HI2.fastq.gz" fastq/ENCSR000AKA_R2.fastq.gz
+```
+
+### Step 4: Run the Hi-C pipeline
 
 ```bash
 nextflow run scripts/main.nf \
@@ -377,14 +397,15 @@ Key pipeline steps:
 3. pairtools parse + sort (classify pairs, MAPQ 30, mask walks)
 4. pairtools dedup (remove PCR duplicates), then select UU pairs
 5. Contact matrix generation (`.hic` via Juicer, `.mcool` via cooler)
-6. Loop calling (HiCCUPS at 5 kb, 10 kb and 25 kb, merged into one BEDPE)
+6. Loop calling (HiCCUPS at the `--hiccups_resolutions`, by default 5 kb, 10 kb
+   and 25 kb, merged into one BEDPE)
 
-### Step 4: Validate output quality
+### Step 5: Validate output quality
 
 Use the QC threshold table above with `pairs/{sample}.parse_stats.txt`,
 `pairs/{sample}.dedup_stats.txt` and `qc/{sample}.contact_stats.txt`.
 
-### Step 5: Identify significant loops
+### Step 6: Identify significant loops
 
 Download loop calls for downstream analysis:
 ```
@@ -411,15 +432,19 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 4,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR654HRT",
       "assay_title": "Hi-C",
       "biosample_summary": "heart left ventricle tissue male adult (51 years)",
       "status": "released"
     }
-  ]
+  ],
+  "total": 4,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -434,11 +459,11 @@ Expected output:
 {
   "accession": "ENCSR654HRT",
   "assay_title": "Hi-C",
-  "replicates": 2,
+  "bio_replicate_count": 2,
   "biosample_summary": "heart left ventricle tissue male adult (51 years)",
-  "files_count": 18,
-  "assembly": "GRCh38",
-  "audit": {"ERROR": 0, "WARNING": 1}
+  "assembly": ["GRCh38"],
+  "audit_error_count": 0,
+  "audit_warning_count": 1
 }
 ```
 
@@ -470,7 +495,7 @@ When reporting Hi-C pipeline results:
 - **Valid pair count**: Report the UU pair count and its fraction of all parsed pairs from `pairs/{sample}.parse_stats.txt`. UU is the only pair type this workflow carries forward
 - **Cis/trans ratio**: Report the cis/trans contact ratio (>1.5 pass) and long-range cis fraction (>20kb, >40% expected) from `qc/{sample}.contact_stats.txt`. These are the primary Hi-C quality indicators
 - **Contact matrix resolution**: Report the achievable resolution based on sequencing depth (e.g., "500M valid pairs supports 5kb resolution") and list the `--resolutions` actually generated
-- **Loop counts**: Report the number of loops in `loops/{sample}.hiccups_loops.bedpe`. HiCCUPS searches 5 kb, 10 kb and 25 kb and merges them into that single file; per-resolution files stay in the Nextflow work directory
+- **Loop counts**: Report the number of loops in `loops/{sample}.hiccups_loops.bedpe` (the file starts with a `#chr1 ...` header line, so exclude it from the count). HiCCUPS searches the resolutions in `--hiccups_resolutions` (default 5 kb, 10 kb and 25 kb) and merges them into that single file; per-resolution files stay in the Nextflow work directory
 - **Matrix paths**: Provide paths to the .hic file (Juicebox-compatible) and .mcool file (cooler/HiGlass-compatible)
 - **Key QC metrics**: Present library complexity (unique/total >0.7, from `pairs/{sample}.dedup_stats.txt`) and the pair-type breakdown from `pairs/{sample}.parse_stats.txt` in a summary table
 - **Normalization**: Note that `.hic` carries KR, VC and VC_SQRT vectors (HiCCUPS uses KR) and the `.mcool` is ICE-balanced by `cooler zoomify --balance`

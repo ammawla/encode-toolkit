@@ -245,7 +245,10 @@ params {
 
 process {
     container      = params.container
-    errorStrategy  = 'retry'
+    // Retry only when a task was killed for exceeding its memory or time (exit codes
+    // 130-145 and 104); every process requests memory per attempt, so the retry gets more.
+    // Any other failure is a real error: stop and report it.
+    errorStrategy  = { task.exitStatus in ((130..145) + 104) ? 'retry' : 'finish' }
     maxRetries     = 2
     // Nextflow's built-in ceiling: every process request is capped at these values.
     resourceLimits = [cpus: params.max_cpus, memory: params.max_memory, time: params.max_time]
@@ -375,19 +378,33 @@ When the user needs specific processing steps (not full pipelines), extract the 
 
 #### Alignment (ChIP-seq / ATAC-seq)
 ```bash
-# ENCODE ChIP-seq alignment (from chip-seq-pipeline2)
-bwa mem -t ${NCPUS} ${GENOME_INDEX} ${FASTQ_R1} ${FASTQ_R2} | \
-    samtools view -@ ${NCPUS} -bS -q 30 -F 1804 - | \
-    samtools sort -@ ${NCPUS} -o aligned.bam
-samtools index aligned.bam
+# What pipeline-chipseq runs (BWA_MEM). The -F 1804 flag filter is a separate
+# step (FILTER_SORT), not part of this command.
+bwa mem -t ${NCPUS} ${GENOME_INDEX}/${GENOME}.fa ${FASTQ_R1} ${FASTQ_R2} | \
+    samtools view -@ ${NCPUS} -bS -q 30 - | \
+    samtools sort -@ ${NCPUS} -m 2G -o sample.bam -
+samtools index sample.bam
+samtools flagstat sample.bam > sample.flagstat.txt
 
-# Mark/remove duplicates
+# What pipeline-atacseq runs (BOWTIE2_ALIGN)
+bowtie2 --very-sensitive -X 2000 --no-mixed --no-discordant \
+    --threads ${NCPUS} -x ${GENOME_INDEX}/${GENOME} \
+    -1 ${FASTQ_R1} -2 ${FASTQ_R2} 2> sample.bowtie2.log | \
+    samtools view -@ ${NCPUS} -bS -q 30 -f 2 - | \
+    samtools sort -@ ${NCPUS} -m 2G -o sample.bam -
+samtools index sample.bam
+
+# Mark/remove duplicates (MARK_DUPLICATES in both workflows)
 picard MarkDuplicates \
-    INPUT=aligned.bam \
-    OUTPUT=dedup.bam \
-    METRICS_FILE=dup_metrics.txt \
-    REMOVE_DUPLICATES=true
+    INPUT=sample.filtered.bam \
+    OUTPUT=sample.dedup.bam \
+    METRICS_FILE=sample.dup_metrics.txt \
+    REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
 ```
+
+These are the commands the toolkit's own Nextflow workflows run
+(`pipeline-chipseq/scripts/main.nf`, `pipeline-atacseq/scripts/main.nf`). They
+are not copied from ENCODE's WDL pipelines, whose commands differ.
 
 #### Peak Calling (MACS2)
 ```bash
@@ -410,18 +427,20 @@ in `BAMPE` mode, where MACS2 takes the fragment from the read pair. `pipeline-at
 
 #### IDR Analysis
 ```bash
-# What pipeline-chipseq and pipeline-atacseq run: one IDR pass over the first two
-# replicate peak files, narrow peaks only.
+# What pipeline-chipseq and pipeline-atacseq run, once for every pair of samples
+# matched by --reads (narrow peaks only; 2 samples -> 1 comparison, 3 -> 3).
 idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
     --input-file-type narrowPeak \
     --rank p.value \
-    --output-file idr_peaks.txt \
+    --output-file rep1_vs_rep2.idr_peaks.txt \
     --plot \
     --idr-threshold 0.05
 ```
 
-There is no pooled or pseudoreplicate analysis and no rescue/self-consistency ratio in these
-workflows; add those steps yourself if you need the full ENCODE IDR protocol.
+Each comparison is published as `peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt` (plus a
+`.png`), with the two names in alphabetical order; with a single sample IDR is skipped. There is
+no pooled or pseudoreplicate analysis and no rescue/self-consistency ratio in these workflows;
+add those steps yourself if you need the full ENCODE IDR protocol.
 
 #### RNA-seq Quantification
 ```bash
@@ -615,9 +634,9 @@ Expected output:
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac",
   "biosample_summary": "GM12878",
-  "replicates": 2,
-  "status": "released",
-  "pipeline": "Histone ChIP-seq (GRCh38)"
+  "bio_replicate_count": 2,
+  "assembly": ["GRCh38"],
+  "status": "released"
 }
 ```
 
@@ -629,14 +648,12 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF001FQ1", "output_type": "reads", "file_format": "fastq", "biological_replicates": [1], "paired_end": "1", "file_size_mb": 2400},
-    {"accession": "ENCFF002FQ2", "output_type": "reads", "file_format": "fastq", "biological_replicates": [1], "paired_end": "2", "file_size_mb": 2500}
-  ]
-}
+[
+  {"accession": "ENCFF001FQ1", "output_type": "reads", "file_format": "fastq", "biological_replicates": [1], "file_size_human": "2.3 GB", "status": "released"},
+  {"accession": "ENCFF002FQ2", "output_type": "reads", "file_format": "fastq", "biological_replicates": [1], "file_size_human": "2.4 GB", "status": "released"}
+]
 ```
 
 ### Step 3: Select pipeline based on assay type
@@ -655,7 +672,8 @@ Expected output:
 ### Step 4: Configure and run
 
 For Histone ChIP-seq. `--reads` is a glob that Nextflow's `fromFilePairs` must resolve, so give
-the downloaded ENCFF files `_R1`/`_R2` names first:
+the downloaded ENCFF files `_R1`/`_R2` names first. Which mate each accession is comes from its
+page on encodeproject.org (`paired_end` 1 or 2, and `paired_with` naming the other accession):
 
 ```bash
 mkdir -p fastq
@@ -685,9 +703,10 @@ Use → **quality-assessment** skill to evaluate pipeline output against ENCODE 
 - NSC > 1.05
 - RSC > 0.8
 
-`pipeline-chipseq` does not compute these: FRiP, and NSC/RSC (phantompeakqualtools) are manual
-steps on the filtered BAM and peak files. The MultiQC report covers FastQC, trimming, flagstat
-and duplication metrics.
+`pipeline-chipseq` computes FRiP for every treatment sample and publishes it as
+`qc/<sample>.frip_mqc.tsv` (also a MultiQC table). NSC and RSC are not computed:
+phantompeakqualtools is not in the pipeline image, so those stay manual steps on the filtered
+BAM. The MultiQC report covers FastQC, trimming, flagstat, duplication metrics and FRiP.
 
 ### Integration with downstream skills
 - Raw data from → **download-encode** provides FASTQ input for all pipelines
@@ -707,7 +726,8 @@ Expected output:
 {
   "accession": "ENCSR000AKA",
   "assay_title": "Histone ChIP-seq",
-  "pipeline": "Histone ChIP-seq (GRCh38)"
+  "assembly": ["GRCh38"],
+  "target": "H3K27ac"
 }
 ```
 
@@ -716,14 +736,12 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF001FQ1", "output_type": "reads", "paired_end": "1", "file_size_mb": 2400},
-    {"accession": "ENCFF002FQ2", "output_type": "reads", "paired_end": "2", "file_size_mb": 2500}
-  ]
-}
+[
+  {"accession": "ENCFF001FQ1", "output_type": "reads", "file_format": "fastq", "file_size_human": "2.3 GB", "status": "released"},
+  {"accession": "ENCFF002FQ2", "output_type": "reads", "file_format": "fastq", "file_size_human": "2.4 GB", "status": "released"}
+]
 ```
 
 ### 3. Survey available data by assay type for pipeline selection
@@ -731,12 +749,16 @@ Expected output:
 encode_get_facets(organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names):
 ```json
 {
-  "facets": {
-    "assay_title": {"Histone ChIP-seq": 2500, "TF ChIP-seq": 1800, "ATAC-seq": 450, "RNA-seq": 1200, "WGBS": 147}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 2500},
+    {"term": "TF ChIP-seq", "count": 1800},
+    {"term": "total RNA-seq", "count": 1200},
+    {"term": "ATAC-seq", "count": 450},
+    {"term": "WGBS", "count": 147}
+  ]
 }
 ```
 

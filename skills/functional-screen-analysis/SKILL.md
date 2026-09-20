@@ -533,14 +533,18 @@ encode_link_reference(
 encode_search_experiments(assay_title="CRISPR screen", biosample_term_name="H1", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
-  "total": 12,
   "results": [
-    {"accession": "ENCSR000CRI", "assay_title": "CRISPR screen", "biosample_summary": "H1-hESC", "target": "enhancer screen"},
-    {"accession": "ENCSR001SGR", "assay_title": "CRISPR screen", "biosample_summary": "H1-hESC", "target": "gene-level growth screen"}
-  ]
+    {"accession": "ENCSR000CRI", "assay_title": "CRISPR screen", "biosample_summary": "H1-hESC", "target": "enhancer screen", "status": "released", "file_count": 9},
+    {"accession": "ENCSR001SGR", "assay_title": "CRISPR screen", "biosample_summary": "H1-hESC", "target": "gene-level growth screen", "status": "released", "file_count": 7}
+  ],
+  "total": 12,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -552,16 +556,18 @@ Expected output:
 encode_get_experiment(accession="ENCSR000CRI")
 ```
 
-Expected output:
+Expected output (the full response also carries `files`, the four `audit_*_count` values and the rest of the experiment metadata):
 ```json
 {
   "accession": "ENCSR000CRI",
   "assay_title": "CRISPR screen",
+  "assay_term_name": "CRISPR screen",
   "biosample_summary": "H1-hESC",
   "description": "CRISPRi screen targeting 10,000 candidate enhancers with NANOG-GFP readout",
-  "replicates": 3,
+  "bio_replicate_count": 3,
+  "tech_replicate_count": 3,
   "status": "released",
-  "lab": "/labs/jesse-engreitz/"
+  "lab": "Jesse Engreitz, Stanford"
 }
 ```
 
@@ -571,14 +577,12 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000CRI", file_format="tsv", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF500SCR", "output_type": "element quantifications", "file_format": "tsv", "file_size_mb": 15.2},
-    {"accession": "ENCFF501GDE", "output_type": "guide quantifications", "file_format": "tsv", "file_size_mb": 8.7}
-  ]
-}
+[
+  {"accession": "ENCFF500SCR", "output_type": "element quantifications", "file_format": "tsv", "file_size": 15938355, "file_size_human": "15.2 MB", "assembly": "GRCh38"},
+  {"accession": "ENCFF501GDE", "output_type": "guide quantifications", "file_format": "tsv", "file_size": 9122611, "file_size_human": "8.7 MB", "assembly": "GRCh38"}
+]
 ```
 
 **Interpretation**: "Element quantifications" contains per-enhancer effect sizes. "Guide quantifications" has per-guide data for QC.
@@ -617,12 +621,15 @@ Overlay significant enhancer hits with:
 encode_get_facets(assay_title="CRISPR screen", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names):
 ```json
 {
-  "facets": {
-    "biosample_ontology.term_name": {"K562": 45, "H1": 12, "GM12878": 8, "HepG2": 6}
-  }
+  "biosample_ontology.term_name": [
+    {"term": "K562", "count": 45},
+    {"term": "H1", "count": 12},
+    {"term": "GM12878", "count": 8},
+    {"term": "HepG2", "count": 6}
+  ]
 }
 ```
 
@@ -634,10 +641,14 @@ encode_search_experiments(assay_title="MPRA", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "total": 28,
   "results": [
     {"accession": "ENCSR100MPR", "assay_title": "MPRA", "biosample_summary": "K562", "status": "released"}
-  ]
+  ],
+  "total": 28,
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 25
 }
 ```
 
@@ -649,10 +660,14 @@ encode_search_experiments(assay_title="STARR-seq", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "total": 15,
   "results": [
     {"accession": "ENCSR200STR", "assay_title": "STARR-seq", "biosample_summary": "HepG2", "status": "released"}
-  ]
+  ],
+  "total": 15,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

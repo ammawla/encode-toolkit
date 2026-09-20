@@ -382,14 +382,18 @@ The GWAS Catalog provides coordinates in GRCh38. Older GWAS studies may report h
 encode_search_experiments(assay_title="ATAC-seq", organ="pancreas", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
-  "total": 6,
   "results": [
-    {"accession": "ENCSR456PAN", "assay_title": "ATAC-seq", "biosample_summary": "pancreas", "status": "released"},
-    {"accession": "ENCSR457ISL", "assay_title": "ATAC-seq", "biosample_summary": "islet of Langerhans", "status": "released"}
-  ]
+    {"accession": "ENCSR456PAN", "assay_title": "ATAC-seq", "biosample_summary": "pancreas", "status": "released", "assembly": ["GRCh38"]},
+    {"accession": "ENCSR457ISL", "assay_title": "ATAC-seq", "biosample_summary": "islet of Langerhans", "status": "released", "assembly": ["GRCh38"]}
+  ],
+  "total": 6,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -401,13 +405,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR457ISL", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF200ISL", "output_type": "IDR thresholded peaks", "file_format": "bed narrowPeak", "file_size_mb": 0.9}
-  ]
-}
+[
+  {"accession": "ENCFF200ISL", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "assembly": "GRCh38", "file_size": 943718, "file_size_human": "0.9 MB", "preferred_default": true}
+]
 ```
 
 ### Step 3: Query GWAS Catalog for T2D associations
@@ -458,12 +460,16 @@ Rank variants by evidence layers:
 encode_get_facets(assay_title="ATAC-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names):
 ```json
 {
-  "facets": {
-    "organ": {"brain": 32, "heart": 18, "liver": 14, "pancreas": 6, "blood": 25}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 32},
+    {"term": "blood", "count": 25},
+    {"term": "heart", "count": 18},
+    {"term": "liver", "count": 14},
+    {"term": "pancreas", "count": 6}
+  ]
 }
 ```
 
@@ -475,10 +481,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="pancreas", targ
 Expected output:
 ```json
 {
-  "total": 4,
   "results": [
     {"accession": "ENCSR300ACE", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "islet of Langerhans"}
-  ]
+  ],
+  "total": 4,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -487,12 +497,16 @@ Expected output:
 encode_track_experiment(accession="ENCSR457ISL", notes="Islet ATAC-seq for T2D GWAS variant annotation")
 ```
 
-Expected output:
+Expected output (`notes` is stored, not echoed — read it back with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR457ISL",
-  "notes": "Islet ATAC-seq for T2D GWAS variant annotation"
+  "tracking": {"accession": "ENCSR457ISL", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "ATAC-seq (replicated)", "version": "2.2.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
 }
 ```
 

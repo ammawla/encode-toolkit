@@ -5,9 +5,9 @@
 - Adapter sequences: TruSeq adapters (Illumina TruSeq Stranded mRNA kit)
 
 ## Tools
-- **FastQC** (unpinned, from the Ubuntu 22.04 package in the image): Per-base quality,
-  adapter content, sequence duplication estimate, GC bias
-- **Trim Galore 0.6.7** (wraps cutadapt 4.4): Adapter trimming + quality filtering
+- **FastQC 0.12.1**: Per-base quality, adapter content, sequence duplication estimate,
+  GC bias
+- **Trim Galore 0.6.10** (wraps cutadapt 4.6): Adapter trimming + quality filtering
 
 ## Key Difference from ATAC-seq / ChIP-seq
 RNA-seq uses **Illumina TruSeq** adapters, not Nextera. Trim Galore auto-detects

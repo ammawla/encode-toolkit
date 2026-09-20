@@ -411,12 +411,16 @@ encode_search_experiments(assay_title="Hi-C", organism="Homo sapiens", limit=50)
 Expected output:
 ```json
 {
-  "total": 89,
   "results": [
     {"accession": "ENCSR000AKA", "assay_title": "Hi-C", "biosample_summary": "GM12878", "status": "released"},
     {"accession": "ENCSR489OCU", "assay_title": "Hi-C", "biosample_summary": "K562", "status": "released"},
     {"accession": "ENCSR382RFU", "assay_title": "Hi-C", "biosample_summary": "liver", "status": "released"}
-  ]
+  ],
+  "total": 89,
+  "limit": 50,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 50
 }
 ```
 
@@ -428,14 +432,12 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="bedpe", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF001ABC", "output_type": "contact domains", "file_format": "bedpe", "file_size_mb": 2.4},
-    {"accession": "ENCFF002DEF", "output_type": "chromatin interactions", "file_format": "bedpe", "file_size_mb": 1.8}
-  ]
-}
+[
+  {"accession": "ENCFF001ABC", "output_type": "contact domains", "file_format": "bedpe", "file_size_human": "2.4 MB"},
+  {"accession": "ENCFF002DEF", "output_type": "chromatin interactions", "file_format": "bedpe", "file_size_human": "1.8 MB"}
+]
 ```
 
 **Interpretation**: Use "chromatin interactions" files for loop aggregation. Contact domains are TADs, not loops.
@@ -446,13 +448,28 @@ Expected output:
 encode_download_files(file_accessions=["ENCFF002DEF", "ENCFF003GHI", "ENCFF004JKL"], download_dir="/data/hic_loops")
 ```
 
-Expected output:
+Expected output (one of the three `downloaded` entries shown):
 ```json
 {
-  "downloaded": 3,
-  "total_size_mb": 5.6,
-  "md5_verified": true,
-  "files": ["/data/hic_loops/ENCFF002DEF.bedpe", "/data/hic_loops/ENCFF003GHI.bedpe", "/data/hic_loops/ENCFF004JKL.bedpe"]
+  "downloaded": [
+    {
+      "accession": "ENCFF002DEF",
+      "file_path": "/data/hic_loops/ENCFF002DEF.bedpe",
+      "file_size": 1887436,
+      "file_size_human": "1.8 MB",
+      "success": true,
+      "error": "",
+      "md5_verified": true
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "total_requested": 3,
+    "successful": 3,
+    "failed": 0,
+    "total_size": 5872025,
+    "total_size_human": "5.6 MB"
+  }
 }
 ```
 
@@ -486,12 +503,13 @@ awk '$1=="chr8" && $2>=127700000 && $3<=128000000' union_loops.bedpe > myc_loops
 encode_get_facets(assay_title="Hi-C", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {
-    "organ": {"brain": 24, "heart": 12, "liver": 8, "lung": 6, "kidney": 4, "blood": 15}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 24},
+    {"term": "blood", "count": 15}
+  ]
 }
 ```
 
@@ -500,20 +518,26 @@ Expected output:
 encode_get_experiment(accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
   "accession": "ENCSR000AKA",
   "assay_title": "Hi-C",
   "biosample_summary": "GM12878",
-  "replicates": 2,
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
   "status": "released",
-  "lab": "/labs/erez-lieberman-aiden/",
-  "audit": {"WARNING": 1, "ERROR": 0}
+  "lab": "Erez Lieberman Aiden, Baylor",
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 1,
+  "audit_internal_action_count": 0
 }
 ```
 
 ### 3. Compare loop sets between two cell types
+
+Both experiments must already be tracked; otherwise the tool returns `{"error": "Experiment ... not tracked. Track it first."}`.
 ```
 encode_compare_experiments(accession1="ENCSR000AKA", accession2="ENCSR489OCU")
 ```
@@ -521,13 +545,20 @@ encode_compare_experiments(accession1="ENCSR000AKA", accession2="ENCSR489OCU")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"assay": "Hi-C", "organism": "Homo sapiens", "assembly": "GRCh38"},
-    "differences": {
-      "biosample": ["GM12878", "K562"],
-      "lab": ["/labs/erez-lieberman-aiden/", "/labs/erez-lieberman-aiden/"]
-    }
-  }
+  "experiment_1": {"accession": "ENCSR000AKA", "assay": "Hi-C", "biosample": "GM12878"},
+  "experiment_2": {"accession": "ENCSR489OCU", "assay": "Hi-C", "biosample": "K562"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Hi-C",
+    "Same biosample type: cell line"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different labs: Erez Lieberman Aiden, Baylor vs Job Dekker, UMass. Batch effects possible."
+  ]
 }
 ```
 

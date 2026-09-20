@@ -409,11 +409,15 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", target=
 Expected output:
 ```json
 {
-  "total": 8,
   "results": [
-    {"accession": "ENCSR100OLD", "assay_title": "Histone ChIP-seq", "assembly": "hg19"},
-    {"accession": "ENCSR200NEW", "assay_title": "Histone ChIP-seq", "assembly": "GRCh38"}
-  ]
+    {"accession": "ENCSR100OLD", "assay_title": "Histone ChIP-seq", "assembly": ["hg19"]},
+    {"accession": "ENCSR200NEW", "assay_title": "Histone ChIP-seq", "assembly": ["GRCh38"]}
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -465,8 +469,13 @@ Expected output:
 ```json
 {
   "accession": "ENCFF100OLD",
+  "file_format": "bed",
+  "file_type": "bed narrowPeak",
+  "output_type": "IDR thresholded peaks",
   "assembly": "hg19",
-  "file_format": "bed narrowPeak"
+  "file_size": 1258291,
+  "file_size_human": "1.2 MB",
+  "status": "released"
 }
 ```
 
@@ -475,11 +484,9 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR100OLD", file_format="bed", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records — empty here):
 ```json
-{
-  "files": []
-}
+[]
 ```
 
 **Interpretation**: No GRCh38 files available — liftover is required.
@@ -496,7 +503,13 @@ encode_log_derived_file(
 
 Expected output:
 ```json
-{"status": "logged", "derived_file": "/data/peaks_GRCh38.bed", "source_count": 1}
+{
+  "success": true,
+  "record_id": 7,
+  "file_path": "/data/peaks_GRCh38.bed",
+  "source_accessions": ["ENCFF100OLD"],
+  "message": "Provenance logged. Use encode_get_provenance to view the full chain."
+}
 ```
 
 ## Related Skills

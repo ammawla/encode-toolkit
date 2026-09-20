@@ -393,10 +393,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", target=
 Expected output:
 ```json
 {
-  "total": 6,
   "results": [
     {"accession": "ENCSR100LIV", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "liver"}
-  ]
+  ],
+  "total": 6,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -406,13 +410,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR100LIV", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF150ENH", "output_type": "IDR thresholded peaks", "file_format": "bed narrowPeak", "file_size_mb": 1.1}
-  ]
-}
+[
+  {"accession": "ENCFF150ENH", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "assembly": "GRCh38", "file_size": 1153434, "file_size_human": "1.1 MB", "preferred_default": true}
+]
 ```
 
 ### Step 3: Query JASPAR for liver-relevant TF motifs
@@ -448,10 +450,14 @@ encode_search_experiments(assay_title="TF ChIP-seq", organ="liver", target="HNF4
 Expected output:
 ```json
 {
-  "total": 3,
   "results": [
     {"accession": "ENCSR200HNF", "assay_title": "TF ChIP-seq", "target": "HNF4A", "biosample_summary": "liver"}
-  ]
+  ],
+  "total": 3,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -470,12 +476,16 @@ Expected output:
 encode_get_facets(assay_title="TF ChIP-seq", organ="liver", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names):
 ```json
 {
-  "facets": {
-    "target.label": {"HNF4A": 3, "CEBPA": 2, "FOXA2": 2, "RXRA": 2, "TP53": 1}
-  }
+  "target.label": [
+    {"term": "HNF4A", "count": 3},
+    {"term": "CEBPA", "count": 2},
+    {"term": "FOXA2", "count": 2},
+    {"term": "RXRA", "count": 2},
+    {"term": "TP53", "count": 1}
+  ]
 }
 ```
 
@@ -484,16 +494,19 @@ Expected output:
 encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HNF")
 ```
 
-Expected output:
+Expected output (both experiments must be tracked first; differences surface as prose strings in `warnings` / `issues`):
 ```json
 {
-  "comparison": {
-    "shared": {"organ": "liver", "organism": "Homo sapiens", "assembly": "GRCh38"},
-    "differences": {
-      "assay": ["Histone ChIP-seq", "TF ChIP-seq"],
-      "target": ["H3K27ac", "HNF4A"]
-    }
-  }
+  "experiment_1": {"accession": "ENCSR100LIV", "assay": "Histone ChIP-seq", "biosample": "liver tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR200HNF", "assay": "TF ChIP-seq", "biosample": "liver tissue male adult (54 years)"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": ["Same organism: Homo sapiens", "Same assembly: GRCh38", "Same organ: liver"],
+  "issues": [],
+  "warnings": [
+    "Different assay types: Histone ChIP-seq vs TF ChIP-seq. Multi-omic integration may be needed.",
+    "Different targets: H3K27ac vs HNF4A."
+  ]
 }
 ```
 
@@ -502,12 +515,16 @@ Expected output:
 encode_track_experiment(accession="ENCSR100LIV", notes="Liver H3K27ac for JASPAR motif scanning - HNF4A/CEBPA/FOXA2")
 ```
 
-Expected output:
+Expected output (`notes` is stored, not echoed — read it back with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR100LIV",
-  "notes": "Liver H3K27ac for JASPAR motif scanning - HNF4A/CEBPA/FOXA2"
+  "tracking": {"accession": "ENCSR100LIV", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "Histone ChIP-seq 2 (unreplicated)", "version": "1.7.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
 }
 ```
 

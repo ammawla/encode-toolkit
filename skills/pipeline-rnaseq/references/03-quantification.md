@@ -2,7 +2,7 @@
 
 ## Tools
 - **RSEM 1.3.3**: Gene/transcript quantification (Li & Dewey 2011, ~6,000 citations)
-- **Kallisto 0.48.0**: Fast pseudoalignment quantification (Bray et al. 2016, ~4,000 citations)
+- **Kallisto 0.50.1**: Fast pseudoalignment quantification (Bray et al. 2016, ~4,000 citations)
 
 ## RSEM Quantification (Primary)
 
@@ -76,7 +76,9 @@ from being read.
 kallisto index -i kallisto_index.idx gencode.v38.transcripts.fa
 ```
 
-Pass the resulting file as `--kallisto_index`.
+Pass the resulting file as `--kallisto_index`. Build it with kallisto 0.50.1, the version
+in the image: 0.50.1 writes index version 13, and an index built with kallisto 0.48 or
+earlier is rejected at load time. Rebuild rather than reuse an older `.idx`.
 
 ### Kallisto Quantification
 
@@ -100,7 +102,7 @@ kallisto by hand with the right values.
 |------|----------|-----------|
 | `kallisto/<sample>/abundance.tsv` | transcript_id, length, effective_length, est_counts, tpm | Yes |
 | `kallisto/<sample>/run_info.json` | Run metadata and statistics | Yes |
-| `abundance.h5` | Binary HDF5 format (for sleuth) | No — not a declared output, stays in the work directory |
+| `kallisto/<sample>/abundance.h5` | Binary HDF5 format (for sleuth) | Only when the kallisto build has HDF5 support; the process declares it as an optional output |
 
 ## TPM vs FPKM vs Raw Counts
 

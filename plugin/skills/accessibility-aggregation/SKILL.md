@@ -275,14 +275,25 @@ encode_search_experiments(
 )
 ```
 
-Expected output:
+Expected output (one entry per experiment; fields abridged):
 ```json
 {
+  "results": [
+    {
+      "accession": "ENCSR001BRN",
+      "assay_title": "ATAC-seq",
+      "biosample_summary": "brain cortex tissue male adult (53 years)",
+      "organ": "brain",
+      "biosample_type": "tissue",
+      "assembly": ["GRCh38"],
+      "file_count": 18
+    }
+  ],
   "total": 24,
-  "experiments": [
-    {"accession": "ENCSR001BRN", "biosample_summary": "brain cortex tissue male adult (53 years)"},
-    {"accession": "ENCSR002BRN", "biosample_summary": "brain cortex tissue female adult (49 years)"}
-  ]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -298,11 +309,27 @@ encode_search_files(
 )
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
+  "results": [
+    {
+      "accession": "ENCFF001ATQ",
+      "file_format": "bed",
+      "file_type": "bed narrowPeak",
+      "output_type": "IDR thresholded peaks",
+      "assembly": "GRCh38",
+      "file_size": 1258291,
+      "file_size_human": "1.2 MB",
+      "experiment_accession": "ENCSR001BRN",
+      "preferred_default": true
+    }
+  ],
   "total": 8,
-  "files": [{"accession": "ENCFF001ATQ", "output_type": "IDR thresholded peaks", "assembly": "GRCh38"}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -322,10 +349,15 @@ cat *.narrowPeak | sort -k1,1 -k2,2n | bedtools merge -i - -c 4,5 -o count,mean 
 encode_get_facets(organ="pancreas", assay_title="ATAC-seq")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names; which ones appear depends on the filters):
 ```json
 {
-  "facets": {"biosample_term_name": {"pancreas": 4, "pancreatic islet": 3}, "status": {"released": 6}}
+  "assay_title": [{"term": "ATAC-seq", "count": 7}],
+  "biosample_ontology.term_name": [
+    {"term": "pancreas", "count": 4},
+    {"term": "pancreatic islet", "count": 3}
+  ],
+  "status": [{"term": "released", "count": 7}]
 }
 ```
 

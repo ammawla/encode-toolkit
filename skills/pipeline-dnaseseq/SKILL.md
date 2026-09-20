@@ -158,6 +158,14 @@ error if it or the project/queue is missing.
 | Footprinting | 4 | 8 GB | 1-2 hours |
 | **Total** | **8** | **16 GB** | **3-6 hours** |
 
+Every process asks for `memory { N.GB * task.attempt }`, so a task killed for running out
+of memory is retried with more: the second attempt gets twice the figure in the table, the
+third three times it, bounded by `--max_memory` (32 GB by default). `nextflow.config`
+scales the time the same way for `BWA_ALIGN`, `FILTER_DEDUP`, `HOTSPOT2` and
+`FOOTPRINTING`, bounded by `--max_time`; the other processes declare no time limit. A task
+is retried only for exit codes 130-145 and 104 (killed for exceeding a limit); any other
+failure stops the run.
+
 ## Pipeline Parameters
 
 | Parameter | Default | Description |
@@ -396,10 +404,14 @@ encode_search_experiments(assay_title="DNase-seq", biosample_term_name="K562", o
 Expected output:
 ```json
 {
-  "total": 8,
   "results": [
     {"accession": "ENCSR000DNS", "assay_title": "DNase-seq", "biosample_summary": "K562", "status": "released"}
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -409,16 +421,36 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000DNS", file_format="fastq")
 ```
 
-### Step 3: Run the DNase-seq pipeline
+Expected output (a JSON array of file records; fields abridged):
+```json
+[
+  {"accession": "ENCFF500DN1", "file_format": "fastq", "output_type": "reads", "file_size_human": "2.6 GB", "biological_replicates": [1], "status": "released"},
+  {"accession": "ENCFF501DN2", "file_format": "fastq", "output_type": "reads", "file_size_human": "2.7 GB", "biological_replicates": [1], "status": "released"}
+]
+```
 
-`--reads` is a glob that `fromFilePairs` has to resolve, so name the downloaded
-FASTQs `<sample>_R1.fastq.gz` / `<sample>_R2.fastq.gz` first (ENCODE delivers
-them as `ENCFF*.fastq.gz`):
+```
+encode_download_files(file_accessions=["ENCFF500DN1", "ENCFF501DN2"], download_dir="/data/dnaseseq/fastq")
+```
+
+### Step 3: Name the FASTQs so a read-pair glob can find them, then run the pipeline
+
+ENCODE names every FASTQ after its accession (`ENCFF500DN1.fastq.gz`), with no `_R1`/`_R2`
+in the name, so the two files of a pair share no prefix and the `--reads` glob cannot pair
+them. Link them into the shape the glob expects. Which mate an accession is comes from the
+ENCODE file record on encodeproject.org, which carries `paired_end` (1 or 2) and
+`paired_with`; the MCP file tools do not return those two fields:
+
+```bash
+cd /data/dnaseseq/fastq
+ln -s ENCFF500DN1.fastq.gz k562_rep1_R1.fastq.gz
+ln -s ENCFF501DN2.fastq.gz k562_rep1_R2.fastq.gz
+```
 
 ```bash
 nextflow run scripts/main.nf \
   -profile local \
-  --reads '/data/fastq/*_R{1,2}.fastq.gz' \
+  --reads '/data/dnaseseq/fastq/k562_*_R{1,2}.fastq.gz' \
   --bwa_index /ref/bwa_index/genome.fa \
   --chrom_sizes /ref/hg38.chrom.sizes \
   --hotspot_center_sites /ref/hotspot2/hg38.center_sites.n100.starch \
@@ -467,12 +499,13 @@ encode_search_experiments(assay_title="ATAC-seq", biosample_term_name="K562", or
 encode_get_facets(assay_title="DNase-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {
-    "organ": {"blood": 45, "brain": 30, "liver": 20, "heart": 15, "lung": 12}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "blood", "count": 45},
+    {"term": "brain", "count": 30}
+  ]
 }
 ```
 
@@ -482,13 +515,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000DNS", file_format="bed", output_type="peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF800DHS", "output_type": "peaks", "file_format": "bed narrowPeak", "file_size_mb": 1.5}
-  ]
-}
+[
+  {"accession": "ENCFF800DHS", "file_format": "bed", "file_type": "bed narrowPeak", "output_type": "peaks", "assembly": "GRCh38", "file_size_human": "1.5 MB"}
+]
 ```
 
 ### 3. Track DNase-seq experiments
@@ -497,12 +528,16 @@ Expected output:
 encode_track_experiment(accession="ENCSR000DNS", notes="K562 DNase-seq for accessibility comparison with ATAC-seq")
 ```
 
-Expected output:
+Expected output (the `notes` you pass are stored, not echoed back; read them with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR000DNS",
-  "notes": "K562 DNase-seq for accessibility comparison with ATAC-seq"
+  "tracking": {"accession": "ENCSR000DNS", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "DNase-HS pipeline single-end - Version 2", "version": "2.0", "software": [{"name": "bwa", "version": "0.7.17"}], "status": "released"}
+  ]
 }
 ```
 

@@ -488,9 +488,13 @@ encode_get_facets(organ="heart", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "assay_title": {"Histone ChIP-seq": 45, "ATAC-seq": 18, "RNA-seq": 15, "Hi-C": 8, "WGBS": 6}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 45},
+    {"term": "ATAC-seq", "count": 18},
+    {"term": "total RNA-seq", "count": 15},
+    {"term": "intact Hi-C", "count": 8},
+    {"term": "WGBS", "count": 6}
+  ]
 }
 ```
 
@@ -535,7 +539,12 @@ encode_get_facets(organ="heart", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {"assay_title": {"Histone ChIP-seq": 45, "ATAC-seq": 18, "RNA-seq": 15, "Hi-C": 8}}
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 45},
+    {"term": "ATAC-seq", "count": 18},
+    {"term": "total RNA-seq", "count": 15},
+    {"term": "intact Hi-C", "count": 8}
+  ]
 }
 ```
 
@@ -547,10 +556,27 @@ encode_compare_experiments(accession1="ENCSR100CHI", accession2="ENCSR200ATK")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"organ": "heart", "organism": "Homo sapiens"},
-    "differences": {"assay": ["Histone ChIP-seq", "ATAC-seq"]}
-  }
+  "experiment_1": {
+    "accession": "ENCSR100CHI",
+    "assay": "Histone ChIP-seq",
+    "biosample": "heart left ventricle tissue male adult (53 years)"
+  },
+  "experiment_2": {
+    "accession": "ENCSR200ATK",
+    "assay": "ATAC-seq",
+    "biosample": "heart left ventricle tissue male adult (53 years)"
+  },
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same organ: heart"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different assay types: Histone ChIP-seq vs ATAC-seq. Multi-omic integration may be needed."
+  ]
 }
 ```
 
@@ -562,8 +588,16 @@ encode_summarize_collection()
 Expected output:
 ```json
 {
-  "total_tracked": 4,
-  "by_assay": {"Histone ChIP-seq": 1, "ATAC-seq": 1, "RNA-seq": 1, "Hi-C": 1}
+  "total_experiments": 4,
+  "total_publications": 2,
+  "total_derived_files": 3,
+  "total_external_references": 4,
+  "by_assay": {"Histone ChIP-seq": 1, "ATAC-seq": 1, "total RNA-seq": 1, "intact Hi-C": 1},
+  "by_target": {"H3K27ac": 1, "none": 3},
+  "by_organism": {"Homo sapiens": 4},
+  "by_organ": {"heart": 4},
+  "by_biosample_type": {"tissue": 4},
+  "by_lab": {"Bing Ren, UCSD": 4}
 }
 ```
 

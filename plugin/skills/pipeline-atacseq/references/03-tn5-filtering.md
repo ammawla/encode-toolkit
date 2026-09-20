@@ -1,8 +1,8 @@
 # Stage 3: Filtering, Tn5 Shift, and Fragment Selection
 
 ## Tools
-- **Samtools 1.17** (image version): Mitochondrial read removal, sorting, indexing
-- **Picard MarkDuplicates 2.27.5** (image version): PCR duplicate removal
+- **Samtools 1.19** (image version): Mitochondrial read removal, sorting, indexing
+- **Picard MarkDuplicates 3.1.1** (image version, Java 17): PCR duplicate removal
 - **deeptools `alignmentSieve` 3.5.5** (image version): Tn5 shift and fragment size selection
 - **bedtools 2.31.0** (image version): Blacklist filtering
 
@@ -31,11 +31,8 @@ This correction is critical for motif footprinting and accurate cut-site analysi
 The workflow runs the equivalent of:
 
 ```bash
-# Step 1: Record the mitochondrial fraction, then remove chrM reads
-TOTAL=$(samtools view -c aligned.bam)
-MITO=$(samtools view -c aligned.bam chrM)
-echo "total_reads=$TOTAL mito_reads=$MITO mito_frac=$(echo "scale=4; $MITO/$TOTAL" | bc)" \
-  > sample.mito_stats.txt
+# Step 1: Record the per-contig read counts, then remove chrM reads
+samtools idxstats aligned.bam > sample.idxstats.txt
 samtools view -@ 4 -b aligned.bam $(samtools idxstats aligned.bam | \
   awk '$1 != "chrM" && $1 != "*" {print $1}' | tr '\n' ' ') > no_mito.bam
 
@@ -73,7 +70,11 @@ The fragment length boundary (150) is `--nfr_max`, and the mitochondrial contig 
 (`-q 30 -f 2`) happens once, during alignment.
 
 ## Expected Output
-- `qc/<sample>.mito_stats.txt` -- total reads, mitochondrial reads, mitochondrial fraction
+- `qc/<sample>.idxstats.txt` -- `samtools idxstats` of the BAM **before** mitochondrial
+  reads are removed: one row per contig with name, length, mapped and unmapped counts. The
+  mitochondrial fraction is the mapped count on the `--mito_name` row divided by the sum of
+  the mapped column; MultiQC's samtools module reads the same file and reports it. The step
+  also works when the genome has no such contig -- nothing is removed. No `bc` is involved.
 - `filtered/<sample>.dup_metrics.txt` -- Picard duplication metrics
 - `filtered/shifted/<sample>.shifted.bam` + `.bai` -- Tn5-corrected, pre-blacklist
 - `filtered/<sample>.final.bam` + `.final.bam.bai` -- blacklist-filtered (all fragments)
@@ -95,7 +96,7 @@ Both size-selected BAMs land in `filtered/nfr/`.
 
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
-| Mitochondrial fraction | <20% (ideal <5%) | Optimize cell lysis |
+| Mitochondrial fraction (`qc/<sample>.idxstats.txt`) | <20% (ideal <5%) | Optimize cell lysis |
 | Duplication rate | <30% (Picard `PERCENT_DUPLICATION`) | Low complexity library |
 | NFR fraction | >40% of fragments <150bp (manual) | Check transposition efficiency |
 | Post-filter reads | >=25M | May need deeper sequencing |

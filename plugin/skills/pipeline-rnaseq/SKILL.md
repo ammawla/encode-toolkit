@@ -81,7 +81,9 @@ published but are not part of the MultiQC report; read those files directly.
 - **STAR genome index directory** (`--star_index`)
 - **RSEM reference prefix** (`--rsem_index`) produced by `rsem-prepare-reference`
 - **BED12 gene model for RSeQC** (`--rseqc_bed`)
-- **Kallisto index file** (`--kallisto_index`), unless `--skip_kallisto` is set
+- **Kallisto index file** (`--kallisto_index`) built with kallisto 0.50.1, unless
+  `--skip_kallisto` is set. kallisto 0.50.1 writes index version 13 and rejects an index
+  built with 0.48 or earlier
 
 There is no sample sheet: samples are the pairs that `--reads` matches, and the sample
 ID is the shared prefix of each pair. The gene annotation is not a workflow parameter
@@ -136,11 +138,13 @@ published BAM and RSEM output.
 
 ## Execution
 
-The versions the workflow runs are the ones in `scripts/Dockerfile`: STAR 2.7.10b,
-RSEM 1.3.3, kallisto 0.48.0, samtools 1.17, RSeQC 4.0.0, Trim Galore 0.6.7, cutadapt 4.4,
-MultiQC 1.14, and FastQC unpinned from the Ubuntu 22.04 package. The conda environment in
-`bioinformatics-installer` (`environments/rnaseq-env.yml`) is a separate manual route and
-may ship different point releases of the same tools.
+The versions the workflow runs are the ones in `scripts/Dockerfile`: STAR 2.7.11b,
+RSEM 1.3.3, kallisto 0.50.1, samtools 1.19, RSeQC 5.0.3, Trim Galore 0.6.10, cutadapt 4.6,
+MultiQC 1.21 and FastQC 0.12.1. The conda environment in `bioinformatics-installer`
+(`environments/rnaseq-env.yml`) is a separate manual route pinned to the same versions of
+STAR, RSEM, kallisto, samtools, RSeQC, Trim Galore, FastQC and MultiQC; it leaves cutadapt
+to the Trim Galore package, adds salmon and subread, and does not carry
+`bedGraphToBigWig`, which the signal-track step needs.
 
 Every index flag is shown in the examples below because the defaults are bare names
 resolved in the launch directory (`GRCh38_star_index`, `GRCh38_rsem_index/GRCh38`,
@@ -223,7 +227,7 @@ project/queue is missing.
 | `--skip_kallisto` | `false` | Skip `KALLISTO_QUANT`; `--kallisto_index` is then not read |
 | `--star_index` | `GRCh38_star_index` (`mm10_star_index`) | STAR genome directory |
 | `--rsem_index` | `GRCh38_rsem_index/GRCh38` (`mm10_rsem_index/mm10`) | RSEM reference **prefix**, not a directory; every file starting with it is staged |
-| `--kallisto_index` | `gencode.v38.kallisto.idx` (`gencode.vM27.kallisto.idx`) | kallisto index file |
+| `--kallisto_index` | `gencode.v38.kallisto.idx` (`gencode.vM27.kallisto.idx`) | kallisto index file; must be built with kallisto 0.50.1 (index version 13), not with 0.48 or earlier |
 | `--rseqc_bed` | `hg38_RefSeq.bed` (`mm10_RefSeq.bed`) | BED12 gene model used by all four RSeQC modules |
 | `--chrom_sizes` | `<star_index>/chrNameLength.txt` | Chromosome sizes for `bedGraphToBigWig` |
 
@@ -248,9 +252,9 @@ project/queue is missing.
 | Local | 8 cores, 36 GB | $0 | 3-6 hours | Docker required |
 | SLURM | 8 cores, 36 GB | Varies | 2-4 hours | Singularity; pass the `.sif` with `--container` |
 
-**Memory note**: `nextflow.config` asks for 36 GB for `STAR_ALIGN` (doubling on each
-retry, capped by `--max_memory`). The local executor refuses the task on a machine with
-less, so a 32 GB host is not enough. If 36 GB is out of reach, rebuild the STAR index
+**Memory note**: `nextflow.config` asks for 36 GB for `STAR_ALIGN` (multiplied by the
+attempt number on a retry, capped by `--max_memory`). The local executor refuses the task
+on a machine with less, so a 32 GB host is not enough. If 36 GB is out of reach, rebuild the STAR index
 with a larger `--genomeSAsparseD` (which shrinks the loaded index at some cost in
 mapping speed) or move to a bigger machine. `--limitGenomeGenerateRAM` is a
 `genomeGenerate` option and is not a parameter of this workflow.
@@ -271,12 +275,14 @@ results/
     <sample>.SJ.out.tab
     <sample>.ReadsPerGene.out.tab                # STAR gene counts
     <sample>.Signal.UniqueMultiple.str1.out.bg   # plus str2 unless --strandedness none
+    <sample>.Signal.Unique.str1.out.bg           # same signal, unique mappers only
   rsem/
     <sample>.genes.results                       # gene_id, TPM, FPKM, expected_count
     <sample>.isoforms.results                    # transcript_id, TPM, FPKM, IsoPct
     <sample>.stat/                               # RSEM model statistics, read by MultiQC
   kallisto/                                      # absent with --skip_kallisto
     <sample>/abundance.tsv
+    <sample>/abundance.h5                        # only from a kallisto build with HDF5 support
     <sample>/run_info.json
   signal/
     <sample>_plus.bw, <sample>_minus.bw          # or <sample>_unstranded.bw
@@ -397,7 +403,8 @@ Expected output:
   "accession": "ENCSR000CPR",
   "assay_title": "RNA-seq",
   "biosample_summary": "K562",
-  "replicates": 2,
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
   "status": "released"
 }
 ```
@@ -408,23 +415,37 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR000CPR", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF200RN1", "output_type": "reads", "paired_end": "1", "biological_replicates": [1], "file_size_mb": 3200},
-    {"accession": "ENCFF201RN2", "output_type": "reads", "paired_end": "2", "biological_replicates": [1], "file_size_mb": 3300}
-  ]
-}
+[
+  {"accession": "ENCFF200RN1", "file_format": "fastq", "output_type": "reads", "file_size_human": "3.2 GB", "biological_replicates": [1], "status": "released"},
+  {"accession": "ENCFF201RN2", "file_format": "fastq", "output_type": "reads", "file_size_human": "3.3 GB", "biological_replicates": [1], "status": "released"}
+]
 ```
 
-### Step 3: Run the RNA-seq pipeline
+### Step 3: Download and name the FASTQs so a read-pair glob can find them
 
-Name the downloaded FASTQs so that one glob matches both mates of each sample, then:
+```
+encode_download_files(file_accessions=["ENCFF200RN1", "ENCFF201RN2"], download_dir="/data/rnaseq/fastq")
+```
+
+ENCODE names every FASTQ after its accession (`ENCFF200RN1.fastq.gz`), with no `_R1`/`_R2`
+in the name, so the two files of a pair share no prefix and the `--reads` glob cannot pair
+them. Link them into the shape the glob expects. Which mate an accession is comes from the
+ENCODE file record on encodeproject.org, which carries `paired_end` (1 or 2) and
+`paired_with`; the MCP file tools do not return those two fields:
+
+```bash
+cd /data/rnaseq/fastq
+ln -s ENCFF200RN1.fastq.gz k562_rep1_R1.fq.gz
+ln -s ENCFF201RN2.fastq.gz k562_rep1_R2.fq.gz
+```
+
+### Step 4: Run the RNA-seq pipeline
 
 ```bash
 nextflow run scripts/main.nf -profile local \
-    --reads 'fastq/*_R{1,2}.fq.gz' \
+    --reads '/data/rnaseq/fastq/k562_*_R{1,2}.fq.gz' \
     --genome GRCh38 \
     --star_index /ref/GRCh38_star_index \
     --rsem_index /ref/GRCh38_rsem_index/GRCh38 \
@@ -442,7 +463,7 @@ Key pipeline steps:
 5. Signal track generation (bedGraph to bigWig)
 6. RSeQC (infer_experiment, read_distribution, geneBody_coverage, inner_distance) and MultiQC
 
-### Step 4: Validate output quality
+### Step 5: Validate output quality
 
 | Metric | Threshold | Where to read it |
 |---|---|---|
@@ -451,7 +472,7 @@ Key pipeline steps:
 | Exonic rate | > 60% | `qc/rseqc/<sample>.read_distribution.txt` |
 | Replicate correlation | >= 0.9 | compute yourself from the TPM column of `rsem/<sample>.genes.results` |
 
-### Step 5: Use expression data with ENCODE epigenomic data
+### Step 6: Use expression data with ENCODE epigenomic data
 
 Compare gene expression with enhancer marks:
 ```
@@ -477,10 +498,14 @@ encode_search_experiments(assay_title="total RNA-seq", organ="liver", organism="
 Expected output:
 ```json
 {
-  "total": 35,
   "results": [
-    {"accession": "ENCSR300RNA", "assay_title": "RNA-seq", "biosample_summary": "liver", "status": "released"}
-  ]
+    {"accession": "ENCSR300RNA", "assay_title": "total RNA-seq", "biosample_summary": "liver tissue male adult (54 years)", "status": "released"}
+  ],
+  "total": 35,
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 25
 }
 ```
 
@@ -490,13 +515,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR300RNA", file_format="tsv", output_type="gene quantifications", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF400GEQ", "output_type": "gene quantifications", "file_format": "tsv", "file_size_mb": 5.2}
-  ]
-}
+[
+  {"accession": "ENCFF400GEQ", "file_format": "tsv", "output_type": "gene quantifications", "assembly": "GRCh38", "file_size_human": "5.2 MB", "status": "released"}
+]
 ```
 
 ### 3. Download expression data
@@ -505,12 +528,14 @@ Expected output:
 encode_download_files(file_accessions=["ENCFF400GEQ"], download_dir="/data/rnaseq/quantification")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
-  "downloaded": 1,
-  "md5_verified": true,
-  "files": ["/data/rnaseq/quantification/ENCFF400GEQ.tsv"]
+  "downloaded": [
+    {"accession": "ENCFF400GEQ", "file_path": "/data/rnaseq/quantification/ENCFF400GEQ.tsv", "file_size_human": "5.2 MB", "success": true, "md5_verified": true}
+  ],
+  "errors": [],
+  "summary": {"total_requested": 1, "successful": 1, "failed": 0, "total_size_human": "5.2 MB"}
 }
 ```
 

@@ -456,8 +456,12 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [{"accession": "ENCFF567PAN", "output_type": "IDR thresholded peaks", "file_size_human": "1.8 MB"}],
   "total": 5,
-  "files": [{"accession": "ENCFF567PAN", "output_type": "IDR thresholded peaks", "file_size_mb": 1.8}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -506,8 +510,12 @@ encode_search_files(
 Expected output:
 ```json
 {
+  "results": [{"accession": "ENCFF890LIV", "output_type": "IDR thresholded peaks", "assembly": "GRCh38", "file_size_human": "0.9 MB"}],
   "total": 4,
-  "files": [{"accession": "ENCFF890LIV", "output_type": "IDR thresholded peaks", "assembly": "GRCh38", "file_size_mb": 0.9}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

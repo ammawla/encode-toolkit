@@ -234,10 +234,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="heart", organism="Homo 
 Expected output:
 ```json
 {
-  "total": 18,
   "results": [
-    {"accession": "ENCSR100HRT", "assay_title": "ATAC-seq", "biosample_summary": "heart left ventricle", "status": "released"}
-  ]
+    {"accession": "ENCSR100HRT", "assay_title": "ATAC-seq", "biosample_summary": "heart left ventricle", "assembly": ["GRCh38"], "status": "released"}
+  ],
+  "total": 18,
+  "limit": 5,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 5
 }
 ```
 
@@ -253,13 +257,15 @@ Expected output:
   "accession": "ENCFF200BW",
   "file_format": "bigWig",
   "output_type": "fold change over control",
-  "href": "https://www.encodeproject.org/files/ENCFF200BW/@@download/ENCFF200BW.bigWig",
+  "download_url": "https://www.encodeproject.org/files/ENCFF200BW/@@download/ENCFF200BW.bigWig",
+  "s3_uri": "s3://encode-public/2021/06/14/ENCFF200BW.bigWig",
   "assembly": "GRCh38",
-  "file_size_mb": 45.2
+  "file_size": 47400058,
+  "file_size_human": "45.2 MB"
 }
 ```
 
-**Interpretation**: Use the bigWig download URL directly in a UCSC custom track or track hub for visualization.
+**Interpretation**: Use the `download_url` directly in a UCSC custom track or track hub for visualization.
 
 ### Step 3: Query UCSC cCRE track for the region of interest
 
@@ -317,14 +323,20 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 24,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR789XYZ",
       "assay_title": "ATAC-seq",
-      "biosample_summary": "brain tissue female adult (53 years)"
+      "biosample_summary": "brain tissue female adult (53 years)",
+      "organ": "brain",
+      "assembly": ["GRCh38"]
     }
-  ]
+  ],
+  "total": 24,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -338,21 +350,20 @@ encode_list_files(
 )
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "total": 4,
-  "files": [
-    {
-      "accession": "ENCFF456DEF",
-      "file_format": "bigWig",
-      "output_type": "fold change over control",
-      "assembly": "GRCh38",
-      "file_size_mb": 125.3,
-      "href": "/files/ENCFF456DEF/@@download/ENCFF456DEF.bigWig"
-    }
-  ]
-}
+[
+  {
+    "accession": "ENCFF456DEF",
+    "file_format": "bigWig",
+    "output_type": "fold change over control",
+    "assembly": "GRCh38",
+    "file_size": 131386573,
+    "file_size_human": "125.3 MB",
+    "download_url": "https://www.encodeproject.org/files/ENCFF456DEF/@@download/ENCFF456DEF.bigWig",
+    "preferred_default": true
+  }
+]
 ```
 
 ## Integration

@@ -30,7 +30,7 @@ pairtools select \
 ### Build .hic file
 
 ```bash
-java -Xmx64g -jar juicer_tools.jar pre \
+java -Xmx54g -jar juicer_tools.jar pre \
     --threads 4 \
     -r 1000,5000,10000,25000,50000,100000,250000,500000,1000000 \
     -k KR,VC,VC_SQRT \
@@ -43,8 +43,9 @@ java -Xmx64g -jar juicer_tools.jar pre \
 
 | Parameter | Value | Reason |
 |-----------|-------|--------|
-| `-Xmx64g` | 64 GB heap | Large matrices need significant memory |
-| `-r` | Multiple resolutions | Enables multi-scale analysis |
+| `-Xmx54g` | JVM heap | Large matrices need significant memory. `main.nf` gives the heap 85% of the task's memory allocation (54 GB on the first attempt of the 64 GB request), leaving the rest for the JVM itself |
+| `--threads` | 4 | Threads for the normalization step only. Without `--mndindex`, `pre` builds the matrix single-threaded and says so on stderr ("Using single threaded preprocessor") |
+| `-r` | Multiple resolutions | Enables multi-scale analysis (`--resolutions`) |
 | `-k` | KR,VC,VC_SQRT | Generate multiple normalization vectors |
 
 ### Normalization Methods
@@ -62,6 +63,11 @@ ENCODE standard: KR normalization for primary analysis.
 The .mcool format is preferred by Python/R analysis tools.
 
 ### Load pairs into cooler
+
+cooler bins once at a base resolution and coarsens that into the others, so
+`main.nf` uses the smallest value in `--resolutions` as the base bin (1000 in
+the default list). Every other resolution has to be a multiple of it, which the
+workflow checks before it starts.
 
 ```bash
 # Create single-resolution .cool files, then zoom

@@ -383,6 +383,46 @@ class TestTrackingResponses:
     """Validate output structure of local tracker tools."""
 
     @pytest.mark.asyncio
+    async def test_track_experiment_stores_a_real_experiment(self, tmp_path):
+        """The tool must work against a real tracker, not only a mocked one.
+
+        ExperimentDetail carries ``assembly`` as a list built from the files. With the tracker
+        mocked, nothing noticed that SQLite cannot bind that list.
+        """
+        from encode_connector.client.tracker import ExperimentTracker
+
+        mock_client = AsyncMock()
+        mock_client.get_experiment_raw.return_value = {
+            "accession": "ENCSR133RZO",
+            "assay_title": "Histone ChIP-seq",
+            "target": {"label": "H3K27ac"},
+            "status": "released",
+            "lab": {"title": "Bing Ren, UCSD"},
+            "award": {"project": "ENCODE"},
+            "biosample_ontology": {"classification": "tissue", "organ_slims": ["pancreas"]},
+            "organism": {"scientific_name": "Homo sapiens"},
+            "dbxrefs": [],
+            "references": [],
+            "analyses": [],
+            "files": [
+                {"accession": "ENCFF001AAA", "assembly": "GRCh38", "file_format": "bed"},
+                {"accession": "ENCFF002BBB", "assembly": "hg19", "file_format": "bed"},
+            ],
+        }
+        tracker = ExperimentTracker(db_path=tmp_path / "tracker.db")
+
+        with (
+            patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)),
+            patch("encode_connector.server.main._get_tracker", return_value=tracker),
+        ):
+            from encode_connector.server.main import encode_track_experiment
+
+            raw = await encode_track_experiment(accession="ENCSR133RZO")
+
+        assert json.loads(raw)["tracking"]["action"] == "tracked"
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38, hg19"
+
+    @pytest.mark.asyncio
     async def test_track_experiment_response_structure(self):
         """Tracking result must confirm success with tracking and publications keys."""
         mock_client = AsyncMock()

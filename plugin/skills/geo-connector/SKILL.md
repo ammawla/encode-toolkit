@@ -276,15 +276,15 @@ Expected response:
 ### Step 3: Link ENCODE experiment to GEO dataset
 
 ```
-encode_link_reference(experiment_accession="ENCSR123HEP", reference_type="geo", reference_id="GSE156789", description="HepG2 RNA-seq for enhancer-expression integration")
+encode_link_reference(experiment_accession="ENCSR123HEP", reference_type="geo_accession", reference_id="GSE156789", description="HepG2 RNA-seq for enhancer-expression integration")
 ```
 
 Expected output:
 ```json
 {
-  "status": "linked",
-  "accession": "ENCSR123HEP",
-  "reference_type": "geo",
+  "action": "linked",
+  "experiment_accession": "ENCSR123HEP",
+  "reference_type": "geo_accession",
   "reference_id": "GSE156789"
 }
 ```
@@ -298,10 +298,14 @@ encode_search_experiments(assay_title="total RNA-seq", biosample_term_name="HepG
 Expected output:
 ```json
 {
-  "total": 15,
   "results": [
-    {"accession": "ENCSR456RNA", "assay_title": "RNA-seq", "biosample_summary": "HepG2", "status": "released"}
-  ]
+    {"accession": "ENCSR456RNA", "assay_title": "total RNA-seq", "biosample_summary": "HepG2", "biosample_type": "cell line", "status": "released"}
+  ],
+  "total": 15,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -329,8 +333,8 @@ encode_link_reference(
 Expected output:
 ```json
 {
-  "status": "linked",
-  "accession": "ENCSR000AKA",
+  "action": "linked",
+  "experiment_accession": "ENCSR000AKA",
   "reference_type": "geo_accession",
   "reference_id": "GSE76079"
 }
@@ -342,14 +346,26 @@ Expected output:
 encode_get_references(experiment_accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (each row also carries `linked_at`, a float epoch timestamp; rows are ordered newest first):
 ```json
 {
-  "accession": "ENCSR000AKA",
   "references": [
-    {"type": "geo_accession", "id": "GSE76079", "notes": "Complementary RNA-seq"},
-    {"type": "pmid", "id": "27429435", "notes": "Primary publication"}
-  ]
+    {
+      "id": 2,
+      "experiment_accession": "ENCSR000AKA",
+      "reference_type": "geo_accession",
+      "reference_id": "GSE76079",
+      "description": "Complementary RNA-seq from same lab"
+    },
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR000AKA",
+      "reference_type": "pmid",
+      "reference_id": "27429435",
+      "description": "Primary publication"
+    }
+  ],
+  "count": 2
 }
 ```
 

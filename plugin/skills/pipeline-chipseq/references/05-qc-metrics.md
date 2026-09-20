@@ -1,8 +1,9 @@
 # Stage 5: Signal Tracks and QC Report
 
-Stage 5 of the workflow does two things: it converts the MACS2 bedGraphs into bigWig
-signal tracks, and it runs MultiQC over the logs collected in earlier stages. Everything
-else on this page is a **manual step that the workflow does not run**.
+Stage 5 of the workflow does three things: it converts the MACS2 bedGraphs into bigWig
+signal tracks, it computes FRiP for every treatment sample, and it runs MultiQC over the
+logs collected in earlier stages. The sections marked "manual step" below are **not run by
+the workflow**.
 
 ## Signal Track Generation (workflow)
 
@@ -29,6 +30,32 @@ bedGraphToBigWig pval.sorted.bdg GRCh38.chrom.sizes sample.pval.bw
 Published as `signal/<sample>.fc.bw` and `signal/<sample>.pval.bw`. `--chrom_sizes` is
 required for this stage, which is why the workflow stops at startup when it is missing.
 
+## FRiP (workflow)
+
+The workflow computes the fraction of reads in peaks for every treatment sample, in both
+narrow and broad mode, and publishes `qc/<sample>.frip_mqc.tsv`. It runs the equivalent of:
+
+```bash
+TOTAL_READS=$(samtools view -c results/filtered/sample.final.bam)
+READS_IN_PEAKS=$(bedtools intersect -u -a results/filtered/sample.final.bam \
+  -b results/peaks/narrow/sample_peaks.narrowPeak | samtools view -c -)
+awk -v a=$READS_IN_PEAKS -v b=$TOTAL_READS 'BEGIN{printf "%.4f\n", a/b}'
+```
+
+The division uses `awk`. The published file carries a MultiQC header and one row per peak
+file, so MultiQC renders it as the section "Fraction of reads in peaks":
+
+| Column | Meaning |
+|--------|---------|
+| `Peak set` | Name of the peak file the row was computed from |
+| `FRiP` | `reads_in_peaks / total_reads`, printed to four decimals |
+| `reads_in_peaks` | Alignments of the final BAM overlapping a peak (`bedtools intersect -u`) |
+| `total_reads` | All alignments of the final BAM (`samtools view -c`) |
+
+FRiP here is a fraction, not a percentage: the ENCODE >=1% standard is >=0.01 in this
+file. Control libraries are not peak-called, so no `CONTROL_<name>.frip_mqc.tsv` is
+written.
+
 ## MultiQC Aggregated Report (workflow)
 
 ```bash
@@ -44,6 +71,7 @@ feeds it exactly these inputs:
 - `samtools flagstat` from the alignment step
 - Picard MarkDuplicates metrics
 - `samtools flagstat` from the blacklist-filtered BAM
+- `qc/<sample>.frip_mqc.tsv` from the FRiP step, shown as "Fraction of reads in peaks"
 
 MACS2 output is not passed to MultiQC.
 
@@ -55,13 +83,13 @@ MACS2 output is not passed to MultiQC.
 | Mapped reads | samtools flagstat | >=20M TF / >=45M histone | yes |
 | Mapping rate | samtools flagstat | >80% | yes |
 | Duplication rate | Picard | <30% | yes |
-| IDR peaks | IDR | >20,000 (TF) | yes (narrow runs) |
+| IDR peaks | IDR | >20,000 (TF) | yes (narrow runs, one file per replicate pair) |
 | NRF | manual (see 03-filtering.md) | >=0.8 | no |
 | PBC1 | manual (see 03-filtering.md) | >=0.8 | no |
 | PBC2 | manual (see 03-filtering.md) | >=3 | no |
 | NSC | phantompeakqualtools | >1.05 | no |
 | RSC | phantompeakqualtools | >0.8 | no |
-| FRiP | manual calculation | >=1% | no |
+| FRiP | bedtools + samtools (`qc/<sample>.frip_mqc.tsv`) | >=0.01 (1%) | yes |
 | Mitochondrial fraction | `samtools idxstats` | <5% | no |
 
 ## Manual step: Strand Cross-Correlation (phantompeakqualtools)
@@ -80,20 +108,6 @@ run_spp.R -c=results/filtered/sample.final.bam -savp=cc_plot.pdf -out=cc_scores.
 #                 phantomPeak, corr_phantomPeak, argmin_corr, min_corr,
 #                 NSC, RSC, QualityTag
 ```
-
-## Manual step: FRiP Calculation
-
-**Not run by this workflow.** bedtools and samtools are both in the image, so this can be
-run against the published outputs:
-
-```bash
-READS_IN_PEAKS=$(bedtools intersect -a results/filtered/sample.final.bam \
-  -b results/peaks/narrow/sample_peaks.narrowPeak -u -f 0.20 | samtools view -c -)
-TOTAL_READS=$(samtools view -c results/filtered/sample.final.bam)
-awk -v a=$READS_IN_PEAKS -v b=$TOTAL_READS 'BEGIN{printf "FRiP: %.4f\n", a/b}'
-```
-
-`bc` is not installed in the ChIP-seq image, so the division uses `awk`.
 
 ## Manual step: Fingerprint Plot (deeptools)
 

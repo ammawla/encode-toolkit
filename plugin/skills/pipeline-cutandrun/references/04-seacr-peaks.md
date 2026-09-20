@@ -152,18 +152,21 @@ echo "MACS2 peaks: $total_macs2"
 Typical overlap: 60-80% of SEACR peaks overlap MACS2 peaks.
 High-confidence set: intersection of both callers.
 
-## FRiP Calculation (manual, not run by this workflow)
+## FRiP Calculation
 
-No process computes FRiP. Compute it from the published filtered BAM and a
-peak BED:
+The FRIP process runs this for every peak set called for a sample and writes
+the results to `qc/{sample}.frip_mqc.tsv`:
 
 ```bash
-total_reads=$(samtools view -c -F 1804 -f 2 results/alignment/sample.filtered.bam)
+total_reads=$(samtools view -c results/alignment/sample.filtered.bam)
 reads_in_peaks=$(bedtools intersect \
+    -u \
     -a results/alignment/sample.filtered.bam \
     -b results/peaks/sample.seacr.stringent.bed \
-    -u -bed | wc -l)
-echo "FRiP: $(echo "scale=4; $reads_in_peaks / $total_reads" | bc)"
+    | samtools view -c -)
+awk -v a="$reads_in_peaks" -v b="$total_reads" 'BEGIN { printf "FRiP: %.4f\n", a / b }'
 ```
 
-Judge the result against the QC table in `SKILL.md`.
+Both counts are alignments, with no flag filter, so mates count separately.
+Judge the result against the QC table in `SKILL.md`; see
+`05-qc-metrics.md` for the published file's columns.
