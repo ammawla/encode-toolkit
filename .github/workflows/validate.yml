@@ -56,6 +56,10 @@ jobs:
       - name: Check skill docs against the server and the pipelines
         run: python .github/scripts/check-skill-docs.py
 
+      # A pipeline image and its conda environment must pin the same version of every shared tool
+      - name: Check tool versions in images against the conda environments
+        run: python .github/scripts/check-tool-versions.py
+
       - name: skills/ and plugin/skills/ must be identical
         run: diff -r skills plugin/skills
 
