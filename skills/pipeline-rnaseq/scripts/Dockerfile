@@ -28,7 +28,7 @@ RUN wget -qO- https://github.com/samtools/samtools/releases/download/1.17/samtoo
     cd samtools-1.17 && ./configure && make -j4 && make install && cd .. && rm -rf samtools-1.17
 
 # bedGraphToBigWig
-RUN wget -q http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
+RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
     chmod +x /usr/local/bin/bedGraphToBigWig
 
 # Python tools: RSeQC, MultiQC, Trim Galore (via cutadapt)

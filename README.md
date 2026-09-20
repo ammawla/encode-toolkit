@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.3.0-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.1-green)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
 [![Skills](https://img.shields.io/badge/skills-47-orange)](docs/skill-vignettes/)
 [![Tools](https://img.shields.io/badge/MCP_tools-20-purple)](src/encode_connector/server/main.py)
@@ -763,6 +763,15 @@ pytest
 ---
 
 ## Troubleshooting
+
+<details>
+<summary><strong>Server crashes with "No module named 'mcp.server.fastmcp'"</strong></summary>
+
+- Versions before 0.3.1 did not cap the `mcp` dependency, so fresh installs pulled the incompatible `mcp` 2.x. This is fixed in 0.3.1.
+- uv may have cached the broken environment. Refresh it once: `uvx --refresh encode-toolkit` (or `uv cache clean encode-toolkit`)
+- pip users: `pip install --upgrade encode-toolkit`
+
+</details>
 
 <details>
 <summary><strong>"Server not found" in Claude Desktop</strong></summary>
