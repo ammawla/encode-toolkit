@@ -62,11 +62,11 @@ jobs:
           - pipeline: atacseq
             tools: fastqc trim_galore bowtie2 samtools picard bedtools macs2 idr alignmentSieve bamCoverage multiqc
             smoke: >-
-              shows 'samtools 1' samtools --version && shows 'macs2 2' macs2 --version && shows '2.0.4' idr --version && shows 'Version:[0-9]' picard MarkDuplicates --version && shows '33' bash -c 'echo "scale=2; 1/3" | bc'
+              shows 'samtools 1' samtools --version && shows 'macs2 2' macs2 --version && shows 'IDR 2.0' idr --version && shows 'Version:[0-9]' picard MarkDuplicates --version && shows '33' bash -c 'echo "scale=2; 1/3" | bc'
           - pipeline: chipseq
             tools: fastqc trim_galore bwa samtools picard bedtools macs2 idr bedGraphToBigWig multiqc
             smoke: >-
-              shows 'Version: 0.7.18' bwa && shows 'macs2 2' macs2 --version && shows '2.0.4' idr --version && shows 'Version:[0-9]' picard MarkDuplicates --version
+              shows 'Version: 0.7.18' bwa && shows 'macs2 2' macs2 --version && shows 'IDR 2.0' idr --version && shows 'Version:[0-9]' picard MarkDuplicates --version
           - pipeline: cutandrun
             tools: fastqc trim_galore bowtie2 samtools picard bedtools SEACR_1.3.sh macs2 bamCoverage multiqc
             smoke: >-
@@ -116,6 +116,7 @@ jobs:
         env:
           PIPELINE: ${{ matrix.pipeline }}
           SMOKE: ${{ matrix.smoke }}
+          # Note: the IDR 2.0.4.2 release tag still reports itself as "IDR 2.0.3" upstream.
           # shows PATTERN CMD...: run CMD, ignore its exit status (many tools exit non-zero for
           # --version or usage), and require PATTERN in its output. Output is captured first so
           # grep never closes a pipe early.
