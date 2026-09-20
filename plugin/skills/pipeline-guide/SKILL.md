@@ -25,17 +25,26 @@ ENCODE uses standardized pipelines for each assay type, ensuring reproducibility
 
 ### Pipeline Repository Map
 
-| Assay | GitHub Repository | Primary Tools | Container |
-|-------|------------------|---------------|-----------|
-| ChIP-seq | `ENCODE-DCC/chip-seq-pipeline2` | BWA, MACS2, IDR | `encodedcc/chip-seq-pipeline:v2.2.1` |
-| ATAC-seq | `ENCODE-DCC/atac-seq-pipeline` | Bowtie2, MACS2, IDR | `encodedcc/atac-seq-pipeline:v2.2.0` |
-| RNA-seq | `ENCODE-DCC/rna-seq-pipeline` | STAR, RSEM | `encodedcc/rna-seq-pipeline:v1.2.0` |
-| DNase-seq | `ENCODE-DCC/dnase-seq-pipeline` | BWA, Hotspot2 | `encodedcc/dnase-seq-pipeline` |
-| WGBS | `ENCODE-DCC/dna-me-pipeline` | Bismark/bwa-meth, MethylDackel | `encodedcc/dna-me-pipeline` |
-| Hi-C | `ENCODE-DCC/hic-pipeline` | BWA, Juicer, HiCCUPS | `encodedcc/hic-pipeline` |
-| scRNA-seq | `ENCODE-DCC/scrna-seq-pipeline` | STARsolo, Cellranger | — |
-| scATAC-seq | `ENCODE-DCC/scatac-seq-pipeline` | Chromap, SnapATAC2 | — |
-| CUT&RUN | `ENCODE-DCC/cutandrun-pipeline` | Bowtie2, SEACR/MACS2 | — |
+The official ENCODE pipelines are the WDL workflows below. The `pipeline-*` skills in this
+toolkit are independent Nextflow implementations that follow the same standards; they are
+written and maintained by the ENCODE Toolkit author, not by the ENCODE DCC. Each skill builds
+its own image from the `scripts/Dockerfile` it ships with.
+
+| Assay | Official ENCODE pipeline (WDL) | Primary Tools | Toolkit skill (Nextflow) |
+|-------|-------------------------------|---------------|--------------------------|
+| ChIP-seq | `ENCODE-DCC/chip-seq-pipeline2` | BWA, MACS2, IDR | `pipeline-chipseq` |
+| ATAC-seq | `ENCODE-DCC/atac-seq-pipeline` | Bowtie2, MACS2, IDR | `pipeline-atacseq` |
+| RNA-seq | `ENCODE-DCC/rna-seq-pipeline` | STAR, RSEM | `pipeline-rnaseq` |
+| DNase-seq | `ENCODE-DCC/dnase-seq-pipeline` | BWA, Hotspot2 | `pipeline-dnaseseq` |
+| WGBS | `ENCODE-DCC/dna-me-pipeline` | Bismark, MethylDackel | `pipeline-wgbs` |
+| Hi-C | `ENCODE-DCC/hic-pipeline` | BWA, Juicer, HiCCUPS | `pipeline-hic` |
+| CUT&RUN | none published by ENCODE | Bowtie2, SEACR/MACS2 | `pipeline-cutandrun` |
+| scRNA-seq | see the ENCODE portal pipeline pages | STARsolo | — |
+| scATAC-seq | see the ENCODE portal pipeline pages | Chromap | — |
+
+ENCODE also publishes images for some pipelines on Docker Hub, for example
+`encodedcc/chip-seq-pipeline:v2.2.1` and `encodedcc/atac-seq-pipeline:v2.2.0`. Those images are
+built for the WDL workflows and are not what the Nextflow skills here run.
 
 ## Literature Foundation
 
@@ -234,8 +243,8 @@ profiles {
 
     // Profile: Google Cloud
     gcloud {
-        process.executor = 'google-lifesciences'
-        google.region    = 'us-central1'
+        process.executor = 'google-batch'
+        google.location  = 'us-central1'
         google.project   = '${user_project}'
         workDir          = 'gs://${user_bucket}/work'
     }
