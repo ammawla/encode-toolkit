@@ -69,7 +69,9 @@ Expected pattern: peaks at ~200 bp (NFR), ~400 bp (mono-nuc), ~600 bp (di-nuc).
 
 ## ataqv (ATAC-seq QC)
 
-Comprehensive ATAC-seq-specific QC tool from Parker Lab (Orchard et al. 2020):
+Comprehensive ATAC-seq-specific QC tool from Parker Lab (Orchard et al. 2020). ataqv is an
+optional follow-up and is not part of the pipeline image; install it separately, for example
+with `conda install -c bioconda ataqv`:
 
 ```bash
 ataqv --peak-file peaks.narrowPeak --tss-file tss.bed \

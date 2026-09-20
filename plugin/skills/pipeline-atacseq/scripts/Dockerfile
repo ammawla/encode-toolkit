@@ -5,7 +5,7 @@ FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential wget curl git ca-certificates \
+    build-essential wget curl git ca-certificates unzip \
     zlib1g-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev \
     python3 python3-pip python3-dev default-jre \
     && rm -rf /var/lib/apt/lists/*
@@ -35,10 +35,6 @@ RUN wget -qO /usr/local/bin/picard.jar https://github.com/broadinstitute/picard/
 # Trim Galore and FastQC
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir trim-galore==0.6.7
-
-# ataqv (ATAC-seq QC)
-RUN wget -qO- https://github.com/ParkerLab/ataqv/releases/download/1.3.1/ataqv-1.3.1.tar.gz | tar xz && \
-    cd ataqv-1.3.1 && make && cp bin/ataqv /usr/local/bin/ && cp bin/mkarv /usr/local/bin/
 
 # bedGraphToBigWig
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \

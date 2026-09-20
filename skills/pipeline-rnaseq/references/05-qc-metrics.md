@@ -83,8 +83,9 @@ The `Log.final.out` from STAR provides critical metrics:
 ### rRNA Rate Assessment
 
 ```bash
-# Count rRNA reads from STAR ReadsPerGene or samtools
-samtools view -c -F 4 Aligned.sortedByCoord.out.bam rRNA_intervals.bed
+# Count mapped reads overlapping rRNA loci. -L takes a BED file of regions; without it
+# samtools would read the file name as a region string and fail.
+samtools view -c -F 4 -L rRNA_intervals.bed Aligned.sortedByCoord.out.bam
 ```
 
 | rRNA Rate | Interpretation |

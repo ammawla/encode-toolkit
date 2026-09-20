@@ -15,7 +15,10 @@ params.mito_name   = 'chrM'
 params.nfr_max     = 150
 params.tss_bed     = null
 
-def genome_map = [
+// Genome-specific defaults. Kept in a function because scripts that declare processes
+// cannot also hold top-level variables.
+def genomeDefaults() {
+    return [
     'GRCh38': [
         index:     'GRCh38_bowtie2_index',
         blacklist: 'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/hg38-blacklist.v2.bed.gz',
@@ -26,10 +29,8 @@ def genome_map = [
         blacklist: 'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/mm10-blacklist.v2.bed.gz',
         gsize:     'mm'
     ]
-]
-
-gsize     = genome_map[params.genome].gsize
-blacklist = params.blacklist ?: genome_map[params.genome].blacklist
+    ]
+}
 
 process FASTQC {
     tag "$sample_id"
@@ -216,6 +217,7 @@ process MACS2_CALLPEAK {
     path("${sample_id}*.xls"),                              emit: xls
 
     script:
+    def gsize = genomeDefaults()[params.genome].gsize
     """
     macs2 callpeak -t ${bam} \\
       -f BAMPE -g ${gsize} -n ${sample_id} \\
@@ -281,9 +283,19 @@ process MULTIQC {
 }
 
 workflow {
-    ch_reads  = Channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-    ch_genome = Channel.fromPath(genome_map[params.genome].index, type: 'dir')
-    ch_black  = Channel.fromPath(blacklist)
+    // ---- Parameter validation ----
+    if (!params.reads) { error "Missing required parameter: --reads" }
+    if (!genomeDefaults().containsKey(params.genome)) {
+        error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
+    }
+
+    // ---- Input channels ----
+    def defaults  = genomeDefaults()[params.genome]
+    def blacklist = params.blacklist ?: defaults.blacklist
+
+    ch_reads  = channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2, checkIfExists: true)
+    ch_genome = channel.fromPath(defaults.index, type: 'dir', checkIfExists: true)
+    ch_black  = channel.fromPath(blacklist)
 
     // Stage 1: QC and Trimming
     FASTQC(ch_reads)
@@ -304,7 +316,7 @@ workflow {
 
     // IDR (optional, with 2+ replicates)
     if (!params.skip_idr) {
-        ch_peaks = MACS2_CALLPEAK.out.peaks.map { it[1] }.collect()
+        ch_peaks = MACS2_CALLPEAK.out.peaks.map { _sample_id, peaks -> peaks }.collect()
         IDR_ANALYSIS(ch_peaks)
     }
 
