@@ -1,0 +1,106 @@
+name: Pipelines
+
+# Checks for the Nextflow pipeline skills. None of these need reference genomes:
+#   validate  lint + `nextflow run -preview` + profile resolution for every pipeline
+#   images    build each pipeline's Dockerfile and confirm the tools its workflow calls exist
+#   scripts   shellcheck the installer scripts and keep skills/ and plugin/skills/ identical
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/pipeline-*/**"
+      - "skills/bioinformatics-installer/scripts/**"
+      - "plugin/skills/**"
+      - ".github/workflows/pipelines.yml"
+      - ".github/scripts/preview-pipelines.sh"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skills/pipeline-*/**"
+      - "skills/bioinformatics-installer/scripts/**"
+      - "plugin/skills/**"
+      - ".github/workflows/pipelines.yml"
+      - ".github/scripts/preview-pipelines.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Lint and preview workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Use the repository's own installer so CI also proves that the pinned,
+      # checksum-verified install works.
+      - name: Install Nextflow with the bundled installer
+        run: |
+          bash skills/bioinformatics-installer/scripts/install-nextflow.sh --docker
+          nextflow -version
+
+      - name: Lint, preview, and resolve profiles
+        run: bash .github/scripts/preview-pipelines.sh
+
+  images:
+    name: Build ${{ matrix.pipeline }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pipeline: atacseq
+            tools: fastqc trim_galore bowtie2 samtools picard bedtools macs2 idr alignmentSieve bamCoverage multiqc
+          - pipeline: chipseq
+            tools: fastqc trim_galore bwa samtools picard bedtools macs2 idr bedGraphToBigWig multiqc
+          - pipeline: cutandrun
+            tools: fastqc trim_galore bowtie2 samtools picard bedtools SEACR_1.3.sh macs2 bamCoverage multiqc
+          - pipeline: dnaseseq
+            tools: fastqc trim_galore bwa samtools picard bedtools bc hotspot2.sh extractCenterSites.sh hotspot2_part1 modwt unstarch sort-bed bedGraphToBigWig rgt-hint multiqc
+          - pipeline: hic
+            tools: fastqc bwa samtools pairtools cooler java multiqc
+          - pipeline: rnaseq
+            tools: fastqc trim_galore STAR rsem-calculate-expression kallisto samtools bedGraphToBigWig infer_experiment.py multiqc
+          - pipeline: wgbs
+            tools: fastqc trim_galore bismark deduplicate_bismark bowtie2 samtools MethylDackel bgzip tabix multiqc
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        env:
+          PIPELINE: ${{ matrix.pipeline }}
+        run: docker build -t "encode-toolkit/pipeline-${PIPELINE}:ci" "skills/pipeline-${PIPELINE}/scripts"
+
+      - name: Check that every tool the workflow calls is on the PATH
+        env:
+          PIPELINE: ${{ matrix.pipeline }}
+          TOOLS: ${{ matrix.tools }}
+        run: |
+          missing=0
+          for tool in $TOOLS; do
+            if docker run --rm "encode-toolkit/pipeline-${PIPELINE}:ci" bash -c "command -v $tool" > /dev/null; then
+              echo "ok      $tool"
+            else
+              echo "MISSING $tool"; missing=1
+            fi
+          done
+          exit $missing
+
+  scripts:
+    name: Installer scripts and skill copies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Shellcheck
+        run: shellcheck skills/bioinformatics-installer/scripts/*.sh .github/scripts/*.sh
+
+      - name: skills/ and plugin/skills/ must be identical
+        run: diff -r skills plugin/skills
