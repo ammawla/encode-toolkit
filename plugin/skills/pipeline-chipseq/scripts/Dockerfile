@@ -40,7 +40,7 @@ RUN pip3 install --no-cache-dir phantompeakqualtools==1.2.2 || \
      ln -s /opt/phantompeakqualtools/run_spp.R /usr/local/bin/run_spp.R)
 
 # bedGraphToBigWig
-RUN wget -q http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
+RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
     chmod +x /usr/local/bin/bedGraphToBigWig
 
 WORKDIR /data

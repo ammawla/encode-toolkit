@@ -356,7 +356,7 @@ Report:
 
 ### Functional Enrichment of Identified Regions
 Use GREAT (McLean et al. 2010) to assign biological meaning to enhancer/regulatory region sets:
-- Upload enhancer BED file to GREAT (http://great.stanford.edu)
+- Upload enhancer BED file to GREAT (https://great.stanford.edu)
 - Assess GO term enrichment, pathway enrichment, disease association
 - Cell type-specific enhancers should enrich for tissue-relevant terms
 - Whole-genome background is more appropriate than promoter-based background for distal elements
