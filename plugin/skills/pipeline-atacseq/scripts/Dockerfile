@@ -41,7 +41,7 @@ RUN wget -qO- https://github.com/ParkerLab/ataqv/releases/download/1.3.1/ataqv-1
     cd ataqv-1.3.1 && make && cp bin/ataqv /usr/local/bin/ && cp bin/mkarv /usr/local/bin/
 
 # bedGraphToBigWig
-RUN wget -q http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
+RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \
     chmod +x /usr/local/bin/bedGraphToBigWig
 
 WORKDIR /data
