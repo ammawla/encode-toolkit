@@ -1,7 +1,9 @@
-FROM ubuntu:22.04
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE DNase-seq Pipeline: BWA + Hotspot2 + HINT-ATAC"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit DNase-seq pipeline: BWA + Hotspot2 + HINT-ATAC"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -11,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     build-essential \
+    bc \
     bedops \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,11 +39,18 @@ RUN wget -q https://github.com/arq5x/bedtools2/releases/download/v2.31.0/bedtool
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig \
     -O /usr/local/bin/bedGraphToBigWig && chmod +x /usr/local/bin/bedGraphToBigWig
 
-# Hotspot2
-RUN wget -q https://github.com/Altius/hotspot2/archive/refs/tags/v2.3.1.tar.gz && \
-    tar xzf v2.3.1.tar.gz && cd hotspot2-2.3.1 && \
-    make -j4 && cp hotspot2.sh scripts/* /usr/local/bin/ && \
-    cd .. && rm -rf hotspot2-2.3.1 v2.3.1.tar.gz
+# modwt 1.0 (wavelet smoothing; required by Hotspot2's density-peaks step)
+RUN wget -q https://github.com/StamLab/modwt/archive/refs/tags/1.0.tar.gz && \
+    tar xzf 1.0.tar.gz && make -C modwt-1.0/src && \
+    cp modwt-1.0/bin/modwt /usr/local/bin/ && \
+    rm -rf modwt-1.0 1.0.tar.gz
+
+# Hotspot2 2.1.2 (latest tagged release). `make` builds the binaries into bin/; the
+# wrapper scripts live in scripts/ and must sit next to each other on the PATH.
+RUN wget -q https://github.com/Altius/hotspot2/archive/refs/tags/v2.1.2.tar.gz && \
+    tar xzf v2.1.2.tar.gz && make -C hotspot2-2.1.2 && \
+    cp hotspot2-2.1.2/bin/* hotspot2-2.1.2/scripts/* /usr/local/bin/ && \
+    rm -rf hotspot2-2.1.2 v2.1.2.tar.gz
 
 # Picard 3.1.1
 RUN wget -q https://github.com/broadinstitute/picard/releases/download/3.1.1/picard.jar \
