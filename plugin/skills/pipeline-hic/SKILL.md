@@ -30,7 +30,7 @@ FASTQ -> Trim -> BWA (per-mate) -> pairtools parse -> dedup -> .pairs
 ### ENCODE Repository
 
 - **GitHub**: `ENCODE-DCC/hic-pipeline`
-- **Container**: `encodedcc/hic-pipeline`
+- **Container**: built from `scripts/Dockerfile` in this skill (`docker build -t encode-toolkit/pipeline-hic:1.0.0 scripts/`); override with `--container`
 - **WDL**: Available for Cromwell execution
 - **This skill**: Nextflow DSL2 reimplementation for portability
 
@@ -77,7 +77,6 @@ nextflow run main.nf \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
-    --restriction_site 'GATC' \
     --outdir results/ \
     -resume
 ```
@@ -90,7 +89,6 @@ nextflow run main.nf \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
-    --restriction_site 'GATC' \
     --outdir results/ \
     -resume
 ```
@@ -103,7 +101,6 @@ nextflow run main.nf \
     --reads 'gs://bucket/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index 'gs://bucket/ref/genome.fa' \
     --chrom_sizes 'gs://bucket/ref/hg38.chrom.sizes' \
-    --restriction_site 'GATC' \
     --outdir 'gs://bucket/results/' \
     -resume
 ```
@@ -126,7 +123,6 @@ nextflow run main.nf \
 | `--reads` | required | Glob pattern to paired FASTQ files |
 | `--bwa_index` | required | Path to BWA genome index (.fa with .bwt etc.) |
 | `--chrom_sizes` | required | Chromosome sizes file |
-| `--restriction_site` | `GATC` | Restriction enzyme site (GATC for MboI/DpnII) |
 | `--outdir` | `./results` | Output directory |
 | `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions |
 | `--min_mapq` | `30` | Minimum MAPQ for pair filtering |
@@ -208,7 +204,9 @@ The restriction enzyme determines fragment size and resolution:
 - **MboI/DpnII** (GATC): 4-cutter, ~256 bp average fragment -- higher resolution
 - **HindIII** (AAGCTT): 6-cutter, ~4 kb average fragment -- lower resolution
 - **Arima** (proprietary): Two enzymes, ~160 bp average -- highest resolution
-- Always verify which enzyme was used before processing
+- Always verify which enzyme was used before interpreting resolution
+- The workflow itself is enzyme-agnostic: pairtools works at read-pair level and the `.hic`
+  file is built without a restriction-site file, so there is no enzyme parameter to set
 
 ### Normalization Method
 Different normalization methods yield different results:

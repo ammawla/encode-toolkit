@@ -1,13 +1,14 @@
 FROM ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE Hi-C Pipeline: BWA + pairtools + Juicer + cooler"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit Hi-C pipeline: BWA + pairtools + Juicer + cooler"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget curl gzip pigz \
-    python3 python3-pip \
+    wget curl gzip pigz unzip \
+    build-essential \
+    python3 python3-pip python3-dev \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     libhdf5-dev \
