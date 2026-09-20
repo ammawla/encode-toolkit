@@ -6,31 +6,16 @@ nextflow.enable.dsl=2
 // Tools: BWA-MEM, Hotspot2, HINT-ATAC
 // ============================================================================
 
-params.reads          = null
-params.bwa_index      = null
-params.chrom_sizes    = null
-params.hotspot_index  = null
-params.blacklist      = null
-params.outdir         = './results'
-params.fdr            = 0.05
-params.skip_footprint = false
-params.motif_db       = null
-
-if (!params.reads)         { error "Missing required parameter: --reads" }
-if (!params.bwa_index)     { error "Missing required parameter: --bwa_index" }
-if (!params.chrom_sizes)   { error "Missing required parameter: --chrom_sizes" }
-if (!params.hotspot_index) { error "Missing required parameter: --hotspot_index" }
-if (!params.blacklist)     { error "Missing required parameter: --blacklist" }
-
-// ---- Channels ----
-Channel
-    .fromFilePairs(params.reads, checkIfExists: true)
-    .set { ch_reads }
-
-ch_bwa_index      = Channel.fromPath("${params.bwa_index}*", checkIfExists: true).collect()
-ch_chrom_sizes    = Channel.fromPath(params.chrom_sizes, checkIfExists: true)
-ch_hotspot_index  = Channel.fromPath(params.hotspot_index, checkIfExists: true)
-ch_blacklist      = Channel.fromPath(params.blacklist, checkIfExists: true)
+params.reads                = null
+params.bwa_index            = null
+params.chrom_sizes          = null
+params.hotspot_center_sites = null   // center_sites.starch made once per genome by extractCenterSites.sh
+params.hotspot_mappable     = null   // optional: the mappable-regions BED used to make the center sites
+params.blacklist            = null
+params.outdir               = './results'
+params.fdr                  = 0.05
+params.skip_footprint       = false
+params.organism             = 'hg38' // genome name registered in the RGT data directory (HINT)
 
 // ---- Processes ----
 
@@ -91,7 +76,8 @@ process BWA_ALIGN {
     tuple val(sample_id), path("${sample_id}.sorted.bam"), path("${sample_id}.sorted.bam.bai"), emit: bam
 
     script:
-    def idx_base = params.bwa_index
+    // The index files are staged into the task directory, so use the prefix basename.
+    def idx_base = file(params.bwa_index).name
     """
     bwa mem -t ${task.cpus} -M \\
         ${idx_base} \\
@@ -160,31 +146,39 @@ process HOTSPOT2 {
     input:
     tuple val(sample_id), path(bam), path(bai)
     path chrom_sizes
-    path hotspot_index
+    path center_sites
+    path mappable   // empty when --hotspot_mappable is not given
 
     output:
-    tuple val(sample_id), path("${sample_id}.hotspots.fdr*.bed"), emit: hotspots
+    tuple val(sample_id), path("${sample_id}.hotspots.fdr${params.fdr}.bed"), emit: hotspots
     tuple val(sample_id), path("${sample_id}.peaks.narrowPeak"), emit: peaks
     path("${sample_id}.SPOT.txt"), emit: spot
     path("${sample_id}.allcalls.bed"), emit: allcalls
 
     script:
+    def mappable_opt = mappable ? "-M ${mappable}" : ''
+    // The site-calling threshold (-F) may not be stricter than the hotspot threshold (-f).
+    def sitecall_fdr = Math.max(params.fdr as double, 0.05d)
+    // hotspot2.sh names every output after the BAM basename
+    def base = "hotspot2_out/${bam.baseName}"
     """
-    # Run Hotspot2
+    # hotspot2.sh wants chromosome sizes as a sorted BED file with column 2 set to 0
+    awk 'BEGIN {OFS="\\t"} {print \$1, 0, \$2}' ${chrom_sizes} | sort-bed - > chrom_sizes.bed
+
+    # Usage: hotspot2.sh [options] in.bam outdir   (-c and -C are mandatory)
     hotspot2.sh \\
-        -c ${chrom_sizes} \\
-        -M ${hotspot_index}/*.mappable_only.bed \\
+        -c chrom_sizes.bed \\
+        -C ${center_sites} \\
+        ${mappable_opt} \\
         -f ${params.fdr} \\
-        -F 0.05 \\
-        -p "DNase-seq" \\
-        -s ${bam} \\
-        -o hotspot2_out/
+        -F ${sitecall_fdr} \\
+        ${bam} hotspot2_out
 
     # Convert starch to BED
-    unstarch hotspot2_out/*.hotspots.fdr*.starch > ${sample_id}.hotspots.fdr${params.fdr}.bed
-    cp hotspot2_out/*.peaks.narrowPeak ${sample_id}.peaks.narrowPeak
-    cp hotspot2_out/*.SPOT.txt ${sample_id}.SPOT.txt
-    unstarch hotspot2_out/*.allcalls.starch > ${sample_id}.allcalls.bed
+    unstarch ${base}.hotspots.fdr${params.fdr}.starch > ${sample_id}.hotspots.fdr${params.fdr}.bed
+    unstarch ${base}.peaks.fdr${params.fdr}.narrowpeaks.starch > ${sample_id}.peaks.narrowPeak
+    cp ${base}.SPOT.fdr${params.fdr}.txt ${sample_id}.SPOT.txt
+    unstarch ${base}.allcalls.starch > ${sample_id}.allcalls.bed
     """
 }
 
@@ -227,21 +221,17 @@ process FOOTPRINTING {
     memory '8 GB'
 
     input:
-    tuple val(sample_id), path(bam), path(bai)
-    tuple val(sample_id2), path(peaks)
+    tuple val(sample_id), path(bam), path(bai), path(peaks)
 
     output:
     path("${sample_id}.footprints.bed"), emit: footprints
-
-    when:
-    !params.skip_footprint
 
     script:
     """
     rgt-hint footprinting \\
         --dnase-seq \\
         --paired-end \\
-        --organism hg38 \\
+        --organism ${params.organism} \\
         --output-location fp_out/ \\
         --output-prefix ${sample_id} \\
         ${bam} \\
@@ -294,16 +284,34 @@ process MULTIQC {
 // ---- Workflow ----
 
 workflow {
+    // ---- Parameter validation ----
+    if (!params.reads)                { error "Missing required parameter: --reads" }
+    if (!params.bwa_index)            { error "Missing required parameter: --bwa_index" }
+    if (!params.chrom_sizes)          { error "Missing required parameter: --chrom_sizes" }
+    if (!params.hotspot_center_sites) { error "Missing required parameter: --hotspot_center_sites" }
+    if (!params.blacklist)            { error "Missing required parameter: --blacklist" }
+
+    // ---- Channels ----
+    ch_reads        = channel.fromFilePairs(params.reads, checkIfExists: true)
+    ch_bwa_index    = channel.fromPath("${params.bwa_index}*", checkIfExists: true).collect()
+    ch_chrom_sizes  = channel.fromPath(params.chrom_sizes, checkIfExists: true).collect()
+    ch_center_sites = channel.fromPath(params.hotspot_center_sites, checkIfExists: true).collect()
+    ch_blacklist    = channel.fromPath(params.blacklist, checkIfExists: true).collect()
+    ch_mappable     = params.hotspot_mappable
+        ? channel.fromPath(params.hotspot_mappable, checkIfExists: true).collect()
+        : []
+
     FASTQC_RAW(ch_reads)
     TRIM_GALORE(ch_reads)
     BWA_ALIGN(TRIM_GALORE.out.trimmed, ch_bwa_index)
-    FILTER_DEDUP(BWA_ALIGN.out.bam, ch_blacklist.collect())
-    HOTSPOT2(FILTER_DEDUP.out.bam, ch_chrom_sizes.collect(), ch_hotspot_index.collect())
-    SIGNAL_TRACK(FILTER_DEDUP.out.bam, ch_chrom_sizes.collect())
+    FILTER_DEDUP(BWA_ALIGN.out.bam, ch_blacklist)
+    HOTSPOT2(FILTER_DEDUP.out.bam, ch_chrom_sizes, ch_center_sites, ch_mappable)
+    SIGNAL_TRACK(FILTER_DEDUP.out.bam, ch_chrom_sizes)
     INSERT_SIZES(FILTER_DEDUP.out.bam)
 
     if (!params.skip_footprint) {
-        FOOTPRINTING(FILTER_DEDUP.out.bam, HOTSPOT2.out.peaks)
+        // join on sample_id so each BAM is footprinted against its own peaks
+        FOOTPRINTING(FILTER_DEDUP.out.bam.join(HOTSPOT2.out.peaks))
     }
 
     ch_multiqc = FASTQC_RAW.out.reports

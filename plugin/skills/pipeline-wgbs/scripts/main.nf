@@ -3,27 +3,15 @@ nextflow.enable.dsl=2
 
 // ============================================================================
 // ENCODE WGBS Pipeline — FASTQ to bedMethyl
-// Tools: Trim Galore, Bismark, MethylDackel
+// Tools: Trim Galore, Bismark (Bowtie2), MethylDackel
 // ============================================================================
 
-params.reads       = null
-params.genome_dir  = null
-params.outdir      = './results'
-params.aligner     = 'bismark'    // 'bismark' or 'bwameth'
-params.min_coverage = 5
-params.no_overlap  = true
-params.lambda_genome = null
-params.skip_dedup  = false
-
-if (!params.reads)      { error "Missing required parameter: --reads" }
-if (!params.genome_dir) { error "Missing required parameter: --genome_dir" }
-
-// ---- Channels ----
-Channel
-    .fromFilePairs(params.reads, checkIfExists: true)
-    .set { ch_reads }
-
-ch_genome = Channel.fromPath(params.genome_dir, checkIfExists: true)
+params.reads         = null
+params.genome_dir    = null    // Bismark genome folder (bismark_genome_preparation output + the .fa)
+params.outdir        = './results'
+params.min_coverage  = 5
+params.merge_context = true    // merge the two strands of each CpG/CHG into one record
+params.skip_dedup    = false
 
 // ---- Processes ----
 
@@ -158,7 +146,6 @@ process METHYLDACKEL_MBIAS {
     path("*.txt"), emit: report
 
     script:
-    def genome_fa = "${genome_dir}/*.fa"
     """
     GENOME_FA=\$(ls ${genome_dir}/*.fa | head -1)
     MethylDackel mbias \\
@@ -182,9 +169,12 @@ process METHYLDACKEL_EXTRACT {
     output:
     tuple val(sample_id), path("*.bedGraph"), emit: bedgraph
     tuple val(sample_id), path("*.bedMethyl.gz"), emit: bedmethyl
+    path("*.bedMethyl.gz.tbi"), emit: index
 
     script:
-    def merge = params.no_overlap ? '--mergeContext' : ''
+    // MethylDackel never counts both mates of an overlapping pair, so there is no overlap
+    // switch. --mergeContext is a separate choice: per-CpG/CHG records instead of per-cytosine.
+    def merge = params.merge_context ? '--mergeContext' : ''
     """
     GENOME_FA=\$(ls ${genome_dir}/*.fa | head -1)
     MethylDackel extract \\
@@ -198,16 +188,21 @@ process METHYLDACKEL_EXTRACT {
         \$GENOME_FA \\
         ${bam}
 
-    # Convert CpG bedGraph to bedMethyl
-    awk 'BEGIN {OFS="\\t"} {
-        cov = \$5 + \$6;
-        pct = (\$5 / cov) * 100;
-        print \$1, \$2, \$3, ".", int(pct*10), "+", \$2, \$3, "0,0,0", cov, pct
-    }' ${sample_id}_CpG.bedGraph \\
-        | sort -k1,1 -k2,2n \\
-        | bgzip > ${sample_id}.CpG.bedMethyl.gz
+    # Convert each context to ENCODE bedMethyl: score = coverage capped at 1000,
+    # column 10 = coverage, column 11 = percent methylated. MethylDackel bedGraphs start
+    # with a "track" header line and carry no strand, so the header is skipped and strand is ".".
+    for context in CpG CHG CHH; do
+        awk 'BEGIN {OFS="\\t"} !/^track/ {
+            cov = \$5 + \$6
+            if (cov == 0) next
+            score = (cov > 1000) ? 1000 : cov
+            print \$1, \$2, \$3, ".", score, ".", \$2, \$3, "0,0,0", cov, int((\$5 / cov) * 100 + 0.5)
+        }' ${sample_id}_\${context}.bedGraph \\
+            | sort -k1,1 -k2,2n \\
+            | bgzip > ${sample_id}.\${context}.bedMethyl.gz
 
-    tabix -p bed ${sample_id}.CpG.bedMethyl.gz
+        tabix -p bed ${sample_id}.\${context}.bedMethyl.gz
+    done
     """
 }
 
@@ -225,12 +220,13 @@ process COVERAGE_STATS {
 
     script:
     """
-    awk '{
+    awk '!/^track/ {
         cov = \$5 + \$6; sum += cov; n++;
         if (cov >= 1)  c1++;
         if (cov >= 5)  c5++;
         if (cov >= 10) c10++
     } END {
+        if (n == 0) { print "Total CpGs: 0"; exit }
         printf "Total CpGs: %d\\n", n;
         printf "Mean coverage: %.1f\\n", sum/n;
         printf "CpGs >=1x: %d (%.1f%%)\\n", c1, c1/n*100;
@@ -260,10 +256,18 @@ process MULTIQC {
 // ---- Workflow ----
 
 workflow {
+    // ---- Parameter validation ----
+    if (!params.reads)      { error "Missing required parameter: --reads" }
+    if (!params.genome_dir) { error "Missing required parameter: --genome_dir" }
+
+    // ---- Channels ----
+    ch_reads  = channel.fromFilePairs(params.reads, checkIfExists: true)
+    ch_genome = channel.fromPath(params.genome_dir, type: 'dir', checkIfExists: true).collect()
+
     FASTQC_RAW(ch_reads)
     TRIM_GALORE(ch_reads)
 
-    BISMARK_ALIGN(TRIM_GALORE.out.trimmed, ch_genome.collect())
+    BISMARK_ALIGN(TRIM_GALORE.out.trimmed, ch_genome)
 
     if (!params.skip_dedup) {
         DEDUPLICATE(BISMARK_ALIGN.out.bam)
@@ -272,8 +276,8 @@ workflow {
         SAMTOOLS_SORT_INDEX(BISMARK_ALIGN.out.bam)
     }
 
-    METHYLDACKEL_MBIAS(SAMTOOLS_SORT_INDEX.out.bam, ch_genome.collect())
-    METHYLDACKEL_EXTRACT(SAMTOOLS_SORT_INDEX.out.bam, ch_genome.collect())
+    METHYLDACKEL_MBIAS(SAMTOOLS_SORT_INDEX.out.bam, ch_genome)
+    METHYLDACKEL_EXTRACT(SAMTOOLS_SORT_INDEX.out.bam, ch_genome)
     COVERAGE_STATS(METHYLDACKEL_EXTRACT.out.bedgraph)
 
     ch_multiqc = FASTQC_RAW.out.reports

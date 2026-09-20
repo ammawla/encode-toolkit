@@ -11,11 +11,14 @@ params.single_end    = false
 params.strandedness  = 'reverse'
 params.skip_kallisto = false
 params.star_index    = null
-params.rsem_index    = null
-params.gtf           = null
+params.rsem_index    = null   // RSEM reference prefix (rsem-prepare-reference output), not a directory
 params.chrom_sizes   = null
 
-def genome_map = [
+// Genome-specific defaults. Kept in a function because scripts that declare processes
+// cannot also hold top-level variables. The annotation is part of the STAR and RSEM
+// references, so it is chosen when those are built rather than passed to this workflow.
+def genomeDefaults() {
+    return [
     'GRCh38': [
         fasta:       'GRCh38.primary_assembly.genome.fa',
         gtf:         'gencode.v38.primary_assembly.annotation.gtf',
@@ -32,11 +35,8 @@ def genome_map = [
         kallisto_idx: 'gencode.vM27.kallisto.idx',
         rseqc_bed:   'mm10_RefSeq.bed'
     ]
-]
-
-gtf_file      = params.gtf        ?: genome_map[params.genome].gtf
-star_idx_path = params.star_index  ?: genome_map[params.genome].star_index
-rsem_idx_path = params.rsem_index  ?: genome_map[params.genome].rsem_index
+    ]
+}
 
 process FASTQC {
     tag "$sample_id"
@@ -135,6 +135,8 @@ process RSEM_QUANT {
 
     script:
     def pe_flag = params.single_end ? "" : "--paired-end"
+    // The reference files are staged into the task directory, so use the prefix basename.
+    def rsem_prefix = file(params.rsem_index ?: genomeDefaults()[params.genome].rsem_index).name
     """
     rsem-calculate-expression \\
       ${pe_flag} \\
@@ -144,7 +146,7 @@ process RSEM_QUANT {
       --strandedness ${params.strandedness} \\
       --num-threads ${task.cpus} \\
       ${transcriptome_bam} \\
-      ${rsem_index} \\
+      ${rsem_prefix} \\
       ${sample_id}
     """
 }
@@ -245,10 +247,22 @@ process MULTIQC {
 }
 
 workflow {
-    ch_reads      = Channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-    ch_star_idx   = Channel.fromPath(star_idx_path, type: 'dir')
-    ch_rsem_idx   = Channel.fromPath(rsem_idx_path, type: 'dir')
-    ch_rseqc_bed  = Channel.fromPath(genome_map[params.genome].rseqc_bed)
+    // ---- Parameter validation ----
+    if (!params.reads) { error "Missing required parameter: --reads" }
+    if (!genomeDefaults().containsKey(params.genome)) {
+        error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
+    }
+
+    // ---- Input channels ----
+    def defaults      = genomeDefaults()[params.genome]
+    def star_idx_path = params.star_index ?: defaults.star_index
+    def rsem_idx_path = params.rsem_index ?: defaults.rsem_index
+
+    ch_reads      = channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2, checkIfExists: true)
+    ch_star_idx   = channel.fromPath(star_idx_path, type: 'dir', checkIfExists: true)
+    // rsem_idx_path is a prefix such as .../GRCh38, so stage every file that starts with it
+    ch_rsem_idx   = channel.fromPath("${rsem_idx_path}*", checkIfExists: true)
+    ch_rseqc_bed  = channel.fromPath(defaults.rseqc_bed, checkIfExists: true)
 
     // Stage 1: QC and Trimming
     FASTQC(ch_reads)
@@ -262,14 +276,14 @@ workflow {
 
     // Kallisto (optional)
     if (!params.skip_kallisto) {
-        ch_kallisto_idx = Channel.fromPath(genome_map[params.genome].kallisto_idx)
+        ch_kallisto_idx = channel.fromPath(defaults.kallisto_idx, checkIfExists: true)
         KALLISTO_QUANT(TRIM_GALORE.out.trimmed, ch_kallisto_idx.collect())
     }
 
     // Stage 4: Signal Tracks
     ch_chrom_sizes = params.chrom_sizes ?
-        Channel.fromPath(params.chrom_sizes) :
-        Channel.fromPath("${star_idx_path}/chrNameLength.txt")
+        channel.fromPath(params.chrom_sizes, checkIfExists: true) :
+        channel.fromPath("${star_idx_path}/chrNameLength.txt", checkIfExists: true)
     SIGNAL_TRACKS(STAR_ALIGN.out.bedgraph, ch_chrom_sizes.collect())
 
     // Stage 5: QC Metrics

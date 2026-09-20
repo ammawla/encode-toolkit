@@ -20,13 +20,14 @@ producing per-CpG methylation levels in bedMethyl format.
 ```
 FASTQ -> Trim adapters -> Bismark align -> Deduplicate -> MethylDackel extract -> bedMethyl
   |           |               |                |                |                    |
-  QC      Trim Galore    Bismark/bwa-meth   Picard         Per-CpG calls      Final output
+  QC      Trim Galore    Bismark (Bowtie2)  deduplicate_   Per-cytosine       Final output
+                                            bismark        calls
 ```
 
 ### ENCODE Repository
 
 - **GitHub**: `ENCODE-DCC/dna-me-pipeline`
-- **Container**: `encodedcc/dna-me-pipeline`
+- **Container**: built from `scripts/Dockerfile` in this skill (`docker build -t encode-toolkit/pipeline-wgbs:1.0.0 scripts/`); override with `--container`
 - **WDL**: Available for Cromwell execution
 - **This skill**: Nextflow DSL2 reimplementation for portability
 
@@ -36,7 +37,6 @@ FASTQ -> Trim adapters -> Bismark align -> Deduplicate -> MethylDackel extract -
 |------|---------|---------|----------|
 | Trim Galore | 0.6.10 | Adapter + quality trimming (bisulfite-aware) | Krueger (Babraham) |
 | Bismark | 0.24.2 | Bisulfite-aware alignment + methylation | Krueger & Andrews 2011 |
-| bwa-meth | 0.2.7 | Alternative bisulfite aligner (faster) | Pedersen 2014 |
 | MethylDackel | 0.6.1 | Methylation extraction from BAM | Ryan (GitHub) |
 | Picard | 3.1.1 | Duplicate marking | Broad Institute |
 | samtools | 1.19 | BAM operations | Li et al. 2009 |
@@ -115,11 +115,19 @@ nextflow run main.nf \
 | `--reads` | required | Glob pattern to paired FASTQ files |
 | `--genome_dir` | required | Path to Bismark genome index directory |
 | `--outdir` | `./results` | Output directory |
-| `--aligner` | `bismark` | Aligner: `bismark` or `bwameth` |
 | `--min_coverage` | `5` | Minimum coverage for CpG reporting |
-| `--no_overlap` | `true` | Remove overlapping PE reads (avoid double-counting) |
-| `--lambda_genome` | `null` | Lambda genome index for conversion rate QC |
+| `--merge_context` | `true` | Merge the two strands of each CpG/CHG into one record (`MethylDackel --mergeContext`) |
 | `--skip_dedup` | `false` | Skip deduplication (for RRBS data) |
+
+Notes on what the workflow does and does not do:
+- **Aligner**: Bismark with Bowtie2. bwa-meth is described in `references/02-bismark-alignment.md`
+  as a manual alternative; it is not an option of this workflow and is not in the image.
+- **Overlapping mates**: MethylDackel never counts both mates of an overlapping read pair, so
+  there is no switch for it. `--merge_context` is a separate choice about per-CpG versus
+  per-cytosine output.
+- **Bisulfite conversion rate**: not computed by the workflow. Estimate it from the CHH
+  methylation percentage in the Bismark alignment report, or align a lambda/pUC19 spike-in
+  separately when the sample carries real non-CpG methylation (ESCs, neurons).
 
 ## Output Files
 
@@ -134,7 +142,7 @@ results/
       {sample}.CpG.bedMethyl.gz
       {sample}.CHG.bedMethyl.gz   # Non-CpG contexts
       {sample}.CHH.bedMethyl.gz
-    conversion_rate/         # Lambda/pUC19 conversion QC
+    mbias/                   # MethylDackel M-bias plots and report
   coverage/
     {sample}.coverage_stats.txt
   multiqc/

@@ -32,8 +32,9 @@ This skill solves that by providing:
 - **Python install script** for single-cell, Hi-C, and genomics packages
 - **Nextflow + container setup** for pipeline execution on local, HPC, and cloud platforms
 
-All environments use the same channel priority (conda-forge > bioconda > defaults) and are tested
-for cross-platform compatibility on Linux x86_64 and macOS (Intel + Apple Silicon where possible).
+All environments use the same channel priority (conda-forge > bioconda). Every file is dry-run
+solved for Linux x86_64 in CI, so the pinned versions exist and install together. Several tools
+have no macOS arm64 build on bioconda; on Apple Silicon use the pipeline Docker images instead.
 
 ## Quick Start
 
@@ -95,7 +96,7 @@ uniform pipeline standards (Landt et al. 2012, ENCODE Consortium 2020).
 | MACS2 | 2.2.9.1 | Peak calling for narrow (TF) and broad (histone) marks (Zhang et al. 2008) |
 | Picard | 3.1.1 | Duplicate marking and library complexity metrics (Broad Institute) |
 | phantompeakqualtools | 1.2.2 | Strand cross-correlation (NSC/RSC) quality metrics (Kharchenko et al. 2008) |
-| IDR | 2.0.3 | Irreproducible Discovery Rate for replicate consistency (Li et al. 2011) |
+| IDR | 2.0.4.2 | Irreproducible Discovery Rate for replicate consistency (Li et al. 2011) |
 | deeptools | 3.5.5 | Signal normalization (bamCoverage), fingerprint, correlation (Ramirez et al. 2016) |
 | bedtools | 2.31.0 | Interval operations, blacklist filtering (Quinlan & Hall 2010) |
 | FastQC | 0.12.1 | Raw read quality assessment (Andrews 2010) |
@@ -117,7 +118,7 @@ For chromatin accessibility profiling via ATAC-seq following ENCODE standards
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Bowtie2 | 2.5.3 | Alignment (preferred over BWA for ATAC-seq short fragments) (Langmead & Salzberg 2012) |
+| Bowtie2 | 2.5.4 | Alignment (preferred over BWA for ATAC-seq short fragments) (Langmead & Salzberg 2012) |
 | MACS2 | 2.2.9.1 | Peak calling with --nomodel --shift -100 --extsize 200 for ATAC (Zhang et al. 2008) |
 | samtools | 1.19 | BAM manipulation, mitochondrial read filtering |
 | Picard | 3.1.1 | Duplicate marking, insert size metrics |
@@ -168,7 +169,7 @@ For chromatin conformation capture processing following ENCODE Hi-C standards
 | Tool | Version | Purpose |
 |------|---------|---------|
 | BWA-MEM | 0.7.17 | Chimeric read alignment (each mate aligned independently) |
-| pairtools | 1.0.3 | Parse, sort, deduplicate, filter contact pairs (Open2C) |
+| pairtools | 1.1.2 | Parse, sort, deduplicate, filter contact pairs (Open2C) |
 | cooler | 0.9.3 | Multi-resolution contact matrix storage and balancing (Abdennur & Mirny 2020) |
 | Juicer | 2.20.00 | Contact matrix generation and HiCCUPS loop calling (Durand et al. 2016) |
 | samtools | 1.19 | BAM handling for chimeric alignment parsing |
@@ -219,9 +220,9 @@ For DNase I hypersensitive site mapping following ENCODE standards
 | Tool | Version | Purpose |
 |------|---------|---------|
 | BWA-MEM | 0.7.17 | Read alignment to reference genome |
-| Hotspot2 | 2.3.1 | DNase-seq hotspot detection (John et al. 2011) |
-| HINT-ATAC | 0.13.2 | TF footprinting from DNase-seq data (Li et al. 2019) |
-| F-Seq2 | 2.0.3 | Feature density estimation for peak calling (Boyle et al. 2008, Zhao et al. 2020) |
+| Hotspot2 | 2.1.2 | DNase-seq hotspot detection (John et al. 2011); not on conda, built from source in the pipeline image |
+| HINT (RGT) | 1.0.2 | TF footprinting from DNase-seq data (Li et al. 2019); installed from PyPI |
+| F-Seq2 | 2.0.3 | Feature density estimation for peak calling (Boyle et al. 2008, Zhao et al. 2020); installed from PyPI |
 | samtools | 1.19 | BAM handling and filtering |
 | bedtools | 2.31.0 | Interval operations, blacklist filtering |
 | FastQC | 0.12.1 | Read quality assessment |
@@ -239,7 +240,7 @@ CUT&Tag (Kaya-Okur et al. 2019).
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Bowtie2 | 2.5.3 | Alignment (recommended for shorter CUT&RUN/Tag fragments) |
+| Bowtie2 | 2.5.4 | Alignment (recommended for shorter CUT&RUN/Tag fragments) |
 | SEACR | 1.3 | Sparse Enrichment Analysis for CUT&RUN (Meers et al. 2019) |
 | MACS2 | 2.2.9.1 | Alternative peak calling with adjusted parameters |
 | samtools | 1.19 | BAM handling, spike-in alignment filtering |
@@ -427,9 +428,9 @@ ENCODE pipeline execution requires Nextflow DSL2 and a container runtime (Docker
 ### Nextflow Installation
 
 ```bash
-# Install Nextflow (requires Java 11+)
-curl -s https://get.nextflow.io | bash
-mv nextflow /usr/local/bin/
+# Install the pinned Nextflow release (requires Java 17+). The script downloads the
+# self-contained release from GitHub, verifies its SHA-256, and only then installs it.
+bash scripts/install-nextflow.sh --docker
 
 # Verify
 nextflow -version
@@ -553,7 +554,7 @@ conda activate encode-chipseq
 The YAML includes:
 ```yaml
 name: encode-chipseq
-channels: [bioconda, conda-forge, defaults]
+channels: [conda-forge, bioconda]
 dependencies:
   - bwa=0.7.17
   - samtools=1.17
@@ -657,7 +658,7 @@ Expected output:
 - **R/Bioconductor version mismatch**: R packages from CRAN and Bioconductor must match the R version. Installing Bioconductor 3.18 packages with R 4.4 will fail silently or produce errors. Use BiocManager::install() to ensure version compatibility.
 - **Python 2 vs Python 3**: Some legacy bioinformatics tools (MACS 1.x, old HOMER) require Python 2. Never install Python 2 tools in the same environment as Python 3 tools — use separate conda environments.
 - **ARM Mac (M1/M2/M3) compatibility**: Many bioinformatics tools lack native ARM builds. Use `CONDA_SUBDIR=osx-64` or Rosetta 2 emulation for x86_64 packages. Some tools (samtools, BWA) have ARM-native builds.
-- **Nextflow requires Java 11+**: Nextflow will not run on Java 8. Check `java -version` before running pipelines. Install with `curl -s https://get.nextflow.io | bash` for correct Java bundling.
+- **Nextflow requires Java 17+**: check `java -version` before running pipelines. Install Nextflow with `scripts/install-nextflow.sh`, which pins the release the pipelines are validated against and verifies its checksum; avoid piping a remote installer straight into a shell.
 - **Docker vs Singularity on HPC**: Most HPC clusters do not allow Docker (requires root). Use Singularity instead. Nextflow supports both via `-profile singularity` or `-profile docker`.
 
 ## Literature Foundation

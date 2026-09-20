@@ -68,7 +68,7 @@ samtools depth -a sample_filtered.bam | \
 
 # Mean and median coverage
 samtools depth -a sample_filtered.bam | \
-    awk '{sum+=$3; n++; a[n]=$3} END {
+    awk '{sum+=$3; n++; a[n]=$3; if ($3>=5) sum5++} END {
         asort(a);
         print "Mean:", sum/n;
         print "Median:", a[int(n/2)];

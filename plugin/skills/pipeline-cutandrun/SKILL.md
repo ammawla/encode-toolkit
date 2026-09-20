@@ -27,8 +27,10 @@ FASTQ -> Trim -> Bowtie2 align (genome) -> Filter/dedup -> SEACR peaks
 
 ### ENCODE Repository
 
-- **GitHub**: `ENCODE-DCC/cutandrun-pipeline`
-- **Container**: `encodedcc/cutandrun-pipeline`
+- ENCODE does not publish an official CUT&RUN pipeline. This workflow follows the published
+  CUT&RUN/CUT&Tag processing protocol (Bowtie2, fragment bedGraphs, SEACR) and applies
+  ENCODE conventions for filtering, blacklisting, and QC.
+- **Container**: built from `scripts/Dockerfile` in this skill (`docker build -t encode-toolkit/pipeline-cutandrun:1.0.0 scripts/`); override with `--container`
 - **This skill**: Nextflow DSL2 reimplementation for portability
 
 ## Core Tools and Versions
@@ -127,15 +129,17 @@ nextflow run main.nf \
 |-----------|---------|-------------|
 | `--reads` | required | Glob pattern to paired FASTQ files |
 | `--bowtie2_index` | required | Bowtie2 genome index prefix |
-| `--spikein_index` | required | Bowtie2 E. coli spike-in index prefix |
+| `--spikein_index` | `null` | Bowtie2 E. coli spike-in index prefix. When given, signal tracks are spike-in calibrated |
 | `--chrom_sizes` | required | Chromosome sizes file |
 | `--blacklist` | required | ENCODE blacklist BED file |
 | `--outdir` | `./results` | Output directory |
-| `--seacr_mode` | `stringent` | SEACR mode: `stringent` or `relaxed` |
-| `--seacr_norm` | `norm` | SEACR normalization: `norm` or `non` |
-| `--control` | `null` | IgG control BAM (if available) |
+| `--seacr_mode` | `stringent` | SEACR mode: `stringent`, `relaxed`, or `both` |
+| `--seacr_norm` | `norm` | SEACR normalization to the control: `norm` or `non` (only used with `--control`) |
+| `--seacr_threshold` | `0.01` | Top fraction of signal kept by SEACR when no `--control` is given |
+| `--control` | `null` | IgG control BAM, already filtered and deduplicated. Converted to a fragment bedGraph for SEACR and passed as `-c` to MACS2 |
+| `--macs2_gsize` | `hs` | MACS2 effective genome size (`hs`, `mm`, or a number) |
 | `--peak_caller` | `seacr` | Peak caller: `seacr` or `macs2` or `both` |
-| `--skip_spikein` | `false` | Skip spike-in normalization |
+| `--skip_spikein` | `false` | Skip spike-in calibration; signal tracks are then RPKM-normalized |
 
 ## Output Files
 

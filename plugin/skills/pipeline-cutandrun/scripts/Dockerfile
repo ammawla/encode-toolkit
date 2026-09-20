@@ -1,14 +1,16 @@
-FROM ubuntu:22.04
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE CUT&RUN Pipeline: Bowtie2 + SEACR + MACS2 + deepTools"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit CUT&RUN pipeline: Bowtie2 + SEACR + MACS2 + deepTools"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gzip pigz unzip \
     python3 python3-pip python3-dev \
-    default-jre \
+    openjdk-17-jre-headless \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     build-essential r-base \
     && rm -rf /var/lib/apt/lists/*
@@ -44,13 +46,13 @@ RUN wget -q https://github.com/broadinstitute/picard/releases/download/3.1.1/pic
 # SEACR 1.3
 RUN wget -q https://github.com/FredHutch/SEACR/archive/refs/tags/v1.3.tar.gz && \
     tar xzf v1.3.tar.gz && mv SEACR-1.3 /opt/SEACR && \
-    ln -s /opt/SEACR/SEACR_1.3.sh /usr/local/bin/ && \
+    ln -s /opt/SEACR/SEACR_1.3.sh /opt/SEACR/SEACR_1.3.R /usr/local/bin/ && \
     rm v1.3.tar.gz
 
 # MACS2 + deepTools + cutadapt
 RUN pip3 install --no-cache-dir \
     macs2==2.2.9.1 \
-    deeptools==3.5.4 \
+    deeptools==3.5.5 \
     cutadapt==4.6
 
 # Trim Galore

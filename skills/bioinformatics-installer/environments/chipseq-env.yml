@@ -6,9 +6,9 @@ name: encode-chipseq
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - python=3.11
+  # IDR 2.0.4.2 is built for Python 3.10 and older on bioconda
+  - python=3.10
   # Alignment
   - bwa=0.7.17
   # BAM processing
@@ -17,7 +17,7 @@ dependencies:
   # Peak calling
   - macs2=2.2.9.1
   # Replicate consistency
-  - idr=2.0.3
+  - idr=2.0.4.2
   # Quality metrics
   - phantompeakqualtools=1.2.2
   # Signal processing

@@ -1,15 +1,19 @@
-FROM ubuntu:22.04
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE WGBS Pipeline: Bismark + MethylDackel"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit WGBS pipeline: Bismark + MethylDackel"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl unzip gzip pigz \
+    build-essential \
     python3 python3-pip \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
+    libbigwig-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # samtools 1.19
@@ -21,7 +25,7 @@ RUN wget -q https://github.com/samtools/samtools/releases/download/1.19/samtools
 # htslib (tabix, bgzip) 1.19
 RUN wget -q https://github.com/samtools/htslib/releases/download/1.19/htslib-1.19.tar.bz2 && \
     tar xjf htslib-1.19.tar.bz2 && cd htslib-1.19 && \
-    ./configure --prefix=/usr/local && make -j4 && make install && \
+    ./configure --prefix=/usr/local && make -j4 && make install && ldconfig && \
     cd .. && rm -rf htslib-1.19*
 
 # Bowtie2 2.5.3
@@ -47,7 +51,7 @@ RUN pip3 install --no-cache-dir cutadapt==4.6 && \
 # MethylDackel 0.6.1
 RUN wget -q https://github.com/dpryan79/MethylDackel/archive/0.6.1.tar.gz && \
     tar xzf 0.6.1.tar.gz && cd MethylDackel-0.6.1 && \
-    make CFLAGS="-O3 -Wall" && cp MethylDackel /usr/local/bin/ && \
+    make CFLAGS="-O3 -Wall" LIBBIGWIG="-lBigWig" && cp MethylDackel /usr/local/bin/ && \
     cd .. && rm -rf MethylDackel-0.6.1*
 
 # FastQC 0.12.1

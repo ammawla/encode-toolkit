@@ -1,13 +1,14 @@
 FROM ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE Hi-C Pipeline: BWA + pairtools + Juicer + cooler"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit Hi-C pipeline: BWA + pairtools + Juicer + cooler"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget curl gzip pigz \
-    python3 python3-pip \
+    wget curl gzip pigz unzip \
+    build-essential \
+    python3 python3-pip python3-dev \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     libhdf5-dev \
@@ -19,21 +20,21 @@ RUN wget -q https://github.com/samtools/samtools/releases/download/1.19/samtools
     ./configure --prefix=/usr/local && make -j4 && make install && \
     cd .. && rm -rf samtools-1.19*
 
-# BWA 0.7.17
-RUN wget -q https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2 && \
-    tar xjf bwa-0.7.17.tar.bz2 && cd bwa-0.7.17 && \
+# BWA 0.7.18 (0.7.17 does not link with GCC 10 or newer)
+RUN wget -q https://github.com/lh3/bwa/archive/refs/tags/v0.7.18.tar.gz && \
+    tar xzf v0.7.18.tar.gz && cd bwa-0.7.18 && \
     make -j4 && cp bwa /usr/local/bin/ && \
-    cd .. && rm -rf bwa-0.7.17*
+    cd .. && rm -rf bwa-0.7.18 v0.7.18.tar.gz
 
-# pairtools 1.0.3
-RUN pip3 install --no-cache-dir pairtools==1.0.3
+# pairtools 1.1.2 (first release line with prebuilt wheels; 1.0.3 no longer builds from source)
+RUN pip3 install --no-cache-dir pairtools==1.1.2
 
 # Juicer tools 2.20.00
 RUN wget -q https://github.com/aidenlab/Juicebox/releases/download/v2.20.00/juicer_tools.2.20.00.jar \
     -O /opt/juicer_tools.jar
 
-# cooler 0.9.3 + cooltools
-RUN pip3 install --no-cache-dir cooler==0.9.3 cooltools==0.7.0
+# cooler 0.9.3
+RUN pip3 install --no-cache-dir cooler==0.9.3
 
 # FastQC 0.12.1
 RUN wget -q https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip && \

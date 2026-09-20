@@ -15,7 +15,10 @@ params.mito_name   = 'chrM'
 params.nfr_max     = 150
 params.tss_bed     = null
 
-def genome_map = [
+// Genome-specific defaults. Kept in a function because scripts that declare processes
+// cannot also hold top-level variables.
+def genomeDefaults() {
+    return [
     'GRCh38': [
         index:     'GRCh38_bowtie2_index',
         blacklist: 'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/hg38-blacklist.v2.bed.gz',
@@ -26,10 +29,8 @@ def genome_map = [
         blacklist: 'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/mm10-blacklist.v2.bed.gz',
         gsize:     'mm'
     ]
-]
-
-gsize     = genome_map[params.genome].gsize
-blacklist = params.blacklist ?: genome_map[params.genome].blacklist
+    ]
+}
 
 process FASTQC {
     tag "$sample_id"
@@ -120,14 +121,14 @@ process MITO_FILTER {
 
 process MARK_DUPLICATES {
     tag "$sample_id"
-    publishDir "${params.outdir}/filtered", mode: 'copy', pattern: '*.metrics.txt'
+    publishDir "${params.outdir}/filtered", mode: 'copy', pattern: '*_metrics.txt'
 
     input:
     tuple val(sample_id), path(bam)
 
     output:
-    tuple val(sample_id), path("${sample_id}.dedup.bam"), emit: bam
-    path("${sample_id}.dup_metrics.txt"),                  emit: metrics
+    tuple val(sample_id), path("${sample_id}.dedup.bam"), path("${sample_id}.dedup.bam.bai"), emit: bam
+    path("${sample_id}.dup_metrics.txt"),                                                       emit: metrics
 
     script:
     """
@@ -145,7 +146,7 @@ process TN5_SHIFT {
     publishDir "${params.outdir}/filtered/shifted", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(bam)
+    tuple val(sample_id), path(bam), path(bai)   // alignmentSieve needs the index
 
     output:
     tuple val(sample_id), path("${sample_id}.shifted.bam"), path("${sample_id}.shifted.bam.bai"), emit: bam
@@ -216,6 +217,7 @@ process MACS2_CALLPEAK {
     path("${sample_id}*.xls"),                              emit: xls
 
     script:
+    def gsize = genomeDefaults()[params.genome].gsize
     """
     macs2 callpeak -t ${bam} \\
       -f BAMPE -g ${gsize} -n ${sample_id} \\
@@ -239,6 +241,9 @@ process IDR_ANALYSIS {
     !params.skip_idr
 
     script:
+    if (peak_files.size() > 2) {
+        log.warn "IDR compares two replicates: using ${peak_files[0]} and ${peak_files[1]} of ${peak_files.size()} peak files"
+    }
     """
     idr --samples ${peak_files[0]} ${peak_files[1]} \\
       --input-file-type narrowPeak --rank p.value \\
@@ -281,9 +286,22 @@ process MULTIQC {
 }
 
 workflow {
-    ch_reads  = Channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2)
-    ch_genome = Channel.fromPath(genome_map[params.genome].index, type: 'dir')
-    ch_black  = Channel.fromPath(blacklist)
+    // ---- Parameter validation ----
+    if (!params.reads) { error "Missing required parameter: --reads" }
+    if (params.single_end) {
+        error "This ATAC-seq workflow needs paired-end reads: Tn5 shifting, nucleosome-free selection, and BAMPE peak calling all depend on fragment length"
+    }
+    if (!genomeDefaults().containsKey(params.genome)) {
+        error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
+    }
+
+    // ---- Input channels ----
+    def defaults  = genomeDefaults()[params.genome]
+    def blacklist = params.blacklist ?: defaults.blacklist
+
+    ch_reads  = channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2, checkIfExists: true)
+    ch_genome = channel.fromPath(defaults.index, type: 'dir', checkIfExists: true)
+    ch_black  = channel.fromPath(blacklist)
 
     // Stage 1: QC and Trimming
     FASTQC(ch_reads)
@@ -304,7 +322,12 @@ workflow {
 
     // IDR (optional, with 2+ replicates)
     if (!params.skip_idr) {
-        ch_peaks = MACS2_CALLPEAK.out.peaks.map { it[1] }.collect()
+        // IDR compares two replicates. Sort by name so the pair is the same on every run,
+        // and skip IDR when fewer than two peak files exist.
+        ch_peaks = MACS2_CALLPEAK.out.peaks
+            .map { _sample_id, peaks -> peaks }
+            .toSortedList { a, b -> a.name <=> b.name }
+            .filter { peaks -> peaks.size() >= 2 }
         IDR_ANALYSIS(ch_peaks)
     }
 

@@ -12,29 +12,13 @@ params.spikein_index  = null
 params.chrom_sizes    = null
 params.blacklist      = null
 params.outdir         = './results'
-params.seacr_mode     = 'stringent'
-params.seacr_norm     = 'norm'
-params.control        = null
-params.peak_caller    = 'seacr'    // 'seacr', 'macs2', or 'both'
+params.seacr_mode     = 'stringent'  // 'stringent', 'relaxed', or 'both'
+params.seacr_norm     = 'norm'       // 'norm' or 'non'; only used when --control is given
+params.seacr_threshold = 0.01        // top fraction of signal kept when no --control is given
+params.control        = null         // IgG control BAM (filtered, deduplicated)
+params.peak_caller    = 'seacr'      // 'seacr', 'macs2', or 'both'
+params.macs2_gsize    = 'hs'         // MACS2 effective genome size ('hs', 'mm', or a number)
 params.skip_spikein   = false
-
-if (!params.reads)         { error "Missing required parameter: --reads" }
-if (!params.bowtie2_index) { error "Missing required parameter: --bowtie2_index" }
-if (!params.chrom_sizes)   { error "Missing required parameter: --chrom_sizes" }
-if (!params.blacklist)     { error "Missing required parameter: --blacklist" }
-
-// ---- Channels ----
-Channel
-    .fromFilePairs(params.reads, checkIfExists: true)
-    .set { ch_reads }
-
-ch_bt2_index    = Channel.fromPath("${params.bowtie2_index}*", checkIfExists: true).collect()
-ch_chrom_sizes  = Channel.fromPath(params.chrom_sizes, checkIfExists: true)
-ch_blacklist    = Channel.fromPath(params.blacklist, checkIfExists: true)
-
-if (params.spikein_index) {
-    ch_spikein_index = Channel.fromPath("${params.spikein_index}*", checkIfExists: true).collect()
-}
 
 // ---- Processes ----
 
@@ -97,7 +81,8 @@ process BOWTIE2_ALIGN {
     path("${sample_id}.bowtie2.log"), emit: log
 
     script:
-    def idx_prefix = params.bowtie2_index
+    // The index files are staged into the task directory, so use the prefix basename.
+    def idx_prefix = file(params.bowtie2_index).name
     """
     bowtie2 \\
         --very-sensitive \\
@@ -128,19 +113,16 @@ process SPIKEIN_ALIGN {
     path spikein_idx
 
     output:
-    tuple val(sample_id), path("${sample_id}.spikein_counts.txt"), emit: counts
-
-    when:
-    !params.skip_spikein && params.spikein_index
+    path("${sample_id}.spikein_counts.txt"), emit: counts
 
     script:
-    def idx_prefix = params.spikein_index
+    def idx_prefix = file(params.spikein_index).name
     """
-    # Extract unmapped reads
+    # Extract read pairs that did not map to the primary genome
     samtools view -b -f 12 -F 256 ${bam} | samtools sort -n -@ 2 -o unmapped.bam
     bedtools bamtofastq -i unmapped.bam -fq unmap_R1.fq -fq2 unmap_R2.fq
 
-    # Align to spike-in
+    # Align to the spike-in genome
     bowtie2 \\
         --very-sensitive \\
         --no-mixed --no-discordant --dovetail \\
@@ -153,7 +135,7 @@ process SPIKEIN_ALIGN {
         | samtools sort -o spikein.bam
 
     spikein_count=\$(samtools view -c spikein.bam)
-    echo "${sample_id}\t\${spikein_count}" > ${sample_id}.spikein_counts.txt
+    printf '%s\\t%s\\n' "${sample_id}" "\${spikein_count}" > ${sample_id}.spikein_counts.txt
     """
 }
 
@@ -209,37 +191,47 @@ process COMPUTE_SCALE_FACTOR {
     output:
     path("scale_factors.txt"), emit: factors
 
-    when:
-    !params.skip_spikein
-
     script:
     """
     cat ${counts} > all_counts.txt
-    min_count=\$(awk '{print \$2}' all_counts.txt | sort -n | head -1)
-    awk -v min=\$min_count '{print \$1, \$2, min/\$2}' all_counts.txt > scale_factors.txt
+
+    # Scale every sample to the smallest non-zero spike-in count (factor = min / count).
+    # A sample with no spike-in reads cannot be calibrated and is left unscaled (factor 1).
+    min_count=\$(awk -F'\\t' '\$2 > 0 {print \$2}' all_counts.txt | sort -n | head -1)
+    awk -F'\\t' -v min="\${min_count:-0}" 'BEGIN {OFS="\\t"} {
+        factor = (\$2 > 0 && min > 0) ? min / \$2 : 1
+        print \$1, \$2, factor
+    }' all_counts.txt > scale_factors.txt
     """
 }
 
-process FRAGMENT_BED {
+process FRAGMENT_BEDGRAPH {
     tag "${sample_id}"
     cpus 2
     memory '4 GB'
 
     input:
-    tuple val(sample_id), path(bam), path(bai)
+    tuple val(sample_id), path(bam)
+    path chrom_sizes
 
     output:
     tuple val(sample_id), path("${sample_id}_fragments.bedGraph"), emit: bedgraph
 
     script:
     """
-    bedtools bamtobed -bedpe -i ${bam} \\
-        | awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$6, \$7, \$8, \$9}' \\
-        | sort -k1,1 -k2,2n \\
+    # bamtobed -bedpe needs mates on adjacent lines, so name-sort first
+    samtools sort -n -@ ${task.cpus} -o namesorted.bam ${bam}
+
+    # Keep properly paired fragments on one chromosome and shorter than 1 kb
+    bedtools bamtobed -bedpe -i namesorted.bam \\
+        | awk 'BEGIN {OFS="\\t"} \$1 == \$4 && \$6 - \$2 < 1000 {print \$1, \$2, \$6}' \\
+        | sort -k1,1 -k2,2n -k3,3n \\
         > fragments.bed
 
-    bedtools genomecov -i fragments.bed -g ${params.chrom_sizes} -bg \\
-        | sort -k1,1 -k2,2n > ${sample_id}_fragments.bedGraph
+    bedtools genomecov -bg -i fragments.bed -g ${chrom_sizes} \\
+        > ${sample_id}_fragments.bedGraph
+
+    rm namesorted.bam
     """
 }
 
@@ -251,21 +243,22 @@ process SEACR_PEAKS {
 
     input:
     tuple val(sample_id), path(bedgraph)
+    path control_bedgraph   // empty when no --control is given
 
     output:
     tuple val(sample_id), path("${sample_id}.seacr.*.bed"), emit: peaks
 
-    when:
-    params.peak_caller == 'seacr' || params.peak_caller == 'both'
-
     script:
-    def ctrl = params.control ? "${params.control}" : "0.01"
+    // SEACR takes either a control bedGraph or a numeric threshold as its second argument.
+    // Normalization to the control only applies when a control bedGraph is supplied.
+    def ctrl  = control_bedgraph ? "${control_bedgraph}" : "${params.seacr_threshold}"
+    def norm  = control_bedgraph ? params.seacr_norm : 'non'
+    def modes = params.seacr_mode == 'both' ? ['stringent', 'relaxed'] : [params.seacr_mode]
+    def calls = modes.collect { mode ->
+        "SEACR_1.3.sh ${bedgraph} ${ctrl} ${norm} ${mode} ${sample_id}.seacr"
+    }.join('\n    ')
     """
-    # Stringent
-    SEACR_1.3.sh ${bedgraph} ${ctrl} ${params.seacr_norm} stringent ${sample_id}.seacr
-
-    # Also run relaxed
-    SEACR_1.3.sh ${bedgraph} ${ctrl} ${params.seacr_norm} relaxed ${sample_id}.seacr
+    ${calls}
     """
 }
 
@@ -277,28 +270,24 @@ process MACS2_PEAKS {
 
     input:
     tuple val(sample_id), path(bam), path(bai)
+    path control_bam   // empty when no --control is given
 
     output:
     tuple val(sample_id), path("${sample_id}.macs2_peaks.narrowPeak"), emit: peaks
 
-    when:
-    params.peak_caller == 'macs2' || params.peak_caller == 'both'
-
     script:
-    def ctrl_flag = params.control ? "-c ${params.control}" : ""
+    def ctrl_flag = control_bam ? "-c ${control_bam}" : ""
     """
     macs2 callpeak \\
         -t ${bam} \\
         ${ctrl_flag} \\
         -f BAMPE \\
-        -g hs \\
+        -g ${params.macs2_gsize} \\
         -n ${sample_id}.macs2 \\
         --nomodel \\
         --keep-dup all \\
         -q 0.05 \\
         --outdir .
-
-    mv ${sample_id}.macs2_peaks.narrowPeak ${sample_id}.macs2_peaks.narrowPeak
     """
 }
 
@@ -309,18 +298,22 @@ process SIGNAL_TRACK {
     memory '8 GB'
 
     input:
-    tuple val(sample_id), path(bam), path(bai)
+    tuple val(sample_id), path(bam), path(bai), val(scale_factor)
 
     output:
     path("${sample_id}.normalized.bw"), emit: bigwig
 
     script:
+    // With a spike-in scale factor the track is spike-in calibrated; otherwise fall back to RPKM.
+    def normalization = scale_factor
+        ? "--scaleFactor ${scale_factor} --normalizeUsing None"
+        : "--normalizeUsing RPKM"
     """
     bamCoverage \\
         --bam ${bam} \\
         --outFileName ${sample_id}.normalized.bw \\
         --binSize 10 \\
-        --normalizeUsing RPKM \\
+        ${normalization} \\
         --extendReads \\
         --numberOfProcessors ${task.cpus}
     """
@@ -367,26 +360,80 @@ process MULTIQC {
 // ---- Workflow ----
 
 workflow {
+    // ---- Parameter validation ----
+    if (!params.reads)         { error "Missing required parameter: --reads" }
+    if (!params.bowtie2_index) { error "Missing required parameter: --bowtie2_index" }
+    if (!params.chrom_sizes)   { error "Missing required parameter: --chrom_sizes" }
+    if (!params.blacklist)     { error "Missing required parameter: --blacklist" }
+    if (!(params.seacr_mode in ['stringent', 'relaxed', 'both'])) {
+        error "Invalid --seacr_mode '${params.seacr_mode}': expected 'stringent', 'relaxed', or 'both'"
+    }
+    if (!(params.seacr_norm in ['norm', 'non'])) {
+        error "Invalid --seacr_norm '${params.seacr_norm}': expected 'norm' or 'non'"
+    }
+    if (!(params.peak_caller in ['seacr', 'macs2', 'both'])) {
+        error "Invalid --peak_caller '${params.peak_caller}': expected 'seacr', 'macs2', or 'both'"
+    }
+
+    def use_spikein = !params.skip_spikein && params.spikein_index
+    def use_seacr   = params.peak_caller in ['seacr', 'both']
+    def use_macs2   = params.peak_caller in ['macs2', 'both']
+
+    // ---- Channels ----
+    ch_reads       = channel.fromFilePairs(params.reads, checkIfExists: true)
+    ch_bt2_index   = channel.fromPath("${params.bowtie2_index}*", checkIfExists: true).collect()
+    ch_chrom_sizes = channel.fromPath(params.chrom_sizes, checkIfExists: true).collect()
+    ch_blacklist   = channel.fromPath(params.blacklist, checkIfExists: true).collect()
+    ch_control_bam = params.control
+        ? channel.fromPath(params.control, checkIfExists: true).collect()
+        : []
+
+    // ---- Alignment and filtering ----
     FASTQC_RAW(ch_reads)
     TRIM_GALORE(ch_reads)
     BOWTIE2_ALIGN(TRIM_GALORE.out.trimmed, ch_bt2_index)
+    FILTER_DEDUP(BOWTIE2_ALIGN.out.bam, ch_blacklist)
 
-    if (!params.skip_spikein && params.spikein_index) {
+    // ---- Spike-in calibration ----
+    if (use_spikein) {
+        ch_spikein_index = channel.fromPath("${params.spikein_index}*", checkIfExists: true).collect()
         SPIKEIN_ALIGN(BOWTIE2_ALIGN.out.bam, ch_spikein_index)
-        COMPUTE_SCALE_FACTOR(SPIKEIN_ALIGN.out.counts.map{ it[1] }.collect())
+        COMPUTE_SCALE_FACTOR(SPIKEIN_ALIGN.out.counts.collect())
+
+        // scale_factors.txt columns: sample, spike-in count, scale factor
+        ch_factors = COMPUTE_SCALE_FACTOR.out.factors
+            .splitCsv(sep: '\t')
+            .map { row -> [row[0], row[2]] }
+        ch_signal_in = FILTER_DEDUP.out.bam.join(ch_factors)
+    } else {
+        ch_signal_in = FILTER_DEDUP.out.bam.map { sample_id, bam, bai -> [sample_id, bam, bai, ''] }
     }
 
-    FILTER_DEDUP(BOWTIE2_ALIGN.out.bam, ch_blacklist.collect())
-    FRAGMENT_BED(FILTER_DEDUP.out.bam)
-
-    if (params.peak_caller == 'seacr' || params.peak_caller == 'both') {
-        SEACR_PEAKS(FRAGMENT_BED.out.bedgraph)
+    // ---- Fragment bedGraphs (samples, plus the IgG control when given) ----
+    ch_fragment_in = FILTER_DEDUP.out.bam.map { sample_id, bam, _bai -> [sample_id, bam] }
+    if (params.control) {
+        ch_fragment_in = ch_fragment_in.mix(ch_control_bam.map { bams -> ['__control__', bams[0]] })
     }
-    if (params.peak_caller == 'macs2' || params.peak_caller == 'both') {
-        MACS2_PEAKS(FILTER_DEDUP.out.bam)
+    FRAGMENT_BEDGRAPH(ch_fragment_in, ch_chrom_sizes)
+
+    ch_bedgraph = FRAGMENT_BEDGRAPH.out.bedgraph.branch { sample_id, _bedgraph ->
+        control: sample_id == '__control__'
+        sample: true
+    }
+    ch_control_bedgraph = params.control
+        ? ch_bedgraph.control.map { _sample_id, bedgraph -> bedgraph }.collect()
+        : []
+
+    // ---- Peak calling ----
+    if (use_seacr) {
+        SEACR_PEAKS(ch_bedgraph.sample, ch_control_bedgraph)
+    }
+    if (use_macs2) {
+        MACS2_PEAKS(FILTER_DEDUP.out.bam, ch_control_bam)
     }
 
-    SIGNAL_TRACK(FILTER_DEDUP.out.bam)
+    // ---- Signal and QC ----
+    SIGNAL_TRACK(ch_signal_in)
     FRAGMENT_SIZES(FILTER_DEDUP.out.bam)
 
     ch_multiqc = FASTQC_RAW.out.reports

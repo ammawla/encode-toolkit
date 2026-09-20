@@ -9,6 +9,22 @@
 
 set -euo pipefail
 
+# Pinned Nextflow release. The ENCODE Toolkit pipelines are validated against this version
+# with `nextflow lint` and `nextflow run -preview`. To move to another release, change the
+# version and replace the checksum with the sha256 published for the
+# `nextflow-<version>-dist` asset on https://github.com/nextflow-io/nextflow/releases
+NEXTFLOW_VERSION="26.04.6"
+NEXTFLOW_SHA256="182a63c74074e2dc7956ffa3c8cd59de952ed2c44394e21faf5e1736b945444c"
+NEXTFLOW_URL="https://github.com/nextflow-io/nextflow/releases/download/v${NEXTFLOW_VERSION}/nextflow-${NEXTFLOW_VERSION}-dist"
+
+sha256_of() {
+    if command -v sha256sum &> /dev/null; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
 echo "============================================"
 echo "ENCODE Nextflow Pipeline Infrastructure Setup"
 echo "============================================"
@@ -24,34 +40,56 @@ install_nextflow() {
     else
         # Check Java
         if ! command -v java &> /dev/null; then
-            echo "ERROR: Java 11+ is required for Nextflow."
+            echo "ERROR: Java 17+ is required for Nextflow."
             echo "Install Java first:"
             echo "  macOS:  brew install openjdk@17"
             echo "  Ubuntu: sudo apt-get install -y openjdk-17-jdk"
-            echo "  conda:  conda install -c conda-forge openjdk>=11"
+            echo "  conda:  conda install -c conda-forge 'openjdk>=17'"
             exit 1
         fi
 
         JAVA_VER=$(java -version 2>&1 | head -1 | awk -F '"' '{print $2}' | awk -F '.' '{print $1}')
-        if [ "$JAVA_VER" -lt 11 ] 2>/dev/null; then
-            echo "WARNING: Java $JAVA_VER detected. Nextflow requires Java 11+."
+        if [ "$JAVA_VER" -lt 17 ] 2>/dev/null; then
+            echo "WARNING: Java $JAVA_VER detected. Nextflow ${NEXTFLOW_VERSION} requires Java 17+."
         fi
 
-        echo "Downloading Nextflow..."
-        curl -s https://get.nextflow.io | bash
+        # Download the pinned, self-contained release and verify it before it is ever executed
+        local tmp_file
+        tmp_file="$(mktemp)"
+        echo "Downloading Nextflow ${NEXTFLOW_VERSION}..."
+        curl -fsSL "$NEXTFLOW_URL" -o "$tmp_file"
 
-        # Move to a directory in PATH
+        local actual_sha
+        actual_sha="$(sha256_of "$tmp_file")"
+        if [ "$actual_sha" != "$NEXTFLOW_SHA256" ]; then
+            echo "ERROR: checksum mismatch for Nextflow ${NEXTFLOW_VERSION}; refusing to install."
+            echo "  expected: $NEXTFLOW_SHA256"
+            echo "  actual:   $actual_sha"
+            rm -f "$tmp_file"
+            exit 1
+        fi
+        echo "Checksum verified."
+
+        # Install into a directory on PATH when possible, otherwise into ~/.local/bin
+        local install_dir
         if [ -w /usr/local/bin ]; then
-            mv nextflow /usr/local/bin/
-            echo "Nextflow installed to /usr/local/bin/nextflow"
+            install_dir="/usr/local/bin"
         else
-            mkdir -p "$HOME/.local/bin"
-            mv nextflow "$HOME/.local/bin/"
-            echo "Nextflow installed to $HOME/.local/bin/nextflow"
-            echo "Add to PATH: export PATH=\$PATH:\$HOME/.local/bin"
+            install_dir="$HOME/.local/bin"
+            mkdir -p "$install_dir"
         fi
+        local nextflow_bin="$install_dir/nextflow"
+        mv "$tmp_file" "$nextflow_bin"
+        chmod 755 "$nextflow_bin"
+        echo "Nextflow installed to $nextflow_bin"
 
-        nextflow -version
+        case ":$PATH:" in
+            *":$install_dir:"*) ;;
+            *) echo "Add it to your PATH: export PATH=\"\$PATH:$install_dir\"" ;;
+        esac
+
+        # Call the installed file directly: it may not be on PATH yet in this shell
+        "$nextflow_bin" -version
     fi
     echo ""
 }

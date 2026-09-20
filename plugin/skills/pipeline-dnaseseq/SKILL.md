@@ -27,7 +27,7 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 ### ENCODE Repository
 
 - **GitHub**: `ENCODE-DCC/dnase-seq-pipeline`
-- **Container**: `encodedcc/dnase-seq-pipeline`
+- **Container**: built from `scripts/Dockerfile` in this skill (`docker build -t encode-toolkit/pipeline-dnaseseq:1.0.0 scripts/`); override with `--container`
 - **WDL**: Available for Cromwell execution
 - **This skill**: Nextflow DSL2 reimplementation for portability
 
@@ -35,12 +35,13 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 
 | Tool | Version | Purpose | Citation |
 |------|---------|---------|----------|
-| BWA-MEM | 0.7.17 | Alignment | Li & Durbin 2009 |
+| BWA-MEM | 0.7.18 | Alignment | Li & Durbin 2009 |
 | samtools | 1.19 | BAM operations | Li et al. 2009 |
 | Picard | 3.1.1 | Duplicate marking | Broad Institute |
-| Hotspot2 | 2.3.1 | DHS calling (ENCODE standard) | John et al. 2011 |
+| Hotspot2 | 2.1.2 | DHS calling (ENCODE standard) | John et al. 2011 |
+| modwt | 1.0 | Wavelet smoothing used by Hotspot2 | Stam Lab |
 | bedtools | 2.31.0 | Genomic arithmetic | Quinlan & Hall 2010 |
-| HINT-ATAC | 0.13.2 | TF footprinting | Li et al. 2019 |
+| HINT (RGT) | 1.0.2 | TF footprinting | Li et al. 2019 |
 | FastQC | 0.12.1 | Read quality | Andrews (Babraham) |
 | MultiQC | 1.21 | Aggregated QC | Ewels et al. 2016 |
 
@@ -75,7 +76,8 @@ nextflow run main.nf \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
-    --hotspot_index '/ref/hotspot2_index/' \
+    --hotspot_center_sites '/ref/hotspot2/hg38.center_sites.n100.starch' \
+    --hotspot_mappable '/ref/hotspot2/hg38.mappable_only.bed' \
     --blacklist '/ref/hg38-blacklist.v2.bed' \
     --outdir results/ \
     -resume
@@ -89,7 +91,8 @@ nextflow run main.nf \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
-    --hotspot_index '/ref/hotspot2_index/' \
+    --hotspot_center_sites '/ref/hotspot2/hg38.center_sites.n100.starch' \
+    --hotspot_mappable '/ref/hotspot2/hg38.mappable_only.bed' \
     --blacklist '/ref/hg38-blacklist.v2.bed' \
     --outdir results/ \
     -resume
@@ -103,7 +106,8 @@ nextflow run main.nf \
     --reads 'gs://bucket/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index 'gs://bucket/ref/genome.fa' \
     --chrom_sizes 'gs://bucket/ref/hg38.chrom.sizes' \
-    --hotspot_index 'gs://bucket/ref/hotspot2_index/' \
+    --hotspot_center_sites 'gs://bucket/ref/hotspot2/hg38.center_sites.n100.starch' \
+    --hotspot_mappable 'gs://bucket/ref/hotspot2/hg38.mappable_only.bed' \
     --blacklist 'gs://bucket/ref/hg38-blacklist.v2.bed' \
     --outdir 'gs://bucket/results/' \
     -resume
@@ -127,12 +131,13 @@ nextflow run main.nf \
 | `--reads` | required | Glob pattern to paired FASTQ files |
 | `--bwa_index` | required | Path to BWA genome index (.fa) |
 | `--chrom_sizes` | required | Chromosome sizes file |
-| `--hotspot_index` | required | Hotspot2 mappability index directory |
+| `--hotspot_center_sites` | required | Hotspot2 center-sites file (`.starch`), made once per genome with `extractCenterSites.sh` |
+| `--hotspot_mappable` | `null` | Mappable-regions BED that the center sites were made from (recommended) |
 | `--blacklist` | required | ENCODE blacklist BED file |
 | `--outdir` | `./results` | Output directory |
 | `--fdr` | `0.05` | Hotspot2 FDR threshold |
 | `--skip_footprint` | `false` | Skip footprinting analysis |
-| `--motif_db` | `null` | JASPAR motif database for footprinting |
+| `--organism` | `hg38` | Genome name registered in the RGT data directory, used by HINT footprinting |
 
 ## Output Files
 
@@ -210,8 +215,20 @@ DNase-seq produces a characteristic fragment size distribution:
 - If distribution is abnormal, check library preparation protocol
 
 ### Mappability Index
-Hotspot2 requires a pre-computed mappability index. These are read-length
-and genome-build specific:
+Hotspot2 needs a center-sites file, which is derived from a mappable-regions BED. Both are
+read-length and genome-build specific. Create the center sites once per genome with the script
+that ships with Hotspot2 (it is on the PATH inside the image):
+
+```bash
+# chrom_sizes.bed is a BED file: chromosome, 0, length
+awk 'BEGIN{OFS="\t"} {print $1, 0, $2}' hg38.chrom.sizes | sort-bed - > chrom_sizes.bed
+extractCenterSites.sh -c chrom_sizes.bed -M hg38.mappable_only.bed -o hg38.center_sites.n100.starch
+```
+
+The workflow ends at footprint calling; motif matching against JASPAR is a separate
+downstream step (see the `jaspar-motifs` skill).
+
+Mappable-regions files:
 - hg38 / 36 bp: Use ENCODE-provided index
 - hg38 / 76 bp: Use ENCODE-provided index
 - hg38 / 150 bp: May need to generate custom index
@@ -256,7 +273,7 @@ encode_log_derived_file(
     source_accessions=["ENCSR...", "ENCFF..."],
     description="DNase hypersensitive sites from ENCODE DNase-seq pipeline",
     file_type="DHS_peaks",
-    tool_used="BWA 0.7.17 + Hotspot2 2.3.1",
+    tool_used="BWA 0.7.18 + Hotspot2 2.1.2",
     parameters="FDR 0.05, blacklist filtered, ENCODE hg38 mappability index"
 )
 ```

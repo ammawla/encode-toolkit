@@ -5,15 +5,21 @@ FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential wget curl git ca-certificates \
+    build-essential wget curl git ca-certificates unzip bc \
     zlib1g-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev \
     python3 python3-pip python3-dev default-jre \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python tools
 RUN pip3 install --no-cache-dir \
-    macs2==2.2.9.1 idr==2.0.4.2 multiqc==1.14 cutadapt==4.4 \
-    deeptools==3.5.4
+    numpy==1.23.5 macs2==2.2.9.1 multiqc==1.14 cutadapt==4.4 \
+    deeptools==3.5.5
+
+# IDR 2.0.4.2 is not on PyPI (the PyPI package named idr is unrelated). Install the release
+# ENCODE uses from its GitHub tag. It imports numpy in setup.py and uses numpy.int at
+# runtime, so numpy is installed first and held below 1.24.
+RUN pip3 install --no-cache-dir --no-build-isolation \
+    https://github.com/kundajelab/idr/archive/refs/tags/2.0.4.2.tar.gz
 
 # Bowtie2
 RUN wget -qO- https://github.com/BenLangmead/bowtie2/releases/download/v2.5.1/bowtie2-2.5.1-linux-x86_64.zip > bowtie2.zip && \
@@ -34,11 +40,10 @@ RUN wget -qO /usr/local/bin/picard.jar https://github.com/broadinstitute/picard/
 
 # Trim Galore and FastQC
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir trim-galore==0.6.7
-
-# ataqv (ATAC-seq QC)
-RUN wget -qO- https://github.com/ParkerLab/ataqv/releases/download/1.3.1/ataqv-1.3.1.tar.gz | tar xz && \
-    cd ataqv-1.3.1 && make && cp bin/ataqv /usr/local/bin/ && cp bin/mkarv /usr/local/bin/
+# Trim Galore is a Perl script and is not published on PyPI; install the tagged release
+RUN wget -qO- https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.tar.gz | tar xz && \
+    cp TrimGalore-0.6.7/trim_galore /usr/local/bin/ && chmod +x /usr/local/bin/trim_galore && \
+    rm -rf TrimGalore-0.6.7
 
 # bedGraphToBigWig
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \

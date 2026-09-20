@@ -6,11 +6,10 @@ name: encode-atacseq
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.11
   # Alignment
-  - bowtie2=2.5.3
+  - bowtie2=2.5.4
   # BAM processing
   - samtools=1.19
   - picard=3.1.1

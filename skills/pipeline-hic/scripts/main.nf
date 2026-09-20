@@ -6,26 +6,17 @@ nextflow.enable.dsl=2
 // Tools: BWA-MEM, pairtools, Juicer, cooler, HiCCUPS
 // ============================================================================
 
+// Contacts are processed at read-pair level with pairtools, which does not depend on the
+// restriction enzyme, so the same workflow applies to MboI/DpnII, HindIII, Arima, and Micro-C.
+
 params.reads            = null
 params.bwa_index        = null
 params.chrom_sizes      = null
-params.restriction_site = 'GATC'
 params.outdir           = './results'
 params.resolutions      = '1000,5000,10000,25000,50000,100000,250000,500000,1000000'
 params.min_mapq         = 30
 params.assembly         = 'hg38'
-
-if (!params.reads)       { error "Missing required parameter: --reads" }
-if (!params.bwa_index)   { error "Missing required parameter: --bwa_index" }
-if (!params.chrom_sizes) { error "Missing required parameter: --chrom_sizes" }
-
-// ---- Channels ----
-Channel
-    .fromFilePairs(params.reads, checkIfExists: true)
-    .set { ch_reads }
-
-ch_bwa_index   = Channel.fromPath("${params.bwa_index}*", checkIfExists: true).collect()
-ch_chrom_sizes = Channel.fromPath(params.chrom_sizes, checkIfExists: true)
+params.hiccups_gpu      = false   // HiCCUPS runs its CPU mode unless an NVIDIA GPU and CUDA are available
 
 // ---- Processes ----
 
@@ -61,7 +52,8 @@ process BWA_ALIGN {
     tuple val(sample_id), path("${sample_id}.paired.bam"), emit: bam
 
     script:
-    def idx_base = params.bwa_index
+    // The index files are staged into the task directory, so use the prefix basename.
+    def idx_base = file(params.bwa_index).name
     """
     bwa mem -t ${task.cpus} -SP5M \\
         ${idx_base} \\
@@ -86,6 +78,8 @@ process PAIRTOOLS_PARSE_SORT {
 
     script:
     """
+    mkdir -p tmp   # pairtools sort hands --tmpdir to GNU sort, which does not create it
+
     pairtools parse \\
         --chroms-path ${chrom_sizes} \\
         --min-mapq ${params.min_mapq} \\
@@ -167,7 +161,9 @@ process JUICER_HIC {
 
     script:
     """
-    # Convert to Juicer medium format
+    # Convert to Juicer short format: str1 chr1 pos1 frag1 str2 chr2 pos2 frag2.
+    # No restriction-site file is used, so the fragment fields carry the dummy values
+    # 0 and 1 that Juicer's `pre` command documents for this case.
     zcat ${pairs} | awk 'BEGIN{OFS="\\t"} !/^#/ {
         s1 = (\$6 == "+") ? 0 : 16;
         s2 = (\$7 == "+") ? 0 : 16;
@@ -230,8 +226,12 @@ process HICCUPS {
     path("${sample_id}.hiccups_loops.bedpe"), emit: loops
 
     script:
+    // The image has no CUDA runtime, so use HiCCUPS' CPU mode unless a GPU is requested.
+    // CPU mode only searches near the diagonal (8 Mb by default).
+    def cpu_flag = params.hiccups_gpu ? '' : '--cpu'
     """
     java -Xmx${task.memory.toGiga()}g -jar /opt/juicer_tools.jar hiccups \\
+        ${cpu_flag} \\
         --threads ${task.cpus} \\
         -r 5000,10000,25000 \\
         -f 0.1,0.1,0.1 \\
@@ -283,14 +283,24 @@ process MULTIQC {
 // ---- Workflow ----
 
 workflow {
+    // ---- Parameter validation ----
+    if (!params.reads)       { error "Missing required parameter: --reads" }
+    if (!params.bwa_index)   { error "Missing required parameter: --bwa_index" }
+    if (!params.chrom_sizes) { error "Missing required parameter: --chrom_sizes" }
+
+    // ---- Channels ----
+    ch_reads       = channel.fromFilePairs(params.reads, checkIfExists: true)
+    ch_bwa_index   = channel.fromPath("${params.bwa_index}*", checkIfExists: true).collect()
+    ch_chrom_sizes = channel.fromPath(params.chrom_sizes, checkIfExists: true).collect()
+
     FASTQC_RAW(ch_reads)
     BWA_ALIGN(ch_reads, ch_bwa_index)
-    PAIRTOOLS_PARSE_SORT(BWA_ALIGN.out.bam, ch_chrom_sizes.collect())
+    PAIRTOOLS_PARSE_SORT(BWA_ALIGN.out.bam, ch_chrom_sizes)
     PAIRTOOLS_DEDUP(PAIRTOOLS_PARSE_SORT.out.pairs)
     PAIRTOOLS_SELECT(PAIRTOOLS_DEDUP.out.pairs)
 
-    JUICER_HIC(PAIRTOOLS_SELECT.out.pairs, ch_chrom_sizes.collect())
-    COOLER_MCOOL(PAIRTOOLS_SELECT.out.pairs, ch_chrom_sizes.collect())
+    JUICER_HIC(PAIRTOOLS_SELECT.out.pairs, ch_chrom_sizes)
+    COOLER_MCOOL(PAIRTOOLS_SELECT.out.pairs, ch_chrom_sizes)
     HICCUPS(JUICER_HIC.out.hic)
     CONTACT_STATS(PAIRTOOLS_SELECT.out.pairs)
 

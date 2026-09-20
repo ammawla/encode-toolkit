@@ -12,10 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install bioinformatics tools
 RUN pip3 install --no-cache-dir \
-    macs2==2.2.9.1 idr==2.0.4.2 multiqc==1.14 cutadapt==4.4
+    numpy==1.23.5 macs2==2.2.9.1 multiqc==1.14 cutadapt==4.4
 
-RUN wget -qO- https://github.com/lh3/bwa/releases/download/v0.7.17/bwa-0.7.17.tar.bz2 | tar xj && \
-    cd bwa-0.7.17 && make && cp bwa /usr/local/bin/
+# IDR 2.0.4.2 is not on PyPI (the PyPI package named idr is unrelated). Install the release
+# ENCODE uses from its GitHub tag. It imports numpy in setup.py and uses numpy.int at
+# runtime, so numpy is installed first and held below 1.24.
+RUN pip3 install --no-cache-dir --no-build-isolation \
+    https://github.com/kundajelab/idr/archive/refs/tags/2.0.4.2.tar.gz
+
+RUN wget -qO- https://github.com/lh3/bwa/archive/refs/tags/v0.7.18.tar.gz | tar xz && \
+    cd bwa-0.7.18 && make && cp bwa /usr/local/bin/
 
 RUN wget -qO- https://github.com/samtools/samtools/releases/download/1.17/samtools-1.17.tar.bz2 | tar xj && \
     cd samtools-1.17 && ./configure && make -j4 && make install
@@ -26,18 +32,14 @@ RUN wget -qO- https://github.com/arq5x/bedtools2/releases/download/v2.31.0/bedto
 RUN wget -qO- https://github.com/broadinstitute/picard/releases/download/2.27.5/picard.jar > /usr/local/bin/picard.jar && \
     echo '#!/bin/bash\njava -jar /usr/local/bin/picard.jar "$@"' > /usr/local/bin/picard && chmod +x /usr/local/bin/picard
 
-RUN pip3 install --no-cache-dir trim-galore==0.6.7
+# Trim Galore is a Perl script and is not published on PyPI; install the tagged release
+RUN wget -qO- https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.tar.gz | tar xz && \
+    cp TrimGalore-0.6.7/trim_galore /usr/local/bin/ && chmod +x /usr/local/bin/trim_galore && \
+    rm -rf TrimGalore-0.6.7
 
-RUN wget -qO /usr/local/bin/fastqc https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip || true
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir deeptools==3.5.4
-
-# phantompeakqualtools
-RUN pip3 install --no-cache-dir phantompeakqualtools==1.2.2 || \
-    (git clone https://github.com/kundajelab/phantompeakqualtools.git /opt/phantompeakqualtools && \
-     chmod +x /opt/phantompeakqualtools/run_spp.R && \
-     ln -s /opt/phantompeakqualtools/run_spp.R /usr/local/bin/run_spp.R)
+RUN pip3 install --no-cache-dir deeptools==3.5.5
 
 # bedGraphToBigWig
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \

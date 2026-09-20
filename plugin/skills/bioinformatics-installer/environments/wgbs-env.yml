@@ -6,7 +6,6 @@ name: encode-wgbs
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.11
   # Bisulfite-aware alignment and methylation extraction
@@ -24,6 +23,6 @@ dependencies:
   - trim-galore=0.6.10
   - multiqc=1.21
   # Bowtie2 (required by Bismark as backend aligner)
-  - bowtie2=2.5.3
+  - bowtie2=2.5.4
   # Utilities
   - pigz

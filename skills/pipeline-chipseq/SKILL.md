@@ -335,7 +335,7 @@ encode_log_derived_file(
   source_accessions=["ENCFF001FQ1", "ENCFF002FQ2", "ENCFF003FQ3", "ENCFF004FQ4"],
   derived_file="/data/chipseq/peaks/idr_peaks.narrowPeak",
   description="IDR-thresholded H3K27ac peaks from ENCODE pipeline",
-  tool="ENCODE ChIP-seq pipeline v2.0 (BWA 0.7.17, MACS2 2.2.9.1, IDR 2.0.3)"
+  tool="ENCODE ChIP-seq pipeline v2.0 (BWA 0.7.18, MACS2 2.2.9.1, IDR 2.0.4.2)"
 )
 ```
 
