@@ -5,6 +5,23 @@ All notable changes to the ENCODE Toolkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-20
+
+### Fixed
+
+- **Server failed to start on fresh installs.** The `mcp` dependency had no upper bound, so new
+  environments resolved `mcp` 2.x, which removed `mcp.server.fastmcp`. Startup then crashed with
+  `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. The dependency is now capped at
+  `mcp[cli]>=1.0,<2`. Existing installs that already had `mcp` 1.x were not affected.
+
+  If you hit this error, uv may have cached the broken environment. Refresh it once with
+  `uvx --refresh encode-toolkit` (or `uv cache clean encode-toolkit`); pip users can run
+  `pip install --upgrade encode-toolkit`.
+
+### Added
+
+- Packaging regression test that fails if the `mcp` dependency loses its upper bound.
+
 ## [0.3.0-beta.1] - 2026-03-08
 
 Initial public beta release.
