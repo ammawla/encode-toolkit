@@ -398,7 +398,7 @@ Expected output:
 ### Step 2: Download regulatory peak files
 
 ```
-encode_list_files(accession="ENCSR457ISL", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR457ISL", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:
@@ -455,7 +455,7 @@ Rank variants by evidence layers:
 
 ### 1. Survey ENCODE data for GWAS-relevant tissues
 ```
-encode_get_facets(facet_field="organ", assay_title="ATAC-seq", organism="Homo sapiens")
+encode_get_facets(assay_title="ATAC-seq", organism="Homo sapiens")
 ```
 
 Expected output:

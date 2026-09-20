@@ -4,16 +4,15 @@ nextflow.enable.dsl=2
 // ENCODE ATAC-seq Pipeline — Nextflow DSL2
 // FASTQ -> QC -> Bowtie2 -> Tn5 Shift -> Filter -> Peaks -> IDR -> Signal
 
-params.reads       = null
-params.genome      = 'GRCh38'
-params.outdir      = 'results'
-params.single_end  = false
-params.skip_idr    = false
-params.blacklist   = null
-params.chrom_sizes = null
-params.mito_name   = 'chrM'
-params.nfr_max     = 150
-params.tss_bed     = null
+params.reads         = null
+params.genome        = 'GRCh38'
+params.outdir        = 'results'
+params.single_end    = false
+params.skip_idr      = false
+params.blacklist     = null   // defaults to the ENCODE blacklist v2 for --genome
+params.bowtie2_index = null   // directory holding the Bowtie2 index <genome>.*.bt2; default ./<genome>_bowtie2_index
+params.mito_name     = 'chrM'
+params.nfr_max       = 150
 
 // Genome-specific defaults. Kept in a function because scripts that declare processes
 // cannot also hold top-level variables.
@@ -50,7 +49,8 @@ process FASTQC {
 
 process TRIM_GALORE {
     tag "$sample_id"
-    publishDir "${params.outdir}/trimmed", mode: 'copy'
+    publishDir "${params.outdir}/trimmed", mode: 'copy', pattern: '*{.fq.gz,trimming_report.txt}'
+    publishDir "${params.outdir}/fastqc",  mode: 'copy', pattern: '*_fastqc.{html,zip}'
 
     input:
     tuple val(sample_id), path(reads)
@@ -58,6 +58,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*{val_1.fq.gz,val_2.fq.gz,trimmed.fq.gz}"), emit: trimmed
     path("*trimming_report.txt"),                                             emit: log
+    path("*_fastqc.{html,zip}"),                                              emit: fastqc
 
     script:
     if (params.single_end)
@@ -90,7 +91,7 @@ process BOWTIE2_ALIGN {
       --threads ${task.cpus} -x ${genome_index}/${params.genome} \\
       ${input_reads} 2> ${sample_id}.bowtie2.log | \\
       samtools view -@ ${task.cpus} -bS -q 30 -f 2 - | \\
-      samtools sort -@ ${task.cpus} -m 4G -o ${sample_id}.bam -
+      samtools sort -@ ${task.cpus} -m 2G -o ${sample_id}.bam -
     samtools index ${sample_id}.bam
     samtools flagstat ${sample_id}.bam > ${sample_id}.flagstat.txt
     """
@@ -98,6 +99,7 @@ process BOWTIE2_ALIGN {
 
 process MITO_FILTER {
     tag "$sample_id"
+    publishDir "${params.outdir}/qc", mode: 'copy', pattern: '*.mito_stats.txt'
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -311,7 +313,7 @@ workflow {
     def blacklist = params.blacklist ?: defaults.blacklist
 
     ch_reads  = channel.fromFilePairs(params.reads, size: params.single_end ? 1 : 2, checkIfExists: true)
-    ch_genome = channel.fromPath(defaults.index, type: 'dir', checkIfExists: true)
+    ch_genome = channel.fromPath(params.bowtie2_index ?: defaults.index, type: 'dir', checkIfExists: true)
     ch_black  = channel.fromPath(blacklist)
 
     // Stage 1: QC and Trimming
@@ -348,6 +350,7 @@ workflow {
     // MultiQC
     ch_multiqc = FASTQC.out.reports
         .mix(TRIM_GALORE.out.log)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(BOWTIE2_ALIGN.out.log)
         .mix(MITO_FILTER.out.stats)
         .mix(MARK_DUPLICATES.out.metrics)

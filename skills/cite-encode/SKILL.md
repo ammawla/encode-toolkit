@@ -585,7 +585,7 @@ Expected output:
 
 ### 2. Link a reference to an experiment
 ```
-encode_link_reference(accession="ENCSR000AKA", reference_type="pubmed", reference_id="29126249", notes="ENCODE consortium paper")
+encode_link_reference(experiment_accession="ENCSR000AKA", reference_type="pubmed", reference_id="29126249", description="ENCODE consortium paper")
 ```
 
 Expected output:

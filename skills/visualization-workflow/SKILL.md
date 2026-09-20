@@ -523,7 +523,7 @@ Expected output:
 
 ```
 encode_download_files(
-  accessions=["ENCFF234ACE", "ENCFF567ME1", "ENCFF890ATQ"],
+  file_accessions=["ENCFF234ACE", "ENCFF567ME1", "ENCFF890ATQ"],
   download_dir="/data/viz/liver_enhancers"
 )
 ```

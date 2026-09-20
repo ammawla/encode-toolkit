@@ -1,7 +1,8 @@
 # ENCODE ChIP-seq Pipeline Docker Image
-# Multi-stage build for minimal final image
 
-FROM ubuntu:22.04 AS builder
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 # perl is listed explicitly: FastQC and Trim Galore are Perl programs

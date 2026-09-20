@@ -65,6 +65,8 @@ process BWA_ALIGN {
 
 process PAIRTOOLS_PARSE_SORT {
     tag "${sample_id}"
+    // The parse statistics hold the pair-type breakdown (UU, NU, MM, WW, ...) used for QC
+    publishDir "${params.outdir}/pairs", mode: 'copy', pattern: '*.parse_stats.txt'
     cpus 4
     memory '16 GB'
 
@@ -233,6 +235,7 @@ process HICCUPS {
     java -Xmx${task.memory.toGiga()}g -jar /opt/juicer_tools.jar hiccups \\
         ${cpu_flag} \\
         --threads ${task.cpus} \\
+        -k KR \\
         -r 5000,10000,25000 \\
         -f 0.1,0.1,0.1 \\
         -p 4,2,1 \\
@@ -276,7 +279,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE Hi-C Pipeline" --force .
+    multiqc --title "ENCODE Hi-C Pipeline" --filename multiqc_report --force .
     """
 }
 

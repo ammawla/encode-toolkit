@@ -500,7 +500,7 @@ Expected output:
 ### Step 2: Log file downloads with MD5 verification
 
 ```
-encode_download_files(accessions=["ENCFF001ABC"], download_dir="/data/chipseq")
+encode_download_files(file_accessions=["ENCFF001ABC"], download_dir="/data/chipseq")
 ```
 
 Expected output:
@@ -517,9 +517,9 @@ Expected output:
 ```
 encode_log_derived_file(
   source_accessions=["ENCFF001ABC", "ENCFF002DEF"],
-  derived_file="/data/analysis/gm12878_enhancers_filtered.bed",
+  file_path="/data/analysis/gm12878_enhancers_filtered.bed",
   description="Filtered H3K27ac peaks: removed blacklist regions, merged within 500bp, filtered signalValue > 5",
-  tool="bedtools v2.31.0",
+  tool_used="bedtools v2.31.0",
   parameters="intersect -v (blacklist), merge -d 500, filter signalValue > 5"
 )
 ```
@@ -557,7 +557,7 @@ Expected output:
 ### Step 5: Generate provenance summary for publication
 
 ```
-encode_get_tracking_summary()
+encode_summarize_collection()
 ```
 
 **Interpretation**: The complete provenance chain enables automatic generation of methods sections: "H3K27ac ChIP-seq peaks (ENCFF001ABC) were filtered using ENCODE blacklist v2 (Amemiya et al. 2019) with bedtools v2.31.0..."
@@ -588,9 +588,9 @@ Expected output:
 ```
 encode_log_derived_file(
   source_accessions=["ENCFF001ABC"],
-  derived_file="/data/peaks_filtered.bed",
+  file_path="/data/peaks_filtered.bed",
   description="Blacklist-filtered peaks",
-  tool="bedtools v2.31.0"
+  tool_used="bedtools v2.31.0"
 )
 ```
 

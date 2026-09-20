@@ -232,7 +232,7 @@ Expected output:
 ### Step 2: Download peaks and extract variants
 
 ```
-encode_download_files(accessions=["ENCFF900ATK"], download_dir="/data/brain_atac")
+encode_download_files(file_accessions=["ENCFF900ATK"], download_dir="/data/brain_atac")
 ```
 
 ### Step 3: Run VEP on regulatory variants

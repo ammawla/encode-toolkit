@@ -51,5 +51,13 @@ jobs:
           print(f'Total skills validated: {count}')
           "
 
+      # Every encode_* call shown in a skill must match the server's real signature, and every
+      # `nextflow run` example must use parameters and profiles that the pipeline declares.
+      - name: Check skill docs against the server and the pipelines
+        run: python .github/scripts/check-skill-docs.py
+
+      - name: skills/ and plugin/skills/ must be identical
+        run: diff -r skills plugin/skills
+
       - name: Run tests
         run: pytest tests/ -v --tb=short

@@ -50,6 +50,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*_val_{1,2}.fq.gz"), emit: trimmed
     path("*_trimming_report.txt"), emit: reports
+    path("*_fastqc.{html,zip}"), emit: fastqc
 
     script:
     """
@@ -263,12 +264,9 @@ process INSERT_SIZES {
 
     script:
     """
-    picard CollectInsertSizeMetrics \\
-        INPUT=${bam} \\
-        OUTPUT=${sample_id}.insert_sizes.txt \\
-        HISTOGRAM_FILE=${sample_id}.insert_hist.pdf \\
-        MINIMUM_PCT=0.05 \\
-        VALIDATION_STRINGENCY=LENIENT
+    # Picard CollectInsertSizeMetrics needs R for its mandatory histogram, which the image does
+    # not ship. samtools stats reports the same insert-size distribution and MultiQC reads it.
+    samtools stats ${bam} > ${sample_id}.insert_sizes.txt
     """
 }
 
@@ -285,7 +283,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE DNase-seq Pipeline" --force .
+    multiqc --title "ENCODE DNase-seq Pipeline" --filename multiqc_report --force .
     """
 }
 
@@ -339,6 +337,7 @@ workflow {
 
     ch_multiqc = FASTQC_RAW.out.reports
         .mix(TRIM_GALORE.out.reports)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(FILTER_DEDUP.out.flagstat)
         .mix(FILTER_DEDUP.out.dup_metrics)
         .mix(HOTSPOT2.out.spot)

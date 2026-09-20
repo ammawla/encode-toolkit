@@ -52,6 +52,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*_val_{1,2}.fq.gz"), emit: trimmed
     path("*_trimming_report.txt"), emit: reports
+    path("*_fastqc.{html,zip}"), emit: fastqc
 
     script:
     """
@@ -105,6 +106,7 @@ process BOWTIE2_ALIGN {
 
 process SPIKEIN_ALIGN {
     tag "${sample_id}"
+    publishDir "${params.outdir}/spikein", mode: 'copy'
     cpus 4
     memory '4 GB'
 
@@ -357,7 +359,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE CUT&RUN Pipeline" --force .
+    multiqc --title "ENCODE CUT&RUN Pipeline" --filename multiqc_report --force .
     """
 }
 
@@ -453,6 +455,7 @@ workflow {
 
     ch_multiqc = FASTQC_RAW.out.reports
         .mix(TRIM_GALORE.out.reports)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(BOWTIE2_ALIGN.out.log)
         .mix(FILTER_DEDUP.out.flagstat)
         .mix(FILTER_DEDUP.out.dup_metrics)

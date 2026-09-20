@@ -269,7 +269,7 @@ Step 1: Find ENCODE H3K27ac experiments in liver
 
 Step 2: Download the peak file
   encode_list_files(
-    accession="ENCSR...",
+    experiment_accession="ENCSR...",
     file_format="bed",
     output_type="IDR thresholded peaks",
     assembly="GRCh38"
@@ -444,8 +444,8 @@ Step 4: Link key papers to tracked experiments
 
 Step 5: Export a complete bibliography
   encode_get_citations(
-    experiment_accession="ENCSR...",
-    format="bibtex"
+    accession="ENCSR...",
+    export_format="bibtex"
   )
   -> Generates a BibTeX file with all linked references
   -> Import directly into reference managers (Zotero, Mendeley, EndNote)
@@ -570,12 +570,12 @@ Step 7: Document the full chain with provenance
     description="Relevant clinical trial")
   -> Log any derived analysis files:
   encode_log_derived_file(
-    experiment_accession="ENCSR...",
+    source_accessions=["ENCSR..."],
     description="Intersection of rs7903146 with H3K27ac peaks in pancreatic islets",
     file_path="/path/to/variant_enhancer_overlap.bed"
   )
   -> Export the complete reference list:
-  encode_get_citations(experiment_accession="ENCSR...", format="bibtex")
+  encode_get_citations(accession="ENCSR...", export_format="bibtex")
 ```
 
 **Databases used in this workflow**:
