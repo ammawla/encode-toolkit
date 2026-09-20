@@ -16,6 +16,7 @@ on:
       - "plugin/skills/**"
       - ".github/workflows/pipelines.yml"
       - ".github/scripts/preview-pipelines.sh"
+      - ".github/scripts/gen-pipeline-configs.py"
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +26,7 @@ on:
       - "plugin/skills/**"
       - ".github/workflows/pipelines.yml"
       - ".github/scripts/preview-pipelines.sh"
+      - ".github/scripts/gen-pipeline-configs.py"
 
 permissions:
   contents: read
@@ -163,6 +165,13 @@ jobs:
 
       - name: Shellcheck
         run: shellcheck skills/bioinformatics-installer/scripts/*.sh .github/scripts/*.sh
+
+      # The seven nextflow.config files come from one template; a hand edit to one of them
+      # would make this regeneration produce a diff.
+      - name: Pipeline configs must match their generator
+        run: |
+          python3 .github/scripts/gen-pipeline-configs.py
+          git diff --exit-code -- 'skills/*/scripts/nextflow.config'
 
       - name: skills/ and plugin/skills/ must be identical
         run: diff -r skills plugin/skills
