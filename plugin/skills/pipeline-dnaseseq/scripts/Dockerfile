@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-dev \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
-    build-essential \
+    build-essential libboost-dev \
     bc \
     bedops \
     && rm -rf /var/lib/apt/lists/*

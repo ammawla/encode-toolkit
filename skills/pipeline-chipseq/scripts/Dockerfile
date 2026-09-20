@@ -32,17 +32,14 @@ RUN wget -qO- https://github.com/arq5x/bedtools2/releases/download/v2.31.0/bedto
 RUN wget -qO- https://github.com/broadinstitute/picard/releases/download/2.27.5/picard.jar > /usr/local/bin/picard.jar && \
     echo '#!/bin/bash\njava -jar /usr/local/bin/picard.jar "$@"' > /usr/local/bin/picard && chmod +x /usr/local/bin/picard
 
-RUN pip3 install --no-cache-dir trim-galore==0.6.7
+# Trim Galore is a Perl script and is not published on PyPI; install the tagged release
+RUN wget -qO- https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.tar.gz | tar xz && \
+    cp TrimGalore-0.6.7/trim_galore /usr/local/bin/ && chmod +x /usr/local/bin/trim_galore && \
+    rm -rf TrimGalore-0.6.7
 
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir deeptools==3.5.4
-
-# phantompeakqualtools
-RUN pip3 install --no-cache-dir phantompeakqualtools==1.2.2 || \
-    (git clone https://github.com/kundajelab/phantompeakqualtools.git /opt/phantompeakqualtools && \
-     chmod +x /opt/phantompeakqualtools/run_spp.R && \
-     ln -s /opt/phantompeakqualtools/run_spp.R /usr/local/bin/run_spp.R)
+RUN pip3 install --no-cache-dir deeptools==3.5.5
 
 # bedGraphToBigWig
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \

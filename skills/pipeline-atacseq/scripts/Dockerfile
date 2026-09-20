@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python tools
 RUN pip3 install --no-cache-dir \
     numpy==1.23.5 macs2==2.2.9.1 multiqc==1.14 cutadapt==4.4 \
-    deeptools==3.5.4
+    deeptools==3.5.5
 
 # IDR 2.0.4.2 is not on PyPI (the PyPI package named idr is unrelated). Install the release
 # ENCODE uses from its GitHub tag. It imports numpy in setup.py and uses numpy.int at
@@ -40,7 +40,10 @@ RUN wget -qO /usr/local/bin/picard.jar https://github.com/broadinstitute/picard/
 
 # Trim Galore and FastQC
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir trim-galore==0.6.7
+# Trim Galore is a Perl script and is not published on PyPI; install the tagged release
+RUN wget -qO- https://github.com/FelixKrueger/TrimGalore/archive/refs/tags/0.6.7.tar.gz | tar xz && \
+    cp TrimGalore-0.6.7/trim_galore /usr/local/bin/ && chmod +x /usr/local/bin/trim_galore && \
+    rm -rf TrimGalore-0.6.7
 
 # bedGraphToBigWig
 RUN wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedGraphToBigWig -O /usr/local/bin/bedGraphToBigWig && \

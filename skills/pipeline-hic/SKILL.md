@@ -39,7 +39,7 @@ FASTQ -> Trim -> BWA (per-mate) -> pairtools parse -> dedup -> .pairs
 | Tool | Version | Purpose | Citation |
 |------|---------|---------|----------|
 | BWA-MEM | 0.7.18 | Alignment (per-mate) | Li & Durbin 2009 |
-| pairtools | 1.0.3 | Pair classification, dedup | Open2C |
+| pairtools | 1.1.2 | Pair classification, dedup | Open2C |
 | Juicer tools | 2.20.00 | .hic generation, HiCCUPS | Durand et al. 2016 |
 | cooler | 0.9.3 | .cool/.mcool generation | Abdennur & Mirny 2020 |
 | samtools | 1.19 | BAM operations | Li et al. 2009 |
@@ -237,7 +237,7 @@ encode_log_derived_file(
     source_accessions=["ENCSR...", "ENCFF..."],
     description="Hi-C contact matrix from ENCODE Hi-C pipeline",
     file_type="hic",
-    tool_used="BWA 0.7.18 + pairtools 1.0.3 + Juicer 2.20.00",
+    tool_used="BWA 0.7.18 + pairtools 1.1.2 + Juicer 2.20.00",
     parameters="MboI digestion, KR normalization, resolutions 1kb-1Mb"
 )
 ```

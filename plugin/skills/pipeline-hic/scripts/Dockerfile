@@ -26,15 +26,15 @@ RUN wget -q https://github.com/lh3/bwa/archive/refs/tags/v0.7.18.tar.gz && \
     make -j4 && cp bwa /usr/local/bin/ && \
     cd .. && rm -rf bwa-0.7.18 v0.7.18.tar.gz
 
-# pairtools 1.0.3
-RUN pip3 install --no-cache-dir pairtools==1.0.3
+# pairtools 1.1.2 (first release line with prebuilt wheels; 1.0.3 no longer builds from source)
+RUN pip3 install --no-cache-dir pairtools==1.1.2
 
 # Juicer tools 2.20.00
 RUN wget -q https://github.com/aidenlab/Juicebox/releases/download/v2.20.00/juicer_tools.2.20.00.jar \
     -O /opt/juicer_tools.jar
 
-# cooler 0.9.3 + cooltools
-RUN pip3 install --no-cache-dir cooler==0.9.3 cooltools==0.7.0
+# cooler 0.9.3
+RUN pip3 install --no-cache-dir cooler==0.9.3
 
 # FastQC 0.12.1
 RUN wget -q https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip && \

@@ -52,7 +52,7 @@ RUN wget -q https://github.com/FredHutch/SEACR/archive/refs/tags/v1.3.tar.gz && 
 # MACS2 + deepTools + cutadapt
 RUN pip3 install --no-cache-dir \
     macs2==2.2.9.1 \
-    deeptools==3.5.4 \
+    deeptools==3.5.5 \
     cutadapt==4.6
 
 # Trim Galore
