@@ -125,14 +125,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       # Trusted publishing (OIDC) needs npm >= 11.5.1. When a trusted publisher is
       # configured for the package on npmjs.com, no token is required; NPM_TOKEN
-      # remains as a fallback.
-      - name: Upgrade npm
-        run: npm install -g npm@latest
+      # remains as a fallback. Pin the major so a new npm release that drops this
+      # Node version cannot break the job.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g "npm@^11.5.1"
 
       - name: Determine npm tag
         id: npm-tag
