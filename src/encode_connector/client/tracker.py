@@ -347,6 +347,15 @@ class ExperimentTracker:
         conn = self._get_conn()
         count = 0
         for pub in publications:
+            # The table is unique on (experiment, pmid). ENCODE lists some papers without a
+            # PMID; stored as "" they would all replace each other, so they are stored as NULL
+            # (which SQLite never treats as equal) and matched on DOI and title instead.
+            pmid = pub.get("pmid") or None
+            if pmid is None:
+                conn.execute(
+                    "DELETE FROM publications WHERE experiment_accession = ? AND pmid IS NULL AND doi = ? AND title = ?",
+                    (accession, pub.get("doi", ""), pub.get("title", "")),
+                )
             try:
                 conn.execute(
                     """
@@ -356,7 +365,7 @@ class ExperimentTracker:
                 """,
                     (
                         accession,
-                        pub.get("pmid", ""),
+                        pmid,
                         pub.get("doi", ""),
                         pub.get("title", ""),
                         pub.get("authors", ""),
@@ -378,7 +387,8 @@ class ExperimentTracker:
             "SELECT * FROM publications WHERE experiment_accession = ?",
             (accession,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        # a missing PMID is stored as NULL; callers keep getting the empty string they always got
+        return [{**dict(r), "pmid": r["pmid"] or ""} for r in rows]
 
     # ------------------------------------------------------------------
     # Pipeline info

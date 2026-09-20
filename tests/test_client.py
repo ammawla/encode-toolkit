@@ -1419,3 +1419,85 @@ class TestConstructor:
         mock_cm = MagicMock()
         EncodeClient(access_key="ak", credential_manager=mock_cm)
         mock_cm.store_credentials.assert_not_called()
+
+
+class TestSearchAsksForUsableFields:
+    async def test_search_experiments_requests_labels_not_object_paths(self):
+        """frame=object returns '/targets/H3K4me1-human/' style paths, which lose the label,
+        the organ, the organism and the assemblies. The search has to name the fields it needs."""
+        client = EncodeClient()
+        captured = {}
+
+        async def mock_request(path, params=None):
+            captured.update(params or {})
+            return {"@graph": [], "total": 0}
+
+        client._request = mock_request
+        await client.search_experiments(assay_title="ATAC-seq")
+
+        assert "frame" not in captured
+        for field in (
+            "accession",
+            "target.label",
+            "lab.title",
+            "assembly",
+            "biosample_ontology.classification",
+            "biosample_ontology.organ_slims",
+            "replicates.library.biosample.organism.scientific_name",
+        ):
+            assert field in captured["field"], field
+
+    async def test_search_experiments_ignores_a_negative_offset(self):
+        client = EncodeClient()
+
+        async def mock_request(path, params=None):
+            return {"@graph": [], "total": 40}
+
+        client._request = mock_request
+        result = await client.search_experiments(limit=25, offset=-10)
+
+        assert result["offset"] == 0
+
+
+class TestSearchFilesByOrganismPaginates:
+    @staticmethod
+    def _client_with_files(per_experiment: int, experiments: int) -> EncodeClient:
+        from encode_connector.client.models import FileSummary
+
+        client = EncodeClient()
+        summaries = []
+        for index in range(experiments):
+            summary = MagicMock()
+            summary.accession = f"ENCSR{index:03d}AAA"
+            summaries.append(summary)
+
+        async def mock_search_experiments(**kwargs):
+            return {"results": summaries, "total": len(summaries)}
+
+        async def mock_list_files(experiment_accession, **kwargs):
+            return [
+                FileSummary.from_api({**SAMPLE_FILE_API, "accession": f"{experiment_accession}-F{n}"})
+                for n in range(per_experiment)
+            ]
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+        return client
+
+    async def test_the_second_page_is_not_the_first_page_again(self):
+        client = self._client_with_files(per_experiment=10, experiments=20)
+
+        first = await client.search_files(organism="Mus musculus", limit=25, offset=0)
+        second = await client.search_files(organism="Mus musculus", limit=25, offset=25)
+
+        first_ids = [f.accession for f in first["results"]]
+        second_ids = [f.accession for f in second["results"]]
+        assert len(first_ids) == 25 and len(second_ids) == 25
+        assert not set(first_ids) & set(second_ids)
+
+    async def test_total_tells_the_caller_that_more_files_exist(self):
+        client = self._client_with_files(per_experiment=10, experiments=20)
+
+        result = await client.search_files(organism="Mus musculus", limit=25, offset=0)
+
+        assert result["total"] > result["offset"] + result["limit"]

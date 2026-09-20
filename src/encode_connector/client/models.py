@@ -12,6 +12,30 @@ def _extract_assemblies(file_list: list | None) -> list[str]:
     return sorted(set(f.get("assembly", "") for f in file_list if isinstance(f, dict) and f.get("assembly")))
 
 
+def _experiment_assemblies(data: dict, file_list: list) -> list[str]:
+    """Assemblies of an experiment: its own ``assembly`` list, else those of its embedded files."""
+    own = data.get("assembly")
+    if isinstance(own, list) and own:
+        return sorted({name for name in own if isinstance(name, str) and name})
+    return _extract_assemblies(file_list)
+
+
+def _experiment_organism(data: dict) -> str:
+    """Organism of an experiment. Search results carry it on the replicates' biosamples."""
+    organism = data.get("organism")
+    if isinstance(organism, dict) and organism.get("scientific_name"):
+        return organism["scientific_name"]
+    names: list[str] = []
+    for replicate in data.get("replicates") or []:
+        if not isinstance(replicate, dict):
+            continue
+        biosample = (replicate.get("library") or {}).get("biosample") or {}
+        name = (biosample.get("organism") or {}).get("scientific_name", "") if isinstance(biosample, dict) else ""
+        if name and name not in names:
+            names.append(name)
+    return ", ".join(names)
+
+
 def _extract_audit_counts(data: dict) -> dict[str, int]:
     """Extract all 4 ENCODE audit level counts from an experiment dict.
 
@@ -57,7 +81,7 @@ class ExperimentSummary(BaseModel):
 
     @classmethod
     def from_api(cls, data: dict) -> ExperimentSummary:
-        """Parse from ENCODE API experiment object (frame=object)."""
+        """Parse a search hit (the fields EXPERIMENT_SEARCH_FIELDS asks for) or an embedded object."""
         # Extract target label
         target = ""
         if data.get("target"):
@@ -90,7 +114,7 @@ class ExperimentSummary(BaseModel):
                 biosample_type = ont
 
         file_list = data.get("files") or []
-        assemblies = _extract_assemblies(file_list)
+        assemblies = _experiment_assemblies(data, file_list)
         audit_counts = _extract_audit_counts(data)
 
         # Extract dbxrefs (GEO accessions, etc.)
@@ -103,9 +127,7 @@ class ExperimentSummary(BaseModel):
             assay_title=data.get("assay_title", ""),
             target=target,
             biosample_summary=data.get("biosample_summary", ""),
-            organism=data.get("organism", {}).get("scientific_name", "")
-            if isinstance(data.get("organism"), dict)
-            else "",
+            organism=_experiment_organism(data),
             organ=organ,
             biosample_type=biosample_type,
             status=data.get("status", ""),

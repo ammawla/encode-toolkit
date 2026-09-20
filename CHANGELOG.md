@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Error binding parameter 13: type 'list' is not supported`. The tests did not see it because
   they mocked the tracker. Assemblies are now stored as joined text, two experiments count as
   compatible when they share an assembly, and a test runs the tool against a real tracker.
+- **Search results lost half their fields.** `encode_search_experiments` asked the API for
+  `frame=object`, which returns linked objects as paths, so every hit had an empty organism,
+  organ and assembly list, and targets and labs came back as slugs (`H3K4me1-human`,
+  `bradley-bernstein`) that the tool's own `target` and `lab` filters do not accept. The search
+  now names the fields it needs. Checked against a live ENCODE response.
+- **Publications without a PMID overwrote each other.** ENCODE lists some papers by PMCID only;
+  they collided on the `(experiment, pmid)` key, so one survived while the count reported all of
+  them. They are now kept apart, and storing them again does not duplicate them.
+- **`encode_search_files` with an organism ignored `offset`** and reported the number of files
+  it had collected as the total, so every page was the first page and `has_more` was false.
+  `encode_batch_download` always took that path. Pages now advance and `total` is a lower bound
+  that exceeds the page when more files exist.
+- A negative `offset` in `encode_search_experiments` is treated as 0 instead of producing a
+  `next_offset` that repeats results.
 - `encode_connector.__version__` was a hard-coded `0.2.1`; it now reports the installed version.
 - **Four pipelines failed at their last step.** MultiQC names its report after `--title`, so
   CUT&RUN, DNase-seq, Hi-C and WGBS never produced the `multiqc_report.html` they declare. They

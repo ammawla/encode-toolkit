@@ -19,6 +19,7 @@ from encode_connector.client.constants import (
     DEFAULT_LIMIT,
     DEFAULT_TIMEOUT,
     EXPERIMENT_FILTER_MAP,
+    EXPERIMENT_SEARCH_FIELDS,
     FILE_FILTER_MAP,
     MAX_REQUESTS_PER_SECOND,
     METADATA_MAP,
@@ -236,10 +237,14 @@ class EncodeClient:
         Returns dict with 'results' (list of ExperimentSummary) and 'total' count.
         """
         limit = clamp_limit(limit)
+        offset = max(0, offset)
+        # frame=object replaces linked objects with paths ("/targets/H3K4me1-human/"), which
+        # loses the labels the filters use, the organ, the organism and the assemblies. Naming
+        # the fields makes the API embed exactly those.
         params: dict[str, Any] = {
             "type": "Experiment",
             "format": "json",
-            "frame": "object",
+            "field": list(EXPERIMENT_SEARCH_FIELDS),
             "limit": limit,
         }
         if offset > 0:
@@ -448,7 +453,10 @@ class EncodeClient:
             if not exp_result["results"]:
                 return {"results": [], "total": 0, "limit": limit, "offset": offset}
 
-            # Get files from matching experiments
+            # Get files from matching experiments, one file past the requested page so the
+            # caller can tell that more exist
+            offset = max(0, offset)
+            wanted = offset + limit + 1
             all_files = []
             for exp in exp_result["results"]:
                 exp_files = await self.list_files(
@@ -462,13 +470,13 @@ class EncodeClient:
                     preferred_default=preferred_default,
                 )
                 all_files.extend(exp_files)
-                if len(all_files) >= limit:
+                if len(all_files) >= wanted:
                     break
 
             return {
-                "results": all_files[:limit],
+                "results": all_files[offset : offset + limit],
                 "total": len(all_files),
-                "total_note": "Approximate — based on files collected from matching experiments",
+                "total_note": "Lower bound: files collected so far from matching experiments, not the full count",
                 "limit": limit,
                 "offset": offset,
             }

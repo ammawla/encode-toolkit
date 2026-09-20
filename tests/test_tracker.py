@@ -259,6 +259,32 @@ class TestPublications:
         count = tracker.store_publications("ENCSR133RZO", pubs)
         assert count == 2
 
+    def test_publications_without_a_pmid_do_not_overwrite_each_other(self, tracker, sample_experiment):
+        # ENCODE lists some papers by PMCID only. With pmid "" they all collided on the
+        # (experiment, pmid) key and only the last one survived, while the count said 3.
+        tracker.track_experiment(sample_experiment)
+        pubs = [
+            {"pmid": "", "doi": "10.1/a", "title": "Paper A"},
+            {"pmid": "", "doi": "10.1/b", "title": "Paper B"},
+            {"pmid": "", "doi": "10.1/c", "title": "Paper C"},
+        ]
+
+        count = tracker.store_publications("ENCSR133RZO", pubs)
+
+        stored = tracker.get_publications("ENCSR133RZO")
+        assert count == 3
+        assert sorted(p["title"] for p in stored) == ["Paper A", "Paper B", "Paper C"]
+        assert {p["pmid"] for p in stored} == {""}
+
+    def test_storing_the_same_pmid_less_publications_twice_does_not_duplicate_them(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        pubs = [{"pmid": "", "doi": "10.1/a", "title": "Paper A"}, {"pmid": "", "doi": "10.1/b", "title": "Paper B"}]
+
+        tracker.store_publications("ENCSR133RZO", pubs)
+        tracker.store_publications("ENCSR133RZO", pubs)
+
+        assert len(tracker.get_publications("ENCSR133RZO")) == 2
+
     def test_store_duplicate_pmid_replaces(self, tracker, sample_experiment):
         """Cover line 354-355: IntegrityError on INSERT OR REPLACE handles duplicates."""
         tracker.track_experiment(sample_experiment)
