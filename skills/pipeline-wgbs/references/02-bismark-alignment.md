@@ -56,6 +56,9 @@ With `--parallel 4`, expect ~24 GB peak RAM for human genome alignment.
 
 ## Alternative: bwa-meth
 
+bwa-meth is not part of the bundled workflow or container image. The commands below are for
+running it by hand when Bismark is too slow or memory-hungry for your genome.
+
 bwa-meth is faster than Bismark for large genomes and uses less memory:
 
 ```bash
