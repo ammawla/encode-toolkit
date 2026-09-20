@@ -546,7 +546,7 @@ Expected output:
 
 ```bash
 # Using the pre-configured environment YAML
-conda env create -f skills/bioinformatics-installer/scripts/chipseq-env.yml
+conda env create -f skills/bioinformatics-installer/environments/chipseq-env.yml
 conda activate encode-chipseq
 ```
 
@@ -570,9 +570,10 @@ dependencies:
 
 For peak annotation and motif analysis:
 ```bash
-conda env create -f skills/bioinformatics-installer/scripts/annotation-env.yml
+conda create -n encode-annotation -c conda-forge -c bioconda \
+  homer bedtools bioconductor-chipseeker bioconductor-clusterprofiler bioconductor-rgreat
 conda activate encode-annotation
-# Includes: HOMER, GREAT, bedtools, R/Bioconductor (ChIPseeker, clusterProfiler)
+# Includes: HOMER, bedtools, R/Bioconductor (ChIPseeker, clusterProfiler, rGREAT for GREAT queries)
 ```
 
 ### Step 4: Verify installation
