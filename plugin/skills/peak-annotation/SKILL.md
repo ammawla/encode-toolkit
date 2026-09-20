@@ -228,7 +228,7 @@ This approach is superior to simple nearest-gene assignment because it accounts 
 
 ### 2b. GREAT Web Interface
 
-For quick analysis, use the GREAT web interface at http://great.stanford.edu/great/public/html/:
+For quick analysis, use the GREAT web interface at https://great.stanford.edu:
 
 1. Upload BED file of peaks (hg38 assembly)
 2. Select "Basal plus extension" association rule (default)
