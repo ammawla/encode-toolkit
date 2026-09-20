@@ -386,10 +386,14 @@ encode_summarize_collection()
 Use `encode_batch_download` with dry_run=True first to preview:
 
 ```
+# encode_batch_download filters by organ and biosample_type. For one specific cell line, collect the
+# file accessions with encode_search_experiments(biosample_term_name=...) + encode_list_files and
+# pass them to encode_download_files instead.
+
 # Histone mark signal tracks
 encode_batch_download(
     assay_title="Histone ChIP-seq",
-    biosample_term_name="...",
+    organ="...",
     file_format="bigWig",
     output_type="fold change over control",
     assembly="GRCh38",
@@ -402,7 +406,7 @@ encode_batch_download(
 # Histone mark peak calls
 encode_batch_download(
     assay_title="Histone ChIP-seq",
-    biosample_term_name="...",
+    organ="...",
     file_format="bed",
     output_type="IDR thresholded peaks",
     assembly="GRCh38",
@@ -466,7 +470,7 @@ ENCODE increasingly includes CUT&RUN and CUT&Tag data alongside traditional ChIP
 ### Step 1: Survey available assay types for the tissue
 
 ```
-encode_get_facets(facet_field="assay_title", organ="pancreas", organism="Homo sapiens")
+encode_get_facets(organ="pancreas", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -524,7 +528,7 @@ Expected output:
 
 ### 1. Survey available marks for a tissue
 ```
-encode_get_facets(facet_field="target.label", organ="pancreas", assay_title="Histone ChIP-seq", organism="Homo sapiens")
+encode_get_facets(organ="pancreas", assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
 Expected output:

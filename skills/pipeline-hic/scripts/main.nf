@@ -65,6 +65,8 @@ process BWA_ALIGN {
 
 process PAIRTOOLS_PARSE_SORT {
     tag "${sample_id}"
+    // The parse statistics hold the pair-type breakdown (UU, NU, MM, WW, ...) used for QC
+    publishDir "${params.outdir}/pairs", mode: 'copy', pattern: '*.parse_stats.txt'
     cpus 4
     memory '16 GB'
 
@@ -160,6 +162,8 @@ process JUICER_HIC {
     tuple val(sample_id), path("${sample_id}.hic"), emit: hic
 
     script:
+    // The JVM needs memory beyond its heap, so the heap gets 85% of the task's allocation
+    def heap_gb = Math.max(1, (task.memory.toGiga() * 0.85) as int)
     """
     # Convert to Juicer short format: str1 chr1 pos1 frag1 str2 chr2 pos2 frag2.
     # No restriction-site file is used, so the fragment fields carry the dummy values
@@ -170,7 +174,7 @@ process JUICER_HIC {
         print s1, \$2, \$3, 0, s2, \$4, \$5, 1
     }' > juicer_medium.txt
 
-    java -Xmx${task.memory.toGiga()}g -jar /opt/juicer_tools.jar pre \\
+    java -Xmx${heap_gb}g -jar /opt/juicer_tools.jar pre \\
         --threads ${task.cpus} \\
         -r ${params.resolutions} \\
         -k KR,VC,VC_SQRT \\
@@ -229,10 +233,12 @@ process HICCUPS {
     // The image has no CUDA runtime, so use HiCCUPS' CPU mode unless a GPU is requested.
     // CPU mode only searches near the diagonal (8 Mb by default).
     def cpu_flag = params.hiccups_gpu ? '' : '--cpu'
+    def heap_gb  = Math.max(1, (task.memory.toGiga() * 0.85) as int)
     """
-    java -Xmx${task.memory.toGiga()}g -jar /opt/juicer_tools.jar hiccups \\
+    java -Xmx${heap_gb}g -jar /opt/juicer_tools.jar hiccups \\
         ${cpu_flag} \\
         --threads ${task.cpus} \\
+        -k KR \\
         -r 5000,10000,25000 \\
         -f 0.1,0.1,0.1 \\
         -p 4,2,1 \\
@@ -276,7 +282,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE Hi-C Pipeline" --force .
+    multiqc --title "ENCODE Hi-C Pipeline" --filename multiqc_report --force .
     """
 }
 
@@ -287,6 +293,17 @@ workflow {
     if (!params.reads)       { error "Missing required parameter: --reads" }
     if (!params.bwa_index)   { error "Missing required parameter: --bwa_index" }
     if (!params.chrom_sizes) { error "Missing required parameter: --chrom_sizes" }
+
+    // Google Batch and AWS Batch stage every task through object storage, so the matching
+    // profile cannot run without a bucket work directory and a project or job queue.
+    def active_profiles = workflow.profile.tokenize(',')
+    def work_uri        = workflow.workDir.toUriString()
+    if (active_profiles.contains('gcp') && !(params.gcp_project && work_uri.startsWith('gs://'))) {
+        error "-profile gcp requires --gcp_project <project-id> and --gcp_workdir gs://<bucket>/work"
+    }
+    if (active_profiles.contains('aws') && !(params.aws_queue && work_uri.startsWith('s3://'))) {
+        error "-profile aws requires --aws_queue <job-queue> and --aws_workdir s3://<bucket>/work"
+    }
 
     // ---- Channels ----
     ch_reads       = channel.fromFilePairs(params.reads, checkIfExists: true)

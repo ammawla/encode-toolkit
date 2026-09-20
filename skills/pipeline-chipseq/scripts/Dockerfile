@@ -1,11 +1,13 @@
 # ENCODE ChIP-seq Pipeline Docker Image
-# Multi-stage build for minimal final image
 
-FROM ubuntu:22.04 AS builder
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+# perl is listed explicitly: FastQC and Trim Galore are Perl programs
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential wget curl git ca-certificates \
+    build-essential wget curl git ca-certificates perl \
     zlib1g-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev \
     python3 python3-pip python3-dev default-jre \
     && rm -rf /var/lib/apt/lists/*

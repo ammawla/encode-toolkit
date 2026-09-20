@@ -276,7 +276,7 @@ Expected response:
 ### Step 3: Link ENCODE experiment to GEO dataset
 
 ```
-encode_link_reference(accession="ENCSR123HEP", reference_type="geo", reference_id="GSE156789", notes="HepG2 RNA-seq for enhancer-expression integration")
+encode_link_reference(experiment_accession="ENCSR123HEP", reference_type="geo", reference_id="GSE156789", description="HepG2 RNA-seq for enhancer-expression integration")
 ```
 
 Expected output:
@@ -319,10 +319,10 @@ Expected output:
 
 ```
 encode_link_reference(
-  accession="ENCSR000AKA",
+  experiment_accession="ENCSR000AKA",
   reference_type="geo_accession",
   reference_id="GSE76079",
-  notes="Complementary RNA-seq from same lab"
+  description="Complementary RNA-seq from same lab"
 )
 ```
 
@@ -339,7 +339,7 @@ Expected output:
 ### 2. View all references for a tracked experiment
 
 ```
-encode_get_references(accession="ENCSR000AKA")
+encode_get_references(experiment_accession="ENCSR000AKA")
 ```
 
 Expected output:

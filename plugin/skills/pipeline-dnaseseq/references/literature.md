@@ -68,7 +68,7 @@
 - **DOI:** [10.1186/s13059-019-1642-2](https://doi.org/10.1186/s13059-019-1642-2)
 - **PMID:** 31649060
 - **Citations:** ~300
-- **Key findings:** Introduced HINT-ATAC, a computational framework for TF footprinting from chromatin accessibility data (ATAC-seq and DNase-seq). HINT-ATAC models the enzymatic cleavage bias of both DNase I and Tn5 transposase, providing bias-corrected footprint scores that improve over raw cleavage signal. Supports both DNase-seq and ATAC-seq data with enzyme-specific bias correction models. Used in this pipeline's optional footprinting analysis step, producing per-motif footprint scores that can be compared against the Vierstra et al. 2020 reference atlas.
+- **Key findings:** Introduced HINT-ATAC, a computational framework for TF footprinting from chromatin accessibility data (ATAC-seq and DNase-seq). HINT-ATAC models the enzymatic cleavage bias of both DNase I and Tn5 transposase, providing bias-corrected footprint scores that improve over raw cleavage signal. Supports both DNase-seq and ATAC-seq data with enzyme-specific bias correction models. Used in this pipeline's optional footprinting analysis step (`rgt-hint footprinting --dnase-seq`), producing a footprint BED that can be compared against the Vierstra et al. 2020 reference atlas.
 
 ---
 

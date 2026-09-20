@@ -18,12 +18,31 @@ producing peak calls with SEACR and spike-in normalized signal tracks.
 ## Pipeline Overview
 
 ```
-FASTQ -> Trim -> Bowtie2 align (genome) -> Filter/dedup -> SEACR peaks
-                     |                          |              |
-              Bowtie2 align (spike-in)   Spike-in normalize  Signal tracks
-                     |
-              Scale factor calculation
+FASTQ
+  |-> FastQC (raw reads)
+  +-> Trim Galore -> Bowtie2 (genome) -> {sample}.sorted.bam
+        |
+        |-> unmapped read pairs -> Bowtie2 (spike-in) -> counts -> scale_factors.txt
+        |                                                                |
+        +-> filter (MAPQ 10, proper pairs) -> Picard MarkDuplicates      |
+            (removed) -> blacklist filter -> {sample}.filtered.bam       |
+                 |-> fragment BED -> fragment bedGraph -> SEACR peaks    |
+                 |-> MACS2 peaks (with --peak_caller macs2|both)         |
+                 +-> bamCoverage -> {sample}.normalized.bw <-- factor ---+
 ```
+
+### Not run by this workflow
+
+- **FRiP** is not computed by any process. Compute it manually from
+  `alignment/{sample}.filtered.bam` and a peak BED -- see
+  `references/05-qc-metrics.md`.
+- **Peak-level filtering**: `--blacklist` is applied to the BAM only. Peak
+  files are never filtered afterwards, and there is no separate suspect-list
+  input. Pass a pre-merged blacklist + suspect-list BED as `--blacklist`, or
+  filter the peak files yourself.
+- **Spike-in scaling of the SEACR input**: only the bigWig is scaled
+  (`bamCoverage --scaleFactor`). The fragment bedGraph given to SEACR is
+  unscaled.
 
 ### ENCODE Repository
 
@@ -35,17 +54,25 @@ FASTQ -> Trim -> Bowtie2 align (genome) -> Filter/dedup -> SEACR peaks
 
 ## Core Tools and Versions
 
+Versions are those installed by `scripts/Dockerfile`, which is what the
+workflow runs.
+
 | Tool | Version | Purpose | Citation |
 |------|---------|---------|----------|
 | Bowtie2 | 2.5.3 | Alignment (genome + spike-in) | Langmead & Salzberg 2012 |
 | SEACR | 1.3 | Peak calling (CUT&RUN-specific) | Meers et al. 2019 |
 | MACS2 | 2.2.9.1 | Alternative peak caller | Zhang et al. 2008 |
-| Picard | 3.1.1 | Duplicate marking | Broad Institute |
+| Picard | 3.1.1 | Duplicate marking and removal | Broad Institute |
 | samtools | 1.19 | BAM operations | Li et al. 2009 |
 | bedtools | 2.31.0 | Genomic arithmetic | Quinlan & Hall 2010 |
-| deepTools | 3.5.4 | Signal track generation | Ramirez et al. 2016 |
+| deepTools | 3.5.5 | Signal track generation | Ramirez et al. 2016 |
+| Trim Galore | 0.6.10 | Adapter trimming | Krueger (Babraham) |
 | FastQC | 0.12.1 | Read quality | Andrews (Babraham) |
 | MultiQC | 1.21 | Aggregated QC | Ewels et al. 2016 |
+
+The conda alternative (`cutandrun-env.yml`) pins Bowtie2 2.5.4 rather than
+2.5.3 and installs no SEACR (only `r-base`), so on that route `SEACR_1.3.sh`
+must be fetched separately from the SEACR repository.
 
 ## Key Literature
 
@@ -73,7 +100,7 @@ FASTQ -> Trim -> Bowtie2 align (genome) -> Filter/dedup -> SEACR peaks
 ### Quick Start (Local)
 
 ```bash
-nextflow run main.nf \
+nextflow run scripts/main.nf \
     -profile local \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bowtie2_index '/ref/bowtie2_index/genome' \
@@ -87,8 +114,9 @@ nextflow run main.nf \
 ### SLURM HPC
 
 ```bash
-nextflow run main.nf \
+nextflow run scripts/main.nf \
     -profile slurm \
+    --container /path/to/pipeline-cutandrun.sif \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bowtie2_index '/ref/bowtie2_index/genome' \
     --spikein_index '/ref/bowtie2_ecoli/ecoli' \
@@ -101,16 +129,34 @@ nextflow run main.nf \
 ### Cloud (GCP / AWS)
 
 ```bash
-nextflow run main.nf \
-    -profile gcp \
-    --reads 'gs://bucket/fastq/*_R{1,2}.fastq.gz' \
-    --bowtie2_index 'gs://bucket/ref/bowtie2_index/genome' \
-    --spikein_index 'gs://bucket/ref/bowtie2_ecoli/ecoli' \
-    --chrom_sizes 'gs://bucket/ref/hg38.chrom.sizes' \
-    --blacklist 'gs://bucket/ref/hg38-blacklist.v2.bed' \
-    --outdir 'gs://bucket/results/' \
-    -resume
+# Google Cloud Batch
+nextflow run scripts/main.nf -profile gcp \
+    --container us-docker.pkg.dev/<project>/<repo>/pipeline-cutandrun:1.0.0 \
+    --gcp_project <project> \
+    --gcp_workdir gs://<bucket>/work \
+    --reads 'gs://<bucket>/fastq/*_R{1,2}.fastq.gz' \
+    --bowtie2_index gs://<bucket>/ref/bowtie2_index/genome \
+    --spikein_index gs://<bucket>/ref/bowtie2_ecoli/ecoli \
+    --chrom_sizes gs://<bucket>/ref/hg38.chrom.sizes \
+    --blacklist gs://<bucket>/ref/hg38-blacklist.v2.bed \
+    --outdir gs://<bucket>/results
+
+# AWS Batch
+nextflow run scripts/main.nf -profile aws \
+    --container <account>.dkr.ecr.<region>.amazonaws.com/pipeline-cutandrun:1.0.0 \
+    --aws_queue <job-queue> \
+    --aws_workdir s3://<bucket>/work \
+    --reads 's3://<bucket>/fastq/*_R{1,2}.fastq.gz' \
+    --bowtie2_index s3://<bucket>/ref/bowtie2_index/genome \
+    --spikein_index s3://<bucket>/ref/bowtie2_ecoli/ecoli \
+    --chrom_sizes s3://<bucket>/ref/hg38.chrom.sizes \
+    --blacklist s3://<bucket>/ref/hg38-blacklist.v2.bed \
+    --outdir s3://<bucket>/results
 ```
+
+`--outdir` only sets where results are published; Google Batch and AWS Batch
+stage every task through the work directory, and the workflow stops with an
+error if it or the project/queue is missing.
 
 ## Resource Requirements
 
@@ -128,55 +174,80 @@ nextflow run main.nf \
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--reads` | required | Glob pattern to paired FASTQ files |
-| `--bowtie2_index` | required | Bowtie2 genome index prefix |
-| `--spikein_index` | `null` | Bowtie2 E. coli spike-in index prefix. When given, signal tracks are spike-in calibrated |
+| `--bowtie2_index` | required | Bowtie2 genome index prefix (every file starting with this prefix is staged) |
+| `--spikein_index` | `null` | Bowtie2 spike-in index prefix (E. coli by convention). When given, signal tracks are spike-in calibrated |
 | `--chrom_sizes` | required | Chromosome sizes file |
-| `--blacklist` | required | ENCODE blacklist BED file |
+| `--blacklist` | required | Blacklist BED applied to the BAM. Pass a pre-merged blacklist + CUT&RUN suspect list here if you want both |
 | `--outdir` | `./results` | Output directory |
 | `--seacr_mode` | `stringent` | SEACR mode: `stringent`, `relaxed`, or `both` |
-| `--seacr_norm` | `norm` | SEACR normalization to the control: `norm` or `non` (only used with `--control`) |
+| `--seacr_norm` | `norm` | SEACR normalization to the control: `norm` or `non`. Only used with `--control`; without a control the workflow always passes `non` |
 | `--seacr_threshold` | `0.01` | Top fraction of signal kept by SEACR when no `--control` is given |
 | `--control` | `null` | IgG control BAM, already filtered and deduplicated. Converted to a fragment bedGraph for SEACR and passed as `-c` to MACS2 |
 | `--macs2_gsize` | `hs` | MACS2 effective genome size (`hs`, `mm`, or a number) |
-| `--peak_caller` | `seacr` | Peak caller: `seacr` or `macs2` or `both` |
+| `--peak_caller` | `seacr` | Peak caller: `seacr`, `macs2`, or `both` |
 | `--skip_spikein` | `false` | Skip spike-in calibration; signal tracks are then RPKM-normalized |
+
+### Infrastructure parameters (`nextflow.config`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--container` | `encode-toolkit/pipeline-cutandrun:1.0.0` | Image built from `scripts/Dockerfile`. Pass a registry image for `gcp`/`aws`, or a `.sif` file for `slurm` |
+| `--max_cpus`, `--max_memory`, `--max_time` | `16`, `16.GB`, `12.h` | Upper bounds applied to every process |
+| `--slurm_queue`, `--slurm_account` | `normal`, none | SLURM partition and account |
+| `--gcp_project`, `--gcp_workdir` | none (both required for `-profile gcp`) | Google Cloud project and `gs://` work directory |
+| `--gcp_location`, `--gcp_disk` | `us-central1`, `200.GB` | Google Batch region and per-task disk |
+| `--aws_queue`, `--aws_workdir` | none (both required for `-profile aws`) | AWS Batch job queue and `s3://` work directory |
+| `--aws_region`, `--aws_cli_path` | `us-east-1`, `/home/ec2-user/miniconda/bin/aws` | AWS region, and the AWS CLI path inside the Batch AMI |
 
 ## Output Files
 
 ```
 results/
-  fastqc/                           # Raw read quality
+  fastqc/                             # Raw read quality
+  trim_galore/                        # Trimmed reads, trimming reports,
+                                      #   and FastQC of the trimmed reads
   alignment/
-    {sample}.filtered.bam           # Filtered, deduplicated BAM
+    {sample}.filtered.bam             # Quality-filtered, deduplicated, blacklist-filtered
     {sample}.filtered.bam.bai
-  spikein/
-    {sample}.spikein_counts.txt     # Spike-in read counts
-    {sample}.scale_factor.txt       # Computed scale factor
+    {sample}.dup_metrics.txt          # Picard MarkDuplicates metrics
+    {sample}.flagstat.txt             # samtools flagstat on the filtered BAM
+  spikein/                            # Only with --spikein_index
+    {sample}.spikein_counts.txt       # sample, spike-in read count
+    scale_factors.txt                 # One file for the run: sample, spikein_count, scale_factor
   peaks/
-    {sample}.seacr.stringent.bed    # SEACR stringent peaks
-    {sample}.seacr.relaxed.bed      # SEACR relaxed peaks
-    {sample}.macs2_peaks.narrowPeak # MACS2 peaks (if requested)
+    {sample}.seacr.stringent.bed      # SEACR stringent peaks
+    {sample}.seacr.relaxed.bed        # With --seacr_mode relaxed or both
+    {sample}.macs2_peaks.narrowPeak   # With --peak_caller macs2 or both
   signal/
-    {sample}.normalized.bw          # Spike-in normalized signal
-    {sample}.fragments.bed          # Fragment BED file
+    {sample}.normalized.bw            # Spike-in scaled, or RPKM without spike-in
+    {sample}.fragments.bed            # Fragment BED (same chromosome, <1 kb)
   qc/
-    {sample}.flagstat.txt
     {sample}.fragment_sizes.txt
-    {sample}.frip.txt
   multiqc/
     multiqc_report.html
+  pipeline_info/
+    timeline.html
+    report.html
+    trace.txt
 ```
+
+The fragment bedGraph that SEACR consumes is an intermediate and is not
+published; the published `signal/{sample}.fragments.bed` is the BED it is
+built from.
 
 ## QC Thresholds
 
-| Metric | Pass | Warning | Fail |
-|--------|------|---------|------|
-| Mapping rate (genome) | >80% | 60-80% | <60% |
-| Spike-in reads | 1-10% of total | 0.1-1% or 10-30% | <0.1% or >30% |
-| Duplication rate | <20% | 20-40% | >40% |
-| FRiP (peaks) | >10% | 5-10% | <5% |
-| Peak count | >5,000 | 1,000-5,000 | <1,000 |
-| Fragment size | Nucleosomal pattern | Irregular | No pattern |
+This is the only QC threshold table for this skill; the reference files point
+back to it.
+
+| Metric | Pass | Warning | Fail | Computed from |
+|--------|------|---------|------|---------------|
+| Mapping rate (genome) | >80% | 60-80% | <60% | Bowtie2 log (in `multiqc_report.html`) |
+| Spike-in reads | 1-10% of total | 0.1-1% or 10-30% | <0.1% or >30% | `spikein/{sample}.spikein_counts.txt` |
+| Duplication rate | <20% | 20-40% | >40% | `alignment/{sample}.dup_metrics.txt` |
+| FRiP (peaks) | >10% | 5-10% | <5% | Not computed -- see `references/05-qc-metrics.md` |
+| Peak count | >5,000 | 1,000-5,000 | <1,000 | `peaks/{sample}.seacr.*.bed` |
+| Fragment size | Nucleosomal pattern | Irregular | No pattern | `qc/{sample}.fragment_sizes.txt` |
 
 ### Fragment Size Distribution
 
@@ -195,17 +266,26 @@ Spike-in normalization is CRITICAL for CUT&RUN quantitative comparison.
 1. E. coli DNA is carried over from pA-MNase/pA-Tn5 production
 2. Each sample has a different amount of spike-in reads
 3. Samples with more target cleavage have fewer spike-in reads (proportionally)
-4. Scale factor = 1 / (spike-in reads / minimum spike-in reads across samples)
+4. Scale factor = smallest non-zero spike-in count across samples / this sample's count
 
 ### Scale Factor Calculation
 
+With three samples whose spike-in counts are 200,000, 400,000 and 100,000, the
+minimum is 100,000:
+
 ```
-Sample A: 200,000 spike-in reads -> scale = 1.0 (minimum)
-Sample B: 400,000 spike-in reads -> scale = 0.5
-Sample C: 100,000 spike-in reads -> scale = 2.0
+Sample A: 200,000 spike-in reads -> scale = 100,000 / 200,000 = 0.5
+Sample B: 400,000 spike-in reads -> scale = 100,000 / 400,000 = 0.25
+Sample C: 100,000 spike-in reads -> scale = 100,000 / 100,000 = 1.0 (minimum)
 ```
 
 Higher spike-in counts = less target enrichment = lower scale factor.
+
+All samples are written to one `spikein/scale_factors.txt` (columns: sample,
+spike-in count, scale factor). A sample with no spike-in reads cannot be
+calibrated and is left unscaled (factor 1). The factor is applied only to the
+bigWig via `bamCoverage --scaleFactor`; the fragment bedGraph SEACR reads is
+unscaled.
 
 ## SEACR vs MACS2
 
@@ -226,35 +306,45 @@ profile of CUT&RUN data. MACS2 may overcall peaks due to the low background.
 ### Spike-in Calibration is CRITICAL
 Without spike-in normalization, quantitative comparisons between samples are
 unreliable. The amount of pA-MNase (or pA-Tn5) varies between experiments,
-and spike-in reads provide the internal calibration standard.
+and spike-in reads provide the internal calibration standard. Without
+`--spikein_index` (or with `--skip_spikein`) the bigWigs fall back to RPKM,
+which is not quantitatively comparable across samples.
 
 ### IgG Control vs No-Antibody Control
 - **IgG control**: Non-specific antibody, captures background binding
 - **No-antibody**: No antibody, captures MNase accessibility background
 - IgG is preferred but not always available
-- SEACR can work without control (uses top 1% of signal as threshold)
+- SEACR can work without a control: it then uses `--seacr_threshold` (default
+  0.01, the top 1% of signal) and, as SEACR v1.3 requires with a numeric
+  threshold, the `non` normalization mode
 
 ### SEACR Stringent vs Relaxed Mode
 - **Stringent**: Returns only the most enriched peaks (fewer, higher confidence)
 - **Relaxed**: Returns a broader set including weaker peaks
-- For initial analysis, use stringent mode
-- For comprehensive catalogs, use relaxed mode with downstream filtering
+- For initial analysis, use stringent mode (the default)
+- For comprehensive catalogs, use `--seacr_mode both` and filter downstream
 
 ### CUT&RUN Suspect List (Nordin 2023)
-In addition to the ENCODE blacklist, filter CUT&RUN peaks against the
-suspect list (Nordin et al. 2023), which identifies regions with
-artifactual signal specific to CUT&RUN/CUT&Tag protocols:
+The workflow applies `--blacklist` to the BAM only; it never filters the peak
+files and takes no separate suspect list. To use the CUT&RUN suspect list
+(Nordin et al. 2023), which identifies regions with artifactual signal
+specific to CUT&RUN/CUT&Tag protocols, either pass a merged BED as
+`--blacklist` or filter the peaks afterwards yourself:
 
 ```bash
 # Download suspect list
 wget https://github.com/Boyle-Lab/Blacklist/raw/master/lists/CUTandRUN.suspectlist.hg38.bed.gz
 
-# Filter peaks
+# Option 1: merge once and pass as --blacklist (filters the BAM)
+zcat CUTandRUN.suspectlist.hg38.bed.gz | cat hg38-blacklist.v2.bed - \
+    | sort -k1,1 -k2,2n | bedtools merge > combined_blacklist.bed
+
+# Option 2: filter the published peaks afterwards (manual)
 bedtools intersect \
-    -a peaks.bed \
-    -b hg38-blacklist.v2.bed CUTandRUN.suspectlist.hg38.bed \
+    -a results/peaks/sample.seacr.stringent.bed \
+    -b combined_blacklist.bed \
     -v \
-    > peaks_filtered.bed
+    > sample_peaks_filtered.bed
 ```
 
 ### CUT&RUN vs CUT&Tag
@@ -275,7 +365,7 @@ encode_log_derived_file(
     description="CUT&RUN peaks from ENCODE CUT&RUN pipeline",
     file_type="CUT&RUN_peaks",
     tool_used="Bowtie2 2.5.3 + SEACR 1.3",
-    parameters="stringent mode, spike-in normalized, blacklist + suspect list filtered"
+    parameters="stringent mode, threshold 0.01 non, BAM blacklist-filtered (peaks unfiltered)"
 )
 ```
 
@@ -287,7 +377,7 @@ Detailed step-by-step documentation is provided in the `references/` directory:
 2. `02-bowtie2-alignment.md` -- Bowtie2 alignment to genome and spike-in
 3. `03-filtering-spikein.md` -- Filtering, dedup, and spike-in normalization
 4. `04-seacr-peaks.md` -- SEACR peak calling and MACS2 alternative
-5. `05-qc-metrics.md` -- Fragment sizes, FRiP, spike-in QC
+5. `05-qc-metrics.md` -- Fragment sizes, manual FRiP, spike-in QC
 
 ## Walkthrough: Processing ENCODE CUT&RUN from FASTQ to Peaks
 
@@ -313,7 +403,7 @@ Expected output:
 ### Step 2: List FASTQ files
 
 ```
-encode_list_files(accession="ENCSR900CUR", file_format="fastq")
+encode_list_files(experiment_accession="ENCSR900CUR", file_format="fastq")
 ```
 
 Expected output:
@@ -331,32 +421,32 @@ Expected output:
 ### Step 3: Run the CUT&RUN pipeline
 
 ```bash
-nextflow run pipeline-cutandrun/main.nf \
-  --fastq_r1 ENCFF900CR1.fastq.gz \
-  --fastq_r2 ENCFF901CR2.fastq.gz \
-  --genome GRCh38 \
-  --spike_in_genome dm6 \
-  --target H3K27me3 \
+nextflow run scripts/main.nf \
+  -profile local \
+  --reads 'fastq/ENCSR900CUR_R{1,2}.fastq.gz' \
+  --bowtie2_index '/ref/bowtie2_index/genome' \
+  --spikein_index '/ref/bowtie2_ecoli/ecoli' \
+  --chrom_sizes '/ref/hg38.chrom.sizes' \
+  --blacklist '/ref/hg38-blacklist.v2.bed' \
   --peak_caller seacr \
-  -profile docker
+  --outdir results/ \
+  -resume
 ```
 
 Key pipeline steps:
-1. Adapter trimming (Trim Galore)
-2. Bowtie2 alignment (very-sensitive-local)
-3. Spike-in alignment (E. coli or Drosophila)
-4. Spike-in normalization (scale factor)
-5. SEACR peak calling (stringent mode)
-6. Signal track generation with spike-in scaling
+1. FastQC on the raw reads, then adapter trimming (Trim Galore, `--nextera`)
+2. Bowtie2 alignment (`--very-sensitive --no-mixed --no-discordant --dovetail -I 10 -X 700`)
+3. Spike-in alignment of the read pairs that did not map to the genome
+4. Scale factor per sample (minimum spike-in count / sample count)
+5. Filter (MAPQ 10, proper pairs), remove duplicates with Picard, remove blacklist regions
+6. SEACR peak calling from the fragment bedGraph (stringent by default)
+7. Signal bigWig with `bamCoverage`, scaled by the spike-in factor
 
 ### Step 4: Validate output quality
 
-| Metric | Threshold | Purpose |
-|---|---|---|
-| Spike-in alignment | 0.5-5% of reads | Normalization calibration |
-| Fragment size | < 150bp majority | CUT&RUN characteristic |
-| FRiP (SEACR) | >= 5% | Higher than ChIP-seq due to lower background |
-| Duplicate rate | < 20% | Library complexity |
+Use the QC threshold table above with `alignment/{sample}.dup_metrics.txt`,
+`spikein/{sample}.spikein_counts.txt` and `qc/{sample}.fragment_sizes.txt`.
+FRiP has to be computed manually (`references/05-qc-metrics.md`).
 
 **Key difference from ChIP-seq**: CUT&RUN has inherently lower background, so peak callers like MACS2 overfit. Use SEACR (Meers et al. 2019) instead.
 
@@ -380,7 +470,7 @@ encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="K
 ### 1. Survey CUT&RUN/CUT&Tag availability
 
 ```
-encode_get_facets(assay_title="CUT&RUN", facet_field="target.label", organism="Homo sapiens")
+encode_get_facets(assay_title="CUT&RUN", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -449,13 +539,13 @@ Expected output:
 
 When reporting CUT&RUN pipeline results:
 
-- **SEACR peak counts**: Report peak counts for both stringent and relaxed modes. If MACS2 was also run, include those counts for comparison
-- **Spike-in normalization factor**: Report the computed scale factor per sample and the spike-in read fraction (ideal 1-10% of total reads). Explain that higher spike-in counts indicate less target enrichment
-- **FRiP**: Report the fraction of reads in peaks (>10% pass, 5-10% warning, <5% fail). Note that CUT&RUN FRiP thresholds differ from ChIP-seq
-- **Signal track paths**: Provide paths to spike-in normalized bigWig files for genome browser visualization
-- **Fragment size distribution**: Confirm the expected nucleosomal ladder pattern and note the dominant fragment class (sub-nucleosomal for TFs, mononucleosomal for histone marks)
+- **SEACR peak counts**: Report peak counts for each SEACR mode that was run (default: stringent only; both with `--seacr_mode both`). If MACS2 was also run, include those counts for comparison
+- **Spike-in normalization factor**: Report the scale factor and spike-in count per sample from `spikein/scale_factors.txt` and the spike-in read fraction (ideal 1-10% of total reads). Explain that higher spike-in counts indicate less target enrichment
+- **FRiP**: Not computed by the pipeline. If you compute it manually from `alignment/{sample}.filtered.bam` and a peak BED (`references/05-qc-metrics.md`), judge it against the QC table (>10% pass, 5-10% warning, <5% fail) and say it was computed outside the workflow
+- **Signal track paths**: Provide paths to the `signal/{sample}.normalized.bw` files (spike-in scaled, or RPKM if spike-in was skipped) for genome browser visualization
+- **Fragment size distribution**: From `qc/{sample}.fragment_sizes.txt`, confirm the expected nucleosomal ladder pattern and note the dominant fragment class (sub-nucleosomal for TFs, mononucleosomal for histone marks)
 - **Key QC metrics**: Present mapping rate (>80%), duplication rate (<20%), and spike-in calibration status in a summary table
-- **Suspect list filtering**: Note whether peaks were filtered against both the ENCODE blacklist and the CUT&RUN suspect list (Nordin 2023)
+- **Blacklist filtering**: State that `--blacklist` was applied to the BAM and that the peak files are unfiltered; note separately whether a suspect list was merged into `--blacklist` or applied to the peaks manually
 - **Next steps**: Suggest `peak-annotation` for gene association of peaks, or `visualization-workflow` for genome browser session generation
 
 ## For the request: "$ARGUMENTS"

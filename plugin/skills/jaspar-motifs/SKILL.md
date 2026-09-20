@@ -403,7 +403,7 @@ Expected output:
 ### Step 2: Download enhancer peak files
 
 ```
-encode_list_files(accession="ENCSR100LIV", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR100LIV", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:
@@ -467,7 +467,7 @@ Expected output:
 
 ### 1. Find TF ChIP-seq to validate motif predictions
 ```
-encode_get_facets(assay_title="TF ChIP-seq", facet_field="target.label", organ="liver", organism="Homo sapiens")
+encode_get_facets(assay_title="TF ChIP-seq", organ="liver", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -481,7 +481,7 @@ Expected output:
 
 ### 2. Compare predicted vs. observed TF binding
 ```
-encode_compare_experiments(accession_1="ENCSR100LIV", accession_2="ENCSR200HNF")
+encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HNF")
 ```
 
 Expected output:

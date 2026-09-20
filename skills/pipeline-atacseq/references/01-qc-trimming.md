@@ -1,16 +1,16 @@
 # Stage 1: QC and Trimming
 
 ## Input
-- Raw paired-end FASTQ files (ATAC-seq is almost always paired-end)
+- Raw paired-end FASTQ files (this workflow is paired-end only)
 - Adapter sequences: Nextera transposase adapters (not TruSeq)
 
 ## Tools
-- **FastQC v0.11.9+**: Per-base quality, adapter content, duplication rates, insert size
-- **Trim Galore v0.6.7+** (wraps Cutadapt): Adapter trimming + quality filtering
+- **FastQC 0.11.9** (image version): Per-base quality, adapter content, duplication rates, insert size
+- **Trim Galore 0.6.7** (image version, wraps Cutadapt 4.4): Adapter trimming + quality filtering
 
 ## Key Difference from ChIP-seq
-ATAC-seq uses **Nextera** transposase adapters, not Illumina TruSeq. Trim Galore
-auto-detects Nextera adapters, but you can force it with `--nextera`.
+ATAC-seq uses **Nextera** transposase adapters, not Illumina TruSeq. The workflow passes
+`--nextera` explicitly rather than relying on auto-detection.
 
 ## Parameters
 
@@ -18,11 +18,14 @@ auto-detects Nextera adapters, but you can force it with `--nextera`.
 |-----------|---------|-------|
 | Quality cutoff | 20 | Phred score minimum |
 | Min length | 20 | Shorter than ChIP-seq due to NFR fragments |
-| Adapter | Nextera (auto-detect) | Tn5 transposase adapters |
+| Adapter | Nextera (`--nextera`) | Tn5 transposase adapters |
 | Stringency | 1 | Overlap with adapter sequence required |
-| Max N | 10 | Maximum Ns allowed in read |
+
+The workflow does not expose these as parameters; they are fixed in `main.nf`.
 
 ## Commands
+
+The workflow runs the equivalent of:
 
 ```bash
 # Raw QC
@@ -34,9 +37,13 @@ trim_galore --paired --nextera --quality 20 --length 20 --fastqc \
 ```
 
 ## Expected Output
-- `*_trimming_report.txt` -- trimming statistics
-- `*_val_1.fq.gz`, `*_val_2.fq.gz` -- trimmed paired-end reads
-- FastQC HTML reports for raw and trimmed reads
+- `trimmed/*_trimming_report.txt` -- trimming statistics
+- `trimmed/*_val_1.fq.gz`, `trimmed/*_val_2.fq.gz` -- trimmed paired-end reads
+- `fastqc/*.html`, `fastqc/*.zip` -- FastQC reports for raw reads (FASTQC process) and for
+  the trimmed reads (`trim_galore --fastqc`). Both land in the same `fastqc/` directory;
+  the trimmed-read reports carry `_val_1`/`_val_2` in the file name.
+
+All of these feed the MultiQC report.
 
 ## QC Checkpoints
 
@@ -50,6 +57,6 @@ trim_galore --paired --nextera --quality 20 --length 20 --fastqc \
 
 ## Troubleshooting
 - **High adapter content**: ATAC-seq libraries with short inserts have more adapter
-  read-through. This is normal for NFR fragments. Ensure `--length 20` allows retention.
+  read-through. This is normal for NFR fragments; the fixed `--length 20` keeps them.
 - **No nucleosomal pattern in insert sizes**: May indicate failed transposition or
   over-transposition. Check Tn5:cell ratio.

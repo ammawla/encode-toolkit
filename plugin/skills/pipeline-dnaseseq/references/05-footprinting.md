@@ -11,11 +11,13 @@ Reliable footprinting requires:
 - **Paired-end data**: Better resolution than single-end
 - **High SPOT score**: >0.4 (clean signal)
 - **Peak calls**: DHS regions from Hotspot2
+- **An RGT data directory**: HINT reads genome sequence and annotation from
+  `$RGTDATA`; the workflow stages the directory passed with `--rgt_data`
 
-## HINT-ATAC Footprinting
+## HINT Footprinting (DNase-seq mode)
 
-HINT-ATAC (from the Regulatory Genomics Toolbox) works for both DNase-seq
-and ATAC-seq data:
+HINT (from the Regulatory Genomics Toolbox) works for both DNase-seq and
+ATAC-seq data. This is what the workflow runs:
 
 ```bash
 rgt-hint footprinting \
@@ -24,9 +26,13 @@ rgt-hint footprinting \
     --organism hg38 \
     --output-location footprints/ \
     --output-prefix sample \
-    sample_final.bam \
-    sample.DHS.narrowPeak
+    sample.filtered.bam \
+    sample.peaks.narrowPeak
 ```
+
+It writes `footprints/sample.bed`, which the workflow publishes as
+`results/footprints/sample.footprints.bed`. No other footprinting output is
+produced.
 
 ### Key Parameters
 
@@ -34,56 +40,73 @@ rgt-hint footprinting \
 |-----------|-------|-------------|
 | `--dnase-seq` | Flag | Use DNase-seq cleavage model (not ATAC-seq) |
 | `--paired-end` | Flag | Use paired-end fragment information |
-| `--organism` | hg38 | Genome build for bias correction |
+| `--organism` | hg38 | Genome build for bias correction; must be set up in the RGT data directory |
+| `--output-prefix` | sample | Base name of the output BED |
 
 **Important**: Use `--dnase-seq` for DNase-seq data and `--atac-seq` for
-ATAC-seq data. They have different cleavage bias models.
+ATAC-seq data. They have different cleavage bias models, and using the wrong
+one silently produces wrong footprints.
 
-## Motif Matching in Footprints
+## Motif Matching in Footprints (manual, optional)
 
-After calling footprints, match to known TF motifs:
+Motif matching is not part of the workflow. To run it afterwards, note that
+`rgt-motifanalysis matching --motif-dbs` takes **directories of `.pwm` files**
+in the pre-2016 JASPAR format, not a `.meme` file. The RGT data directory ships
+such directories under `motifs/`:
 
 ```bash
+export RGTDATA=/ref/rgtdata
+
 rgt-motifanalysis matching \
     --organism hg38 \
-    --input-files footprints/sample.bed \
+    --input-files results/footprints/sample.footprints.bed \
     --output-location motif_matches/ \
-    --motif-dbs /ref/JASPAR2024_CORE_vertebrates.meme
+    --motif-dbs /ref/rgtdata/motifs/jaspar_vertebrates
 ```
 
-## Wellington Footprinting (Alternative)
+To use a motif collection RGT does not ship, convert it to `.pwm` files in
+their own directory first with RGT's `createPwm.py`, then point `--motif-dbs`
+at that directory.
 
-Wellington uses a different statistical approach for footprint detection:
+## Wellington Footprinting (alternative, manual)
+
+Wellington (pyDNase) uses a different statistical approach. It is **not** in the
+pipeline image or in `dnaseseq-env.yml`; install it separately with
+`pip install pyDNase`.
 
 ```bash
 wellington_footprints.py \
     -A \
     -p 20 \
     -fdrlimit 0.01 \
-    sample.DHS.narrowPeak \
-    sample_final.bam \
+    sample.peaks.narrowPeak \
+    sample.filtered.bam \
     wellington_out/
 ```
 
 ### HINT vs Wellington Comparison
 
-| Feature | HINT-ATAC | Wellington |
-|---------|-----------|-----------|
+| Feature | HINT | Wellington |
+|---------|------|-----------|
 | Bias correction | Sequence-specific | Position-based |
 | Speed | Moderate | Fast |
 | Sensitivity | Higher | More conservative |
 | DNase + ATAC | Both | Both |
 | Active development | Yes | Limited |
+| In the pipeline image | Yes (RGT 1.0.2) | No (`pip install pyDNase`) |
 
 ## Footprint Quality Assessment
+
+None of the checks below are computed by the workflow; run them on the
+published footprint BED.
 
 ### Per-Motif Footprint Depth
 
 ```bash
-# Calculate average footprint depth at known CTCF sites
+# Calculate average footprint score at known CTCF sites
 bedtools intersect \
     -a CTCF_motif_sites.bed \
-    -b footprints/sample.bed \
+    -b results/footprints/sample.footprints.bed \
     -wa -wb \
     | awk '{print $NF}' \
     | awk '{sum+=$1; n++} END {print "Mean CTCF footprint score:", sum/n}'
@@ -105,18 +128,18 @@ Good footprints show:
 | 200M reads | 100,000-200,000 |
 | 500M reads | 200,000-400,000 |
 
-## Aggregate Footprint Visualization
+## Aggregate Footprint Visualization (manual)
 
-Generate aggregate footprint profiles across all instances of a motif:
+Generate aggregate footprint profiles across all instances of a motif. This
+needs the motif matches from the step above:
 
 ```bash
-# Using HINT differential footprinting
 rgt-hint differential \
     --organism hg38 \
     --bc \
     --nc 8 \
     --mpbs-files motif_matches/sample_mpbs.bed \
-    --reads-files sample_final.bam \
+    --reads-files sample.filtered.bam \
     --conditions sample \
     --output-location diff_footprints/
 ```
@@ -140,7 +163,7 @@ TF footprints from 243 DNase-seq datasets. Use it to:
 
 # Compare overlap
 bedtools intersect \
-    -a footprints/sample.bed \
+    -a results/footprints/sample.footprints.bed \
     -b vierstra_consensus_footprints.bed \
     -u | wc -l
 ```

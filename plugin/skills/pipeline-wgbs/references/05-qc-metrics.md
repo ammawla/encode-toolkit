@@ -1,12 +1,53 @@
 # WGBS QC Metrics and Conversion Rate Assessment
 
 Quality control for WGBS requires bisulfite-specific metrics beyond
-standard alignment QC. The most critical metric is bisulfite conversion rate.
+standard alignment QC. The most critical metric, the bisulfite conversion rate, is not
+computed by this workflow — the sections below say which commands you have to run
+yourself.
 
-## Bisulfite Conversion Rate (Lambda Spike-in)
+## What the Workflow Produces
+
+| Output | Contents |
+|--------|----------|
+| `bismark/alignments/*_PE_report.txt` | Mapping efficiency, and the percentage of C methylated in CpG/CHG/CHH context |
+| `bismark/dedup_reports/*.deduplication_report.txt` | Duplicate count and rate |
+| `bismark/mbias/<sample>_mbias_*.svg`, `<sample>_mbias_report.txt` | M-bias plots and MethylDackel's suggested inclusion bounds |
+| `coverage/<sample>.coverage_stats.txt` | Covered CpGs, their mean coverage, and the fraction reaching >=5x and >=10x |
+| `multiqc/multiqc_report.html` | Aggregated report |
+
+## Coverage Statistics
+
+`COVERAGE_STATS` parses the unfiltered `<sample>_CpG.bedGraph`, so it sees every covered
+site rather than only the ones that pass `--min_coverage`:
+
+```bash
+awk '!/^track/ {
+    cov = $5 + $6; sum += cov; n++;
+    if (cov >= 5)  c5++;
+    if (cov >= 10) c10++
+} END {
+    if (n == 0) { print "Covered CpGs: 0"; exit }
+    printf "Covered CpGs (>=1x): %d\n", n;
+    printf "Mean coverage of covered CpGs: %.1f\n", sum/n;
+    printf "Covered CpGs >=5x: %d (%.1f%%)\n", c5, c5/n*100;
+    printf "Covered CpGs >=10x: %d (%.1f%%)\n", c10, c10/n*100
+}' sample_CpG.bedGraph > sample.coverage_stats.txt
+```
+
+Two things to keep straight when reporting these numbers:
+
+- The 5x and 10x thresholds are fixed in the workflow. They do not follow `--min_coverage`.
+- The percentages are of *covered* CpGs. A CpG that received zero reads is not in the
+  bedGraph and is not counted, so this is not the genome-wide CpG completeness.
+
+With `--merge_context false` the records are per cytosine, not per CpG, and the counts
+roughly double.
+
+## Bisulfite Conversion Rate (Lambda Spike-in, not run by this workflow)
 
 Lambda phage DNA is fully unmethylated. Any methylation detected on lambda
-represents incomplete bisulfite conversion.
+represents incomplete bisulfite conversion. Run this yourself, against the trimmed reads,
+if a spike-in was included:
 
 ```bash
 # Align to lambda genome
@@ -14,8 +55,8 @@ bismark \
     --genome /ref/lambda/ \
     --bowtie2 \
     --parallel 2 \
-    -1 sample_R1_trimmed.fq.gz \
-    -2 sample_R2_trimmed.fq.gz \
+    -1 sample_R1_val_1.fq.gz \
+    -2 sample_R2_val_2.fq.gz \
     --output_dir lambda_out/ \
     --unmapped
 
@@ -27,7 +68,7 @@ MethylDackel extract \
     lambda_out/sample_pe.bam
 
 # Calculate conversion rate
-awk '{meth+=$5; unmeth+=$6} END {
+awk '!/^track/ {meth+=$5; unmeth+=$6} END {
     total=meth+unmeth;
     conv=(unmeth/total)*100;
     print "Conversion rate: " conv "%";
@@ -46,28 +87,31 @@ awk '{meth+=$5; unmeth+=$6} END {
 
 ## Non-CpG Methylation as Conversion Proxy
 
-If no spike-in is available, use CHH methylation as a proxy:
+If no spike-in is available, use CHH methylation as a proxy. The Bismark alignment report
+already carries "C methylated in CHH context"; the same number can be recomputed from the
+published CHH bedGraph:
 
 ```bash
-awk '{meth+=$5; unmeth+=$6} END {
+awk '!/^track/ {meth+=$5; unmeth+=$6} END {
     print "CHH methylation: " (meth/(meth+unmeth))*100 "%"
-}' sample_output_CHH.bedGraph
+}' sample_CHH.bedGraph
 ```
 
 In somatic tissue, CHH methylation should be <1%. Higher values suggest
 incomplete conversion. Exception: embryonic stem cells and neurons can have
-genuine non-CpG methylation (2-5%).
+genuine non-CpG methylation (2-5%), which is why this is a proxy rather than a
+measurement.
 
-## Coverage Statistics
+## Additional Manual Coverage Checks
 
 ```bash
-# Genome-wide coverage distribution
-samtools depth -a sample_filtered.bam | \
+# Genome-wide coverage distribution from the published BAM
+samtools depth -a bismark/alignments/sample.sorted.bam | \
     awk '{cov[$3]++} END {for (c in cov) print c, cov[c]}' | \
     sort -k1,1n > coverage_distribution.txt
 
-# Mean and median coverage
-samtools depth -a sample_filtered.bam | \
+# Mean and median coverage (needs gawk for asort)
+samtools depth -a bismark/alignments/sample.sorted.bam | \
     awk '{sum+=$3; n++; a[n]=$3; if ($3>=5) sum5++} END {
         asort(a);
         print "Mean:", sum/n;
@@ -75,47 +119,40 @@ samtools depth -a sample_filtered.bam | \
         print "Total bases:", n;
         print "Bases >=5x:", sum5/n*100 "%"
     }'
-
-# CpG-specific coverage
-awk '{print $5+$6}' sample_output_CpG.bedGraph | \
-    awk '{sum+=$1; n++; if($1>=1) c1++; if($1>=5) c5++; if($1>=10) c10++} END {
-        print "CpGs with >=1x:", c1, "(" c1/n*100 "%)";
-        print "CpGs with >=5x:", c5, "(" c5/n*100 "%)";
-        print "CpGs with >=10x:", c10, "(" c10/n*100 "%)";
-        print "Mean CpG coverage:", sum/n
-    }'
 ```
 
 ## Mapping Statistics
 
+The mapping efficiency in the Bismark `*_PE_report.txt` is the primary number. For a
+flag-level breakdown of the final BAM:
+
 ```bash
-samtools flagstat sample_filtered.bam > flagstat.txt
+samtools flagstat bismark/alignments/sample.sorted.bam > flagstat.txt
 ```
 
 Key values to extract:
-- Total reads (after filtering)
-- Mapped reads (expect >70%)
+- Total reads in the final (deduplicated) BAM
+- Mapped reads (Bismark mapping efficiency >70% expected)
 - Properly paired (expect >95% of mapped)
-- Duplication rate (from dedup step)
+- Duplication rate (from the deduplication report)
 
 ## MultiQC Report
 
-Aggregate all QC metrics into a single report:
+The workflow runs:
 
 ```bash
-multiqc \
-    --title "WGBS Pipeline QC" \
-    --filename multiqc_report \
-    --outdir multiqc/ \
-    fastqc_raw/ trim_galore/ bismark_out/ dedup/ methylation/
+multiqc --title "ENCODE WGBS Pipeline" --filename multiqc_report --force .
 ```
 
-MultiQC recognizes and parses:
-- FastQC reports
-- Trim Galore logs
-- Bismark alignment reports
-- Bismark deduplication reports
-- Picard MarkDuplicates metrics
+`--filename` is required: without it MultiQC 1.21 derives the file name from `--title`
+and writes `ENCODE-WGBS-Pipeline_multiqc_report.html`, which would not match the declared
+output.
+
+The inputs collected are the raw-read FastQC reports, the Trim Galore trimming reports,
+the FastQC reports for the trimmed reads, and the Bismark `*_PE_report.txt` files. The
+deduplication reports are published but are not passed to MultiQC, so read the duplication
+rate from `bismark/dedup_reports/` directly. Picard metrics do not exist for this
+pipeline.
 
 ## Summary QC Table Format
 
@@ -125,3 +162,6 @@ Generate a per-sample summary for reporting:
 echo -e "Sample\tTotal_Reads\tMapping_Rate\tDedup_Rate\tConversion\tMean_CpG_Cov\tCpGs_5x"
 echo -e "${SAMPLE}\t${TOTAL}\t${MAP_RATE}\t${DEDUP_RATE}\t${CONV_RATE}\t${MEAN_COV}\t${CPGS_5X}"
 ```
+
+`CONV_RATE` has to come from the manual check above; everything else is in the published
+reports.

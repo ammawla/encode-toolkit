@@ -317,7 +317,7 @@ Expected output:
 ### Step 2: Download peak files for regulatory regions
 
 ```
-encode_list_files(accession="ENCSR789HRT", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR789HRT", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:
@@ -365,7 +365,7 @@ For each ClinVar variant in an ENCODE peak:
 
 ### 1. Find ENCODE regulatory data matching ClinVar tissue
 ```
-encode_get_facets(facet_field="organ", assay_title="ATAC-seq", organism="Homo sapiens")
+encode_get_facets(assay_title="ATAC-seq", organism="Homo sapiens")
 ```
 
 Expected output:

@@ -63,7 +63,7 @@
 - **DOI:** [10.1186/s13059-023-02960-3](https://doi.org/10.1186/s13059-023-02960-3)
 - **PMID:** 37580722 | **PMC:** PMC10424377
 - **Citations:** ~50
-- **Key findings:** Identified genomic regions that produce artifactual signal in CUT&RUN and CUT&Tag experiments, distinct from the standard ENCODE blacklist. These "suspect" regions include areas with high MNase/Tn5 accessibility, specific repeat families, and regions prone to antibody-independent cleavage. The suspect list should be applied in addition to the ENCODE blacklist v2 (Amemiya et al. 2019) when filtering CUT&RUN/CUT&Tag peaks. Without suspect list filtering, up to 20% of called peaks may be artifacts, particularly for targets with moderate enrichment. This pipeline applies both the ENCODE blacklist and the CUT&RUN suspect list.
+- **Key findings:** Identified genomic regions that produce artifactual signal in CUT&RUN and CUT&Tag experiments, distinct from the standard ENCODE blacklist. These "suspect" regions include areas with high MNase/Tn5 accessibility, specific repeat families, and regions prone to antibody-independent cleavage. The suspect list should be applied in addition to the ENCODE blacklist v2 (Amemiya et al. 2019) when filtering CUT&RUN/CUT&Tag peaks. Without suspect list filtering, up to 20% of called peaks may be artifacts, particularly for targets with moderate enrichment. This workflow applies only the single BED given as `--blacklist`, to the BAM; pass a merged blacklist + suspect list there, or filter the peaks manually.
 
 ---
 
@@ -114,7 +114,7 @@ See pipeline-chipseq/references/literature.md for detailed descriptions of share
 ### Quinlan & Hall 2010 — BEDTools
 
 - **DOI:** [10.1093/bioinformatics/btq033](https://doi.org/10.1093/bioinformatics/btq033) | **PMID:** 20110278 | **Citations:** ~12,000
-- **CUT&RUN role:** Used for blacklist and suspect list filtering, FRiP calculation, and peak annotation.
+- **CUT&RUN role:** Used by the workflow to filter the BAM against `--blacklist` and to build the fragment BED and bedGraph; used manually for peak filtering and FRiP calculation, which the workflow does not run.
 
 ---
 
@@ -128,7 +128,7 @@ See pipeline-chipseq/references/literature.md for detailed descriptions of share
 ### Amemiya et al. 2019 — ENCODE Blacklist
 
 - **DOI:** [10.1038/s41598-019-45839-z](https://doi.org/10.1038/s41598-019-45839-z) | **PMID:** 31249361 | **Citations:** ~1,372
-- **CUT&RUN role:** Blacklist v2 filtering applied alongside the CUT&RUN suspect list (Nordin 2023). Both filters are necessary: the blacklist addresses general sequencing/alignment artifacts while the suspect list addresses CUT&RUN-specific enzyme cleavage artifacts.
+- **CUT&RUN role:** The file normally passed as `--blacklist`, which the workflow applies to the BAM. Both filters are worth applying: the blacklist addresses general sequencing/alignment artifacts while the CUT&RUN suspect list (Nordin 2023) addresses CUT&RUN-specific enzyme cleavage artifacts. Merge the two into one BED and pass it as `--blacklist`, or filter the peaks manually.
 
 ---
 

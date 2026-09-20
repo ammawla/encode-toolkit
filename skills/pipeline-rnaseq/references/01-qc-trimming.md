@@ -5,8 +5,9 @@
 - Adapter sequences: TruSeq adapters (Illumina TruSeq Stranded mRNA kit)
 
 ## Tools
-- **FastQC v0.11.9+**: Per-base quality, adapter content, duplication rates, GC bias
-- **Trim Galore v0.6.7+** (wraps Cutadapt): Adapter trimming + quality filtering
+- **FastQC** (unpinned, from the Ubuntu 22.04 package in the image): Per-base quality,
+  adapter content, sequence duplication estimate, GC bias
+- **Trim Galore 0.6.7** (wraps cutadapt 4.4): Adapter trimming + quality filtering
 
 ## Key Difference from ATAC-seq / ChIP-seq
 RNA-seq uses **Illumina TruSeq** adapters, not Nextera. Trim Galore auto-detects
@@ -18,7 +19,8 @@ with short inserts.
 - **Poly-A tail contamination**: Adapter content plot may show poly-A sequences if
   library inserts are shorter than read length. Trim Galore handles this automatically.
 - **rRNA contamination**: High duplication rates combined with skewed GC content can
-  indicate failed rRNA depletion. Check with `sortmerna` or RSeQC downstream.
+  indicate failed rRNA depletion. The workflow does not measure the rRNA rate; see the
+  manual count in `05-qc-metrics.md`.
 - **GC bias**: RNA-seq GC content should reflect transcriptome composition, not genome.
   A bimodal GC plot may indicate contamination or degraded RNA.
 
@@ -29,8 +31,7 @@ with short inserts.
 | Quality cutoff | 20 | Phred score minimum |
 | Min length | 36 | Longer minimum than ATAC-seq due to longer fragments |
 | Adapter | TruSeq (auto-detect) | Illumina TruSeq adapters |
-| Stringency | 1 | Overlap with adapter sequence required |
-| Max N | 10 | Maximum Ns allowed in read |
+| Stringency | 1 | Overlap with adapter sequence required (Trim Galore default) |
 
 ## Commands
 
@@ -44,9 +45,15 @@ trim_galore --paired --quality 20 --length 36 --fastqc \
 ```
 
 ## Expected Output
-- `*_trimming_report.txt` -- trimming statistics
-- `*_val_1.fq.gz`, `*_val_2.fq.gz` -- trimmed paired-end reads
-- FastQC HTML reports for raw and trimmed reads
+
+The workflow runs FastQC on the raw reads and Trim Galore with `--fastqc` on top, so both
+sets of reports exist:
+
+- `trimmed/*_trimming_report.txt` -- trimming statistics (one per input file)
+- `trimmed/*_val_1.fq.gz`, `trimmed/*_val_2.fq.gz` -- trimmed paired-end reads
+  (`*_trimmed.fq.gz` with `--single_end`)
+- `fastqc/*.{html,zip}` -- FastQC reports for the raw reads and for the trimmed reads,
+  both published to the same directory and both fed to MultiQC
 
 ## QC Checkpoints
 
@@ -61,8 +68,9 @@ trim_galore --paired --quality 20 --length 36 --fastqc \
 ## Troubleshooting
 - **High adapter content**: Short library inserts cause adapter read-through. Ensure
   `--length 36` retains enough reads after trimming.
-- **Bimodal GC content**: Likely rRNA contamination or DNA contamination. Check with
-  downstream rRNA rate from STAR log.
+- **Bimodal GC content**: Likely rRNA contamination or DNA contamination. Confirm with the
+  manual rRNA count in `05-qc-metrics.md` and the intronic/intergenic fractions in
+  `qc/rseqc/<sample>.read_distribution.txt`.
 - **Very high duplication**: Some duplication is biological (highly expressed genes).
   True PCR duplicates are only a concern if NRF <0.5. Mark but do not remove duplicates
   for RNA-seq quantification.

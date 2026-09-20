@@ -377,7 +377,7 @@ Expected output:
 
 ### 2. Survey single-cell data availability
 ```
-encode_get_facets(assay_title="scRNA-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -391,7 +391,7 @@ Expected output:
 
 ### 3. Compare bulk vs single-cell experiments
 ```
-encode_compare_experiments(accession_1="ENCSR500LNG", accession_2="ENCSR600SCA")
+encode_compare_experiments(accession1="ENCSR500LNG", accession2="ENCSR600SCA")
 ```
 
 Expected output:

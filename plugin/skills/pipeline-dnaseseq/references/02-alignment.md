@@ -13,6 +13,11 @@ bwa index -a bwtsw genome.fa
 
 Requires ~8 GB disk space for the human genome.
 
+`--bwa_index` is the **prefix** the index was built on, i.e. the FASTA path
+(`/ref/bwa_index/genome.fa`), not a directory. The workflow stages every file
+matching `<prefix>*` -- the FASTA plus `.amb`, `.ann`, `.bwt`, `.pac`, `.sa` --
+into the task directory and passes the basename to `bwa mem`.
+
 ## Paired-End Alignment
 
 ```bash
@@ -38,7 +43,9 @@ Standard BWA-MEM settings work well.
 
 ## Single-End Alignment
 
-For older ENCODE DNase-seq datasets with single-end reads:
+**Not supported by this workflow -- for reference only.** The Nextflow pipeline
+is paired-end only and has no `--single_end` parameter. For older ENCODE
+DNase-seq datasets with single-end reads, align them outside the pipeline:
 
 ```bash
 bwa mem -t 8 -M \

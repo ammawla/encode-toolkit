@@ -106,7 +106,7 @@ The database location is `~/.encode_connector/tracker.db` (macOS/Linux) or `%USE
 Before tracking anything, survey the landscape. Use facets to understand the breadth of available data for your tissue of interest.
 
 ```
-encode_get_facets(facet_field="assay_title", organ="pancreas", organism="Homo sapiens")
+encode_get_facets(organ="pancreas", organism="Homo sapiens")
 ```
 
 Expected output (example):
@@ -535,7 +535,7 @@ encode_link_reference(
 ### Step 5: View all references for an experiment
 
 ```
-encode_get_references(accession="ENCSR123ABC")
+encode_get_references(experiment_accession="ENCSR123ABC")
 ```
 
 Returns all linked references across all types, giving a complete picture of the external context around this experiment.

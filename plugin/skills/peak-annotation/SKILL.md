@@ -465,7 +465,7 @@ Expected output:
 
 ```
 encode_download_files(
-  accessions=["ENCFF567PAN"],
+  file_accessions=["ENCFF567PAN"],
   download_dir="/data/peaks/pancreas_h3k27ac"
 )
 ```

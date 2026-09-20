@@ -420,7 +420,7 @@ Expected output:
 
 ```
 encode_download_files(
-  accessions=["ENCFF345CTF"],
+  file_accessions=["ENCFF345CTF"],
   download_dir="/data/motifs/liver_ctcf"
 )
 ```

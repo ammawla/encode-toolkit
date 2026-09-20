@@ -7,12 +7,13 @@ LABEL description="ENCODE Toolkit CUT&RUN pipeline: Bowtie2 + SEACR + MACS2 + de
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# perl is listed explicitly: FastQC and Trim Galore are Perl programs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gzip pigz unzip \
     python3 python3-pip python3-dev \
     openjdk-17-jre-headless \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
-    build-essential r-base \
+    build-essential r-base perl \
     && rm -rf /var/lib/apt/lists/*
 
 # samtools 1.19

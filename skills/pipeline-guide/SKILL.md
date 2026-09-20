@@ -149,7 +149,11 @@ singularity --version
 | RNA-seq | 8 cores | 32 GB | 100 GB | No | 4–8 hours (index build) |
 | WGBS | 8 cores | 48 GB | 200 GB | No | 12–24 hours |
 | Hi-C | 8 cores | 64 GB | 200 GB | No | 8–16 hours |
-| scRNA-seq | 8 cores | 64 GB | 100 GB | No | 4–8 hours |
+| DNase-seq | 8 cores | 16 GB | see `pipeline-dnaseseq` | No | 3–6 hours |
+| CUT&RUN | 8 cores | 8 GB | see `pipeline-cutandrun` | No | 1.5–3 hours |
+
+The DNase-seq and CUT&RUN figures are the per-sample totals from those skills' own resource
+tables. There is no toolkit pipeline skill for scRNA-seq or scATAC-seq, so no row is given.
 
 ### Resource Scaling
 - **CPU**: Alignment steps are parallelizable; doubling cores approximately halves alignment time
@@ -164,7 +168,7 @@ When the user needs to run ENCODE-style processing, generate Nextflow workflows 
 ### Why Nextflow Over WDL
 - **Broader adoption**: Nextflow is used by nf-core, most HPC centers, and cloud platforms
 - **Native container support**: Docker, Singularity, Podman
-- **Cloud integration**: AWS Batch, Google Cloud Life Sciences, Azure Batch natively
+- **Cloud integration**: AWS Batch, Google Cloud Batch, Azure Batch natively
 - **Resource management**: Built-in CPU/memory/time limits per process
 - **Resume capability**: Failed runs restart from last successful step
 
@@ -175,29 +179,18 @@ When the user needs to run ENCODE-style processing, generate Nextflow workflows 
 nextflow.enable.dsl=2
 
 // Pipeline parameters
-params.reads         = null          // Input FASTQ path
-params.genome        = 'GRCh38'     // Genome assembly
+params.reads         = null          // Input FASTQ glob, e.g. '*_R{1,2}.fastq.gz'
+params.genome        = 'GRCh38'      // Genome assembly
+params.bwa_index     = null          // BWA index prefix or directory
 params.outdir        = './results'   // Output directory
-params.max_cpus      = Runtime.runtime.availableProcessors()
-params.max_memory    = '${available_memory} GB'
-params.max_time      = '24.h'
-
-// Resource limits (user-specific)
-process {
-    cpus   = { check_max( 4 * task.attempt, 'cpus' ) }
-    memory = { check_max( 8.GB * task.attempt, 'memory' ) }
-    time   = { check_max( 4.h * task.attempt, 'time' ) }
-
-    errorStrategy = 'retry'
-    maxRetries    = 2
-}
 
 // Example: ChIP-seq alignment process
 process ALIGN_READS {
     tag "${sample_id}"
-    cpus 4
-    memory '16 GB'
-    container 'encodedcc/chip-seq-pipeline:v2.2.1'
+    cpus 8
+    memory { 16.GB * task.attempt }
+    time   { 4.h * task.attempt }
+    container params.container
 
     input:
     tuple val(sample_id), path(reads)
@@ -208,67 +201,98 @@ process ALIGN_READS {
 
     script:
     """
-    bwa mem -t ${task.cpus} ${genome_index}/genome.fa ${reads} | \
+    bwa mem -t ${task.cpus} -M ${genome_index}/${params.genome}.fa ${reads} | \
         samtools sort -@ ${task.cpus} -o ${sample_id}.sorted.bam
     samtools index ${sample_id}.sorted.bam
     """
 }
 ```
 
+Per-process resources go on the process (or in `withName:` blocks in the config); the global
+ceiling belongs in `nextflow.config` via `process.resourceLimits`, shown next.
+
 ### Resource-Aware Configuration
 
-Generate a `nextflow.config` based on user's system:
+Generate a `nextflow.config` based on the user's system. This mirrors the `nextflow.config` that
+every `pipeline-*` skill ships; the profile names are `local`, `slurm`, `gcp` and `aws` — no
+others exist. `params.container` used by the process above is declared here.
 
 ```nextflow
-// Auto-detected from user system
 params {
+    outdir     = './results'
+
+    // Auto-detected from the user's system
     max_cpus   = ${detected_cpus}
-    max_memory = '${detected_memory} GB'
+    max_memory = '${detected_memory}.GB'
     max_time   = '72.h'
+
+    // Image built from the skill's scripts/Dockerfile. Override with a registry image for
+    // gcp/aws, or a .sif file for slurm.
+    container  = 'encode-toolkit/pipeline-chipseq:1.0.0'
+
+    // Scheduler and cloud settings (only read by the matching profile)
+    slurm_queue   = 'normal'
+    slurm_account = null
+    gcp_project   = null
+    gcp_location  = 'us-central1'
+    gcp_workdir   = null
+    gcp_disk      = '200.GB'
+    aws_queue     = null
+    aws_region    = 'us-east-1'
+    aws_workdir   = null
+    aws_cli_path  = '/home/ec2-user/miniconda/bin/aws'
 }
 
-// Profile: local execution
+process {
+    container      = params.container
+    errorStrategy  = 'retry'
+    maxRetries     = 2
+    // Nextflow's built-in ceiling: every process request is capped at these values.
+    resourceLimits = [cpus: params.max_cpus, memory: params.max_memory, time: params.max_time]
+}
+
 profiles {
     local {
-        process.executor = 'local'
-        docker.enabled   = true
+        process.executor  = 'local'
+        docker.enabled    = true
+        docker.runOptions = '-u $(id -u):$(id -g)'
     }
 
-    // Profile: SLURM HPC
     slurm {
-        process.executor = 'slurm'
-        process.queue    = 'normal'
-        singularity.enabled = true
+        process.executor       = 'slurm'
+        process.queue          = params.slurm_queue
+        process.clusterOptions = params.slurm_account ? "--account=${params.slurm_account}" : null
+        singularity.enabled    = true
+        singularity.autoMounts = true
     }
 
-    // Profile: Google Cloud
-    gcloud {
-        process.executor = 'google-batch'
-        google.location  = 'us-central1'
-        google.project   = '${user_project}'
-        workDir          = 'gs://${user_bucket}/work'
+    gcp {
+        process.executor  = 'google-batch'
+        process.disk      = params.gcp_disk
+        google.project    = params.gcp_project
+        google.location   = params.gcp_location
+        google.batch.spot = true
+        workDir           = params.gcp_workdir
     }
 
-    // Profile: AWS Batch
-    awsbatch {
-        process.executor = 'awsbatch'
-        process.queue    = '${user_queue}'
-        aws.region       = 'us-east-1'
-        workDir          = 's3://${user_bucket}/work'
-    }
-}
-
-// Resource checking function
-def check_max(obj, type) {
-    if (type == 'memory') {
-        try { if (obj.compareTo(params.max_memory as nextflow.util.MemoryUnit) == 1) return params.max_memory as nextflow.util.MemoryUnit else return obj }
-        catch (all) { return params.max_memory as nextflow.util.MemoryUnit }
-    } else if (type == 'cpus') {
-        try { return Math.min(obj, params.max_cpus as int) }
-        catch (all) { return params.max_cpus as int }
+    aws {
+        process.executor  = 'awsbatch'
+        process.queue     = params.aws_queue
+        aws.region        = params.aws_region
+        aws.batch.cliPath = params.aws_cli_path
+        workDir           = params.aws_workdir
     }
 }
 ```
+
+`process.resourceLimits` replaces the hand-written `check_max()` helper that older nf-core
+configs use: it applies to `cpus`, `memory` and `time` alike, so there is no helper to keep in
+sync.
+
+Google Batch and AWS Batch stage every task through object storage, so `-profile gcp` needs
+`--gcp_project` and `--gcp_workdir gs://<bucket>/work`, and `-profile aws` needs `--aws_queue`
+and `--aws_workdir s3://<bucket>/work`. `--outdir` only sets where results are published. Cloud
+runs also need `--container <registry image>`; the default image name is local-only.
 
 ## Step 3: Cloud Integration
 
@@ -277,14 +301,14 @@ def check_max(obj, type) {
 For users who cannot run pipelines locally, offer cloud integration:
 
 #### Google Cloud / Colab
-- **Nextflow + Google Cloud Life Sciences**: Run full pipelines on Google Cloud
+- **Nextflow + Google Cloud Batch**: Run full pipelines on Google Cloud (`-profile gcp`)
 - **Google Colab**: For interactive analysis (R/Python notebooks)
   - Limited to 12 GB RAM (free tier) or 25 GB (Pro)
   - GPU available (useful for deep learning, not standard pipelines)
   - Best for: downstream analysis after pipeline completion
 
 #### AWS
-- **Nextflow + AWS Batch**: Run pipelines on AWS
+- **Nextflow + AWS Batch**: Run pipelines on AWS (`-profile aws`)
 - **AWS SageMaker**: For ML-based analysis
 - Best for: Large-scale batch processing
 
@@ -302,18 +326,24 @@ For users who cannot run pipelines locally, offer cloud integration:
 | WGBS | n1-highmem-16 / r5.4xlarge | $10–25 |
 | Hi-C | n1-highmem-16 / r5.4xlarge | $8–20 |
 
+DNase-seq and CUT&RUN are not listed: no cost measurements exist for them. Estimate from their
+resource rows above (both fit an 8-core instance) and your provider's current rates; the `gcp`
+profile enables Batch spot instances by default.
+
 ## Step 4: Background Execution
 
 ### Local Background Execution
 ```bash
-# Run Nextflow in background with nohup
-nohup nextflow run pipeline.nf \
+# Nextflow's own -bg flag detaches the run; redirect its log and you do not need nohup.
+# Pass every required parameter for the pipeline you are running (see its SKILL.md).
+nextflow run pipeline-chipseq/scripts/main.nf \
     -profile local \
-    --reads '/path/to/reads/*.fastq.gz' \
+    --reads '/path/to/reads/*_R{1,2}.fastq.gz' \
+    --chrom_sizes /ref/hg38.chrom.sizes \
     --outdir results/ \
     -resume \
     -bg \
-    > pipeline.log 2>&1 &
+    > pipeline.log 2>&1
 
 # Monitor progress
 tail -f pipeline.log
@@ -327,8 +357,11 @@ screen -S encode_pipeline
 # or
 tmux new -s encode_pipeline
 
-# Run pipeline inside session
-nextflow run pipeline.nf -profile local --reads '...' -resume
+# Run pipeline inside session (pass every required parameter for that pipeline)
+nextflow run pipeline-chipseq/scripts/main.nf -profile local \
+    --reads '/path/to/reads/*_R{1,2}.fastq.gz' \
+    --chrom_sizes /ref/hg38.chrom.sizes \
+    --outdir results/ -resume
 
 # Detach: Ctrl+A then D (screen) or Ctrl+B then D (tmux)
 # Reattach later: screen -r encode_pipeline / tmux attach -t encode_pipeline
@@ -358,55 +391,77 @@ picard MarkDuplicates \
 
 #### Peak Calling (MACS2)
 ```bash
-# ENCODE standard peak calling
+# What pipeline-chipseq runs. -f is BAMPE for paired-end, BAM for single-end;
+# -g is 'hs' (GRCh38) or 'mm' (mm10).
 macs2 callpeak \
-    -t treatment.bam \
-    -c control.bam \
-    -f BAMPE \
-    -g hs \
-    -n sample \
-    --nomodel \
-    --shift -75 \
-    --extsize 150 \
-    -B --SPMR \
-    --keep-dup all \
-    --call-summits \
-    -q 0.05 \
-    --outdir peaks/
+    -t treatment.bam -c control.bam \
+    -f BAMPE -g hs -n sample \
+    --qvalue 0.05 --nomodel --keep-dup all \
+    --call-summits -B
+
+# Broad marks (--peak_type broad) swap --call-summits for:
+#   --broad --broad-cutoff 0.1
 ```
+
+`--shift`/`--extsize` are the ATAC/single-end recipe and are not used here: they have no effect
+in `BAMPE` mode, where MACS2 takes the fragment from the read pair. `pipeline-atacseq` also runs
+`-f BAMPE` without them, because it applies the Tn5 offset upstream with
+`alignmentSieve --ATACshift`.
 
 #### IDR Analysis
 ```bash
-# ENCODE IDR for replicate concordance
+# What pipeline-chipseq and pipeline-atacseq run: one IDR pass over the first two
+# replicate peak files, narrow peaks only.
 idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
     --input-file-type narrowPeak \
     --rank p.value \
-    --output-file idr_peaks.narrowPeak \
+    --output-file idr_peaks.txt \
     --plot \
     --idr-threshold 0.05
 ```
 
+There is no pooled or pseudoreplicate analysis and no rescue/self-consistency ratio in these
+workflows; add those steps yourself if you need the full ENCODE IDR protocol.
+
 #### RNA-seq Quantification
 ```bash
-# ENCODE RNA-seq (STAR + RSEM)
-STAR --runThreadN ${NCPUS} \
-    --genomeDir ${STAR_INDEX} \
+# What pipeline-rnaseq runs (STAR 2-pass + RSEM)
+STAR --genomeDir ${STAR_INDEX} \
     --readFilesIn ${FASTQ_R1} ${FASTQ_R2} \
     --readFilesCommand zcat \
+    --runThreadN ${NCPUS} \
     --outSAMtype BAM SortedByCoordinate \
-    --quantMode TranscriptomeSAM \
+    --outSAMunmapped Within \
     --outFilterMultimapNmax 20 \
     --alignSJoverhangMin 8 \
+    --alignSJDBoverhangMin 1 \
     --outFilterMismatchNmax 999 \
-    --outFilterMismatchNoverReadLmax 0.04
+    --outFilterMismatchNoverReadLmax 0.04 \
+    --alignIntronMin 20 \
+    --alignIntronMax 1000000 \
+    --alignMatesGapMax 1000000 \
+    --quantMode TranscriptomeSAM GeneCounts \
+    --twopassMode Basic \
+    --outWigType bedGraph \
+    --outWigStrand Stranded \
+    --outFileNamePrefix sample.
 
 rsem-calculate-expression \
-    --bam --paired-end \
-    -p ${NCPUS} \
-    Aligned.toTranscriptome.out.bam \
+    --paired-end \
+    --bam \
+    --no-bam-output \
+    --estimate-rspd \
+    --strandedness reverse \
+    --num-threads ${NCPUS} \
+    sample.Aligned.toTranscriptome.out.bam \
     ${RSEM_INDEX} \
-    rsem_output
+    sample
 ```
+
+`--twopassMode Basic` is what makes this "STAR 2-pass". `--strandedness` must match the library
+(`reverse` for dUTP protocols, `forward`, or `none`); `--outWigStrand` becomes `Unstranded` when
+it is `none`. The annotation is baked into the STAR and RSEM indexes when they are built, so
+there is no GTF argument here.
 
 #### Liftover (GRCh37 → GRCh38)
 ```bash
@@ -482,7 +537,7 @@ bigWigToBedGraph      # UCSC Kent tools
 bedToBigBed           # UCSC Kent tools
 macs2 --version       # 2.2.9.1 - peak calling
 idr --version         # 2.0.4.2 - reproducibility
-deeptools --version   # 3.5.4 - signal visualization
+deeptools --version   # 3.5.5 - signal visualization
 ```
 
 ## Provenance Integration
@@ -507,7 +562,8 @@ Every pipeline run should produce a provenance entry that enables methods writin
 ### Container Requirements
 - Docker requires root access (or rootless Docker)
 - HPC systems typically use Singularity instead of Docker
-- Singularity can pull Docker images: `singularity pull docker://encodedcc/chip-seq-pipeline:v2.2.1`
+- Singularity can convert Docker images. The toolkit images are built locally from each skill's `scripts/Dockerfile`, so convert from the local daemon and pass the result with `--container`:
+  `singularity build pipeline-chipseq.sif docker-daemon://encode-toolkit/pipeline-chipseq:1.0.0`
 
 ### Genome Index Files
 - STAR genome index requires ~32 GB RAM to generate and ~30 GB disk
@@ -570,7 +626,7 @@ Expected output:
 ### Step 2: Download raw FASTQ files
 
 ```
-encode_list_files(accession="ENCSR000AKA", file_format="fastq", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
 Expected output:
@@ -598,16 +654,29 @@ Expected output:
 
 ### Step 4: Configure and run
 
-For Histone ChIP-seq:
+For Histone ChIP-seq. `--reads` is a glob that Nextflow's `fromFilePairs` must resolve, so give
+the downloaded ENCFF files `_R1`/`_R2` names first:
+
 ```bash
-nextflow run pipeline-chipseq/main.nf \
-  --fastq_r1 ENCFF001FQ1.fastq.gz \
-  --fastq_r2 ENCFF002FQ2.fastq.gz \
+mkdir -p fastq
+ln -s "$PWD/ENCFF001FQ1.fastq.gz" fastq/rep1_R1.fastq.gz
+ln -s "$PWD/ENCFF002FQ2.fastq.gz" fastq/rep1_R2.fastq.gz
+
+nextflow run pipeline-chipseq/scripts/main.nf \
+  -profile local \
+  --reads 'fastq/*_R{1,2}.fastq.gz' \
   --genome GRCh38 \
-  --target H3K27ac \
-  --broad_peak false \
-  -profile docker
+  --peak_type narrow \
+  --bwa_index ./GRCh38_index \
+  --chrom_sizes /ref/hg38.chrom.sizes \
+  --outdir results/ \
+  -resume
 ```
+
+`--reads` and `--chrom_sizes` are required. There is no `--target` parameter: the ChIP target
+does not change the workflow, only `--peak_type` (`narrow` or `broad`, one value per run) does.
+Add `--control '<glob>'` for input samples, making sure the two globs do not match the same
+files.
 
 ### Step 5: Quality check the output
 
@@ -615,6 +684,10 @@ Use → **quality-assessment** skill to evaluate pipeline output against ENCODE 
 - FRiP >= 1%
 - NSC > 1.05
 - RSC > 0.8
+
+`pipeline-chipseq` does not compute these: FRiP, and NSC/RSC (phantompeakqualtools) are manual
+steps on the filtered BAM and peak files. The MultiQC report covers FastQC, trimming, flagstat
+and duplication metrics.
 
 ### Integration with downstream skills
 - Raw data from → **download-encode** provides FASTQ input for all pipelines
@@ -640,7 +713,7 @@ Expected output:
 
 ### 2. Find FASTQ files for pipeline input
 ```
-encode_list_files(accession="ENCSR000AKA", file_format="fastq")
+encode_list_files(experiment_accession="ENCSR000AKA", file_format="fastq")
 ```
 
 Expected output:
@@ -655,7 +728,7 @@ Expected output:
 
 ### 3. Survey available data by assay type for pipeline selection
 ```
-encode_get_facets(facet_field="assay_title", organism="Homo sapiens")
+encode_get_facets(organism="Homo sapiens")
 ```
 
 Expected output:

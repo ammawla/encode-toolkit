@@ -450,7 +450,7 @@ Expected output:
 ### Step 2: Check file-level quality
 
 ```
-encode_list_files(accession="ENCSR000AKA", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000AKA", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 ### Step 3: Review quality metrics
@@ -493,7 +493,7 @@ Expected output:
 
 ### 2. List files to check quality metrics
 ```
-encode_list_files(accession="ENCSR000AKA", file_format="bed", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000AKA", file_format="bed", assembly="GRCh38")
 ```
 
 Expected output:

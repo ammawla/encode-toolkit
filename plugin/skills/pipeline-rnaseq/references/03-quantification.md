@@ -1,8 +1,8 @@
 # Stage 3: Gene and Transcript Quantification
 
 ## Tools
-- **RSEM v1.3.3+**: Gene/transcript quantification (Li & Dewey 2011, ~6,000 citations)
-- **Kallisto v0.48.0+**: Fast pseudoalignment quantification (Bray et al. 2016, ~4,000 citations)
+- **RSEM 1.3.3**: Gene/transcript quantification (Li & Dewey 2011, ~6,000 citations)
+- **Kallisto 0.48.0**: Fast pseudoalignment quantification (Bray et al. 2016, ~4,000 citations)
 
 ## RSEM Quantification (Primary)
 
@@ -10,13 +10,18 @@ RSEM uses an expectation-maximization (EM) algorithm to probabilistically assign
 multi-mapped reads to genes and transcripts, providing accurate quantification even
 for overlapping gene families and repetitive elements.
 
-### RSEM Index Preparation
+### RSEM Index Preparation (one-time prep, outside the workflow)
 
 ```bash
 # Prepare RSEM reference (run once)
 rsem-prepare-reference --gtf gencode.v38.primary_assembly.annotation.gtf \
   --star GRCh38.primary_assembly.genome.fa rsem_index/GRCh38
 ```
+
+The last argument is a **prefix**, not a directory, and it is what you pass as
+`--rsem_index` (here `rsem_index/GRCh38`). The workflow stages every file whose name
+starts with that prefix. The annotation is fixed at this point; there is no `--gtf`
+parameter downstream.
 
 ### RSEM Quantification
 
@@ -37,14 +42,20 @@ rsem-calculate-expression \
 
 | File | Contents | Key Columns |
 |------|----------|-------------|
-| `sample.genes.results` | Gene-level quantification | gene_id, transcript_id(s), length, effective_length, expected_count, TPM, FPKM |
-| `sample.isoforms.results` | Transcript-level quantification | transcript_id, gene_id, length, effective_length, expected_count, TPM, FPKM, IsoPct |
+| `rsem/<sample>.genes.results` | Gene-level quantification | gene_id, transcript_id(s), length, effective_length, expected_count, TPM, FPKM |
+| `rsem/<sample>.isoforms.results` | Transcript-level quantification | transcript_id, gene_id, length, effective_length, expected_count, TPM, FPKM, IsoPct |
+| `rsem/<sample>.stat/` | Model and read statistics | Directory; parsed by MultiQC |
+
+`--no-bam-output` is passed, so RSEM writes no BAM of its own.
 
 ### RSEM Strandedness Flags
 
-| Library Type | RSEM Flag | Description |
+The workflow passes its `--strandedness` value straight through to RSEM, so these are the
+same three values:
+
+| Library Type | Pipeline and RSEM value | Description |
 |-------------|-----------|-------------|
-| dUTP / rf-stranded | `--strandedness reverse` | ENCODE standard |
+| dUTP / rf-stranded | `--strandedness reverse` | ENCODE standard, the pipeline default |
 | fr-stranded | `--strandedness forward` | Directional ligation |
 | Unstranded | `--strandedness none` | SMARTer, SMART-Seq2, older protocols |
 
@@ -54,31 +65,42 @@ Kallisto uses pseudoalignment (k-mer matching without full alignment) for ultra-
 transcript quantification. It runs 10-100x faster than STAR+RSEM but does not produce
 BAM files or support fusion detection.
 
-### Kallisto Index
+In this workflow Kallisto runs on the trimmed FASTQ files, in parallel with (not instead
+of) STAR and RSEM. Skip it with `--skip_kallisto`, which also stops `--kallisto_index`
+from being read.
+
+### Kallisto Index (one-time prep, outside the workflow)
 
 ```bash
 # Build Kallisto index from transcriptome FASTA (run once)
 kallisto index -i kallisto_index.idx gencode.v38.transcripts.fa
 ```
 
+Pass the resulting file as `--kallisto_index`.
+
 ### Kallisto Quantification
 
 ```bash
 kallisto quant \
   -i kallisto_index.idx \
-  -o kallisto_out/ \
+  -o sample/ \
   --rf-stranded \
   -t 8 \
   R1.fq.gz R2.fq.gz
 ```
 
+The strand flag follows `--strandedness`: `--rf-stranded` for `reverse`, `--fr-stranded`
+for `forward`, and no flag for `none`. With `--single_end` the workflow substitutes the
+fixed `--single -l 200 -s 20`; if your fragment length distribution differs, rerun
+kallisto by hand with the right values.
+
 ### Kallisto Output
 
-| File | Contents |
-|------|----------|
-| `abundance.tsv` | transcript_id, length, effective_length, est_counts, tpm |
-| `abundance.h5` | Binary HDF5 format (for sleuth) |
-| `run_info.json` | Run metadata and statistics |
+| File | Contents | Published |
+|------|----------|-----------|
+| `kallisto/<sample>/abundance.tsv` | transcript_id, length, effective_length, est_counts, tpm | Yes |
+| `kallisto/<sample>/run_info.json` | Run metadata and statistics | Yes |
+| `abundance.h5` | Binary HDF5 format (for sleuth) | No — not a declared output, stays in the work directory |
 
 ## TPM vs FPKM vs Raw Counts
 
@@ -99,9 +121,12 @@ kallisto quant \
 
 ## QC Checkpoints
 
+None of these are computed by the workflow; each is a check to run on the published
+quantifications (see `05-qc-metrics.md` for the detected-gene command).
+
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
 | Detected genes (TPM>1) | >12,000 (human) | Check sequencing depth, RNA quality |
-| RSEM mapping rate | >70% of transcriptome BAM reads | Check strandedness setting |
+| RSEM mapping rate (from `<sample>.stat/`) | >70% of transcriptome BAM reads | Check strandedness setting |
 | TPM correlation between replicates | r > 0.95 (Pearson) | Check batch effects, sample swap |
 | Gene count distribution | Log-normal shape expected | Skewed distribution suggests degradation |

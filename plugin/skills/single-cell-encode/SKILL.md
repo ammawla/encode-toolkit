@@ -383,7 +383,7 @@ Before combining any single-cell datasets, verify each item:
 ### Step 1: Survey available single-cell ENCODE data
 
 ```
-encode_get_facets(assay_title="scRNA-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -417,7 +417,7 @@ Expected output:
 ### Step 3: Download single-cell data files
 
 ```
-encode_list_files(accession="ENCSR700SCA", file_format="h5ad", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR700SCA", file_format="h5ad", assembly="GRCh38")
 ```
 
 Expected output:
@@ -462,7 +462,7 @@ Use → **cellxgene-context** to access the CellxGene Census for additional sing
 
 ### 1. Survey single-cell experiment availability
 ```
-encode_get_facets(assay_title="snATAC-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="snATAC-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -476,7 +476,7 @@ Expected output:
 
 ### 2. Compare single-cell and bulk experiments
 ```
-encode_compare_experiments(accession_1="ENCSR700SCA", accession_2="ENCSR800BLK")
+encode_compare_experiments(accession1="ENCSR700SCA", accession2="ENCSR800BLK")
 ```
 
 Expected output:

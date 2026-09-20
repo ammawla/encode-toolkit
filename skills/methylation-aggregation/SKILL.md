@@ -417,7 +417,7 @@ Expected output:
 ### Step 2: List methylation bedGraph files
 
 ```
-encode_list_files(accession="ENCSR765JPC", file_format="bed", output_type="methylation state at CpG", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR765JPC", file_format="bed", output_type="methylation state at CpG", assembly="GRCh38")
 ```
 
 Expected output:
@@ -432,7 +432,7 @@ Expected output:
 ### Step 3: Download methylation files
 
 ```
-encode_download_files(accessions=["ENCFF123BED", "ENCFF456MET", "ENCFF789CPG"], download_dir="/data/wgbs")
+encode_download_files(file_accessions=["ENCFF123BED", "ENCFF456MET", "ENCFF789CPG"], download_dir="/data/wgbs")
 ```
 
 ### Step 4: Per-CpG weighted averaging across replicates
@@ -462,7 +462,7 @@ bedtools intersect -a merged_methylation.bed -b imprinted_icrs.bed -wa -wb | \
 
 ### 1. Survey WGBS data availability by organ
 ```
-encode_get_facets(assay_title="WGBS", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="WGBS", organism="Homo sapiens")
 ```
 
 Expected output:

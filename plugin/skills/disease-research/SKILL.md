@@ -309,7 +309,7 @@ Multiple LD variants may overlap regulatory elements by chance. Enrichment testi
 ### Step 1: Survey ENCODE data for brain tissue
 
 ```
-encode_get_facets(facet_field="assay_title", organ="brain", organism="Homo sapiens")
+encode_get_facets(organ="brain", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -386,7 +386,7 @@ encode_summarize_collection()
 
 ### 1. Survey ENCODE data for a disease-relevant tissue
 ```
-encode_get_facets(facet_field="assay_title", organ="brain", organism="Homo sapiens")
+encode_get_facets(organ="brain", organism="Homo sapiens")
 ```
 
 Expected output:

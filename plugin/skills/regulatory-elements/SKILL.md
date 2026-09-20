@@ -363,7 +363,7 @@ For detailed biology of each histone mark (writers, erasers, readers, contradict
 ### Step 1: Find available marks for classification
 
 ```
-encode_get_facets(facet_field="target.label", organ="liver", assay_title="Histone ChIP-seq", organism="Homo sapiens")
+encode_get_facets(organ="liver", assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -393,7 +393,7 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", target=
 ### Step 4: Download and intersect mark files
 
 ```
-encode_download_files(accessions=["ENCFF100AC", "ENCFF200K4M1", "ENCFF300K4M3"], download_dir="/data/regulatory")
+encode_download_files(file_accessions=["ENCFF100AC", "ENCFF200K4M1", "ENCFF300K4M3"], download_dir="/data/regulatory")
 ```
 
 ### Integration with downstream skills
@@ -419,7 +419,7 @@ Expected output:
 
 ### 2. List preferred peak files
 ```
-encode_list_files(accession="ENCSR500CTF", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR500CTF", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:

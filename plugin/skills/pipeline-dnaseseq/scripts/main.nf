@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 // ============================================================================
 // ENCODE DNase-seq Pipeline — FASTQ to Hotspots and Footprints
-// Tools: BWA-MEM, Hotspot2, HINT-ATAC
+// Tools: BWA-MEM, Hotspot2, HINT (RGT)
 // ============================================================================
 
 params.reads                = null
@@ -50,6 +50,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*_val_{1,2}.fq.gz"), emit: trimmed
     path("*_trimming_report.txt"), emit: reports
+    path("*_fastqc.{html,zip}"), emit: fastqc
 
     script:
     """
@@ -159,6 +160,8 @@ process HOTSPOT2 {
     script:
     def mappable_opt = mappable ? "-M ${mappable}" : ''
     // The site-calling threshold (-F) may not be stricter than the hotspot threshold (-f).
+    // hotspot2.sh names the hotspots, peaks and SPOT files after -f (HOTSPOT_FDR_THRESHOLD),
+    // never after -F, so the names below always use params.fdr.
     def sitecall_fdr = Math.max(params.fdr as double, 0.05d)
     // hotspot2.sh names every output after the BAM basename
     def base = "hotspot2_out/${bam.baseName}"
@@ -261,12 +264,9 @@ process INSERT_SIZES {
 
     script:
     """
-    picard CollectInsertSizeMetrics \\
-        INPUT=${bam} \\
-        OUTPUT=${sample_id}.insert_sizes.txt \\
-        HISTOGRAM_FILE=${sample_id}.insert_hist.pdf \\
-        MINIMUM_PCT=0.05 \\
-        VALIDATION_STRINGENCY=LENIENT
+    # Picard CollectInsertSizeMetrics needs R for its mandatory histogram, which the image does
+    # not ship. samtools stats reports the same insert-size distribution and MultiQC reads it.
+    samtools stats ${bam} > ${sample_id}.insert_sizes.txt
     """
 }
 
@@ -283,7 +283,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE DNase-seq Pipeline" --force .
+    multiqc --title "ENCODE DNase-seq Pipeline" --filename multiqc_report --force .
     """
 }
 
@@ -298,6 +298,17 @@ workflow {
     if (!params.blacklist)            { error "Missing required parameter: --blacklist" }
     if (!params.skip_footprint && !params.rgt_data) {
         error "Footprinting needs --rgt_data (an RGT data directory set up for --organism '${params.organism}'); pass it or use --skip_footprint"
+    }
+
+    // Google Batch and AWS Batch stage every task through object storage, so the matching
+    // profile cannot run without a bucket work directory and a project or job queue.
+    def active_profiles = workflow.profile.tokenize(',')
+    def work_uri        = workflow.workDir.toUriString()
+    if (active_profiles.contains('gcp') && !(params.gcp_project && work_uri.startsWith('gs://'))) {
+        error "-profile gcp requires --gcp_project <project-id> and --gcp_workdir gs://<bucket>/work"
+    }
+    if (active_profiles.contains('aws') && !(params.aws_queue && work_uri.startsWith('s3://'))) {
+        error "-profile aws requires --aws_queue <job-queue> and --aws_workdir s3://<bucket>/work"
     }
 
     // ---- Channels ----
@@ -326,8 +337,10 @@ workflow {
 
     ch_multiqc = FASTQC_RAW.out.reports
         .mix(TRIM_GALORE.out.reports)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(FILTER_DEDUP.out.flagstat)
         .mix(FILTER_DEDUP.out.dup_metrics)
+        .mix(INSERT_SIZES.out.metrics)
         .mix(HOTSPOT2.out.spot)
         .collect()
 

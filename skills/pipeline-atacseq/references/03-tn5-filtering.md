@@ -1,10 +1,21 @@
-# Stage 3: Tn5 Shift, Filtering, and Fragment Selection
+# Stage 3: Filtering, Tn5 Shift, and Fragment Selection
 
 ## Tools
-- **Samtools v1.15+**: Mitochondrial read removal, flag filtering
-- **Picard MarkDuplicates v2.27+**: PCR duplicate removal
-- **bedtools v2.30+**: Blacklist filtering, Tn5 shift, fragment size selection
-- **deeptools alignmentSieve**: Fragment size selection (alternative to bedtools)
+- **Samtools 1.17** (image version): Mitochondrial read removal, sorting, indexing
+- **Picard MarkDuplicates 2.27.5** (image version): PCR duplicate removal
+- **deeptools `alignmentSieve` 3.5.5** (image version): Tn5 shift and fragment size selection
+- **bedtools 2.31.0** (image version): Blacklist filtering
+
+## Order of operations in the workflow
+
+```
+aligned.bam -> mito removal -> Picard MarkDuplicates (REMOVE_DUPLICATES=true)
+            -> alignmentSieve --ATACshift -> bedtools blacklist filter
+            -> final.bam -> alignmentSieve size selection (NFR, mono-nucleosome)
+```
+
+The Tn5 shift runs **after** duplicate removal, not before. Fragment size selection is the
+last step, and peaks are called on the NFR BAM.
 
 ## Tn5 Transposase Offset Correction
 
@@ -17,59 +28,81 @@ This correction is critical for motif footprinting and accurate cut-site analysi
 
 ## Commands
 
+The workflow runs the equivalent of:
+
 ```bash
-# Step 1: Remove mitochondrial reads
+# Step 1: Record the mitochondrial fraction, then remove chrM reads
+TOTAL=$(samtools view -c aligned.bam)
+MITO=$(samtools view -c aligned.bam chrM)
+echo "total_reads=$TOTAL mito_reads=$MITO mito_frac=$(echo "scale=4; $MITO/$TOTAL" | bc)" \
+  > sample.mito_stats.txt
 samtools view -@ 4 -b aligned.bam $(samtools idxstats aligned.bam | \
   awk '$1 != "chrM" && $1 != "*" {print $1}' | tr '\n' ' ') > no_mito.bam
 
-# Step 2: Remove unmapped, mate unmapped, secondary, QC-fail, duplicates
-samtools view -@ 4 -b -F 1804 -q 30 no_mito.bam | \
-  samtools sort -@ 4 -o filtered.bam -
-
-# Step 3: Mark and remove PCR duplicates
+# Step 2: Mark and remove PCR duplicates
+samtools sort -@ 4 -o sorted.bam no_mito.bam
 picard MarkDuplicates \
-  INPUT=filtered.bam OUTPUT=dedup.bam \
+  INPUT=sorted.bam OUTPUT=dedup.bam \
   METRICS_FILE=dup_metrics.txt \
   REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
 samtools index dedup.bam
 
-# Step 4: Apply Tn5 shift (+4/-5)
-alignmentSieve --bam dedup.bam --outFile shifted.bam \
+# Step 3: Apply Tn5 shift (+4/-5)
+alignmentSieve --bam dedup.bam --outFile shifted_unsorted.bam \
   --ATACshift --numberOfProcessors 4
-samtools sort -@ 4 -o shifted.sorted.bam shifted.bam
-samtools index shifted.sorted.bam
+samtools sort -@ 4 -o shifted.bam shifted_unsorted.bam
+samtools index shifted.bam
 
-# Step 5: Remove blacklist regions
-bedtools intersect -v -abam shifted.sorted.bam -b hg38-blacklist.v2.bed > final.bam
+# Step 4: Remove reads overlapping blacklist regions
+bedtools intersect -v -abam shifted.bam -b hg38-blacklist.v2.bed.gz > final.bam
 samtools index final.bam
+samtools flagstat final.bam > final.flagstat.txt
 
-# Step 6: Separate nucleosome-free and mono-nucleosomal fragments
-alignmentSieve --bam final.bam --outFile nfr.bam \
+# Step 5: Separate nucleosome-free and mono-nucleosomal fragments
+alignmentSieve --bam final.bam --outFile nfr_unsorted.bam \
   --maxFragmentLength 150 --numberOfProcessors 4
-alignmentSieve --bam final.bam --outFile mononuc.bam \
+samtools sort -@ 4 -o nfr.bam nfr_unsorted.bam && samtools index nfr.bam
+
+alignmentSieve --bam final.bam --outFile mononuc_unsorted.bam \
   --minFragmentLength 150 --maxFragmentLength 300 --numberOfProcessors 4
-samtools sort -@ 4 -o nfr.sorted.bam nfr.bam && samtools index nfr.sorted.bam
-samtools sort -@ 4 -o mononuc.sorted.bam mononuc.bam && samtools index mononuc.sorted.bam
+samtools sort -@ 4 -o mononuc.bam mononuc_unsorted.bam
 ```
+
+The fragment length boundary (150) is `--nfr_max`, and the mitochondrial contig name is
+`--mito_name`. There is no `samtools view -F 1804` step in this workflow: flag filtering
+(`-q 30 -f 2`) happens once, during alignment.
+
+## Expected Output
+- `qc/<sample>.mito_stats.txt` -- total reads, mitochondrial reads, mitochondrial fraction
+- `filtered/<sample>.dup_metrics.txt` -- Picard duplication metrics
+- `filtered/shifted/<sample>.shifted.bam` + `.bai` -- Tn5-corrected, pre-blacklist
+- `filtered/<sample>.final.bam` + `.final.bam.bai` -- blacklist-filtered (all fragments)
+- `filtered/<sample>.final.flagstat.txt` -- read count after all filtering
+- `filtered/nfr/<sample>.nfr.bam` + `.bai` -- nucleosome-free fragments
+- `filtered/nfr/<sample>.mononuc.bam` -- mono-nucleosome fragments (no index is written)
+
+Both size-selected BAMs land in `filtered/nfr/`.
 
 ## Fragment Size Classes
 
-| Class | Size (bp) | Use |
-|-------|-----------|-----|
-| NFR (nucleosome-free) | <150 | Peak calling, TF footprinting |
-| Mono-nucleosome | 150-300 | Nucleosome positioning |
-| Di-nucleosome | 300-500 | Chromatin architecture |
+| Class | Size (bp) | Use | Produced here? |
+|-------|-----------|-----|----------------|
+| NFR (nucleosome-free) | <150 (`--nfr_max`) | Peak calling, TF footprinting | yes |
+| Mono-nucleosome | 150-300 | Nucleosome positioning | yes |
+| Di-nucleosome | 300-500 | Chromatin architecture | no |
 
 ## QC Checkpoints
 
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
 | Mitochondrial fraction | <20% (ideal <5%) | Optimize cell lysis |
-| Duplication rate | <30% (NRF >= 0.8) | Low complexity library |
-| NFR fraction | >40% of fragments <150bp | Check transposition efficiency |
+| Duplication rate | <30% (Picard `PERCENT_DUPLICATION`) | Low complexity library |
+| NFR fraction | >40% of fragments <150bp (manual) | Check transposition efficiency |
 | Post-filter reads | >=25M | May need deeper sequencing |
 
 ## Notes
-- The `alignmentSieve --ATACshift` from deeptools applies the +4/-5 offset automatically.
-- Alternative: use a custom awk script on BED format for Tn5 shifting.
-- Blacklist: Amemiya et al. 2019 (hg38-blacklist.v2.bed, ~900 regions, ~40 Mb).
+- `alignmentSieve --ATACshift` applies the +4/-5 offset automatically. It emits an unsorted
+  BAM, so every `alignmentSieve` call is followed by `samtools sort`.
+- NRF and PBC are not computed by this workflow; see `references/05-qc-metrics.md`.
+- Blacklist: Amemiya et al. 2019 (hg38-blacklist.v2.bed.gz, ~900 regions, ~40 Mb). It is
+  applied to the BAM, so peaks are already blacklist-clean.

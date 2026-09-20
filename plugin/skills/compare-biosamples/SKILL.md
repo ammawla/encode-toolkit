@@ -390,7 +390,7 @@ Expected output:
 ### Step 2: Compare the two experiments
 
 ```
-encode_compare_experiments(accession_1="ENCSR100LIV", accession_2="ENCSR200HEP")
+encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HEP")
 ```
 
 Expected output:
@@ -409,7 +409,7 @@ Expected output:
 ### Step 3: Download peak files for both
 
 ```
-encode_download_files(accessions=["ENCFF100LIV", "ENCFF200HEP"], download_dir="/data/comparison")
+encode_download_files(file_accessions=["ENCFF100LIV", "ENCFF200HEP"], download_dir="/data/comparison")
 ```
 
 ### Step 4: Identify differential peaks
@@ -432,7 +432,7 @@ bedtools intersect -a liver_peaks.bed -b hepg2_peaks.bed > shared_peaks.bed
 
 ### 1. Compare two experiments
 ```
-encode_compare_experiments(accession_1="ENCSR100LIV", accession_2="ENCSR200HEP")
+encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HEP")
 ```
 
 Expected output:
@@ -447,7 +447,7 @@ Expected output:
 
 ### 2. Find matching experiments across biosamples
 ```
-encode_get_facets(assay_title="Histone ChIP-seq", facet_field="biosample_ontology.term_name", target="H3K27ac", organism="Homo sapiens")
+encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K27ac", organism="Homo sapiens", limit=100)
 ```
 
 Expected output:

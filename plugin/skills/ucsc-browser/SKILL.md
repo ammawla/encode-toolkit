@@ -332,7 +332,7 @@ Expected output:
 
 ```
 encode_list_files(
-  accession="ENCSR789XYZ",
+  experiment_accession="ENCSR789XYZ",
   file_format="bigWig",
   assembly="GRCh38"
 )

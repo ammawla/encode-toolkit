@@ -369,7 +369,7 @@ Expected output:
 
 ### 2. Explore available ENCODE data for GTEx tissues
 ```
-encode_get_facets(facet_field="organ", assay_title="Histone ChIP-seq", organism="Homo sapiens")
+encode_get_facets(assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -383,7 +383,7 @@ Expected output:
 
 ### 3. Get file details for expression comparison
 ```
-encode_list_files(accession="ENCSR456BRN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR456BRN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:

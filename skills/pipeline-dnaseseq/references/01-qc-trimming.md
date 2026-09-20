@@ -25,10 +25,13 @@ trim_galore \
     --length 20 \
     --cores 4 \
     --fastqc \
-    --output_dir trim_galore/ \
     sample_R1.fastq.gz \
     sample_R2.fastq.gz
 ```
+
+`--fastqc` runs FastQC on the trimmed reads. The workflow publishes the trimmed
+FASTQs, the trimming reports and those trimmed-read FastQC reports together in
+`results/trim_galore/`, and feeds the reports to MultiQC.
 
 ### Parameter Rationale
 
@@ -50,11 +53,23 @@ After trimming, verify:
 
 ## Fragment Size Distribution Check
 
-After alignment, verify the insert size distribution:
+After alignment, verify the insert size distribution. The workflow uses
+`samtools stats`, which reports the same distribution and is read by MultiQC:
+
+```bash
+samtools stats sample.filtered.bam > sample.insert_sizes.txt
+
+# The insert-size histogram is the IS block of that file
+grep ^IS sample.insert_sizes.txt | cut -f 2,3
+```
+
+Picard `CollectInsertSizeMetrics` is an alternative, but it always writes a
+histogram PDF and therefore requires R, which the pipeline image does not ship.
+Run it manually in an environment that has R:
 
 ```bash
 picard CollectInsertSizeMetrics \
-    INPUT=sample.bam \
+    INPUT=sample.filtered.bam \
     OUTPUT=insert_sizes.txt \
     HISTOGRAM_FILE=insert_size_histogram.pdf \
     MINIMUM_PCT=0.05
@@ -68,9 +83,14 @@ Expected DNase-seq fragment sizes:
 
 ## Single-End vs Paired-End
 
-ENCODE DNase-seq data exists in both SE and PE formats:
+**Not supported by this workflow -- for reference only.** The Nextflow pipeline
+is paired-end only: it always passes `trim_galore --paired`, aligns read 1 and
+read 2 together, and filters on properly paired reads. There is no
+`--single_end` parameter. Single-end FASTQs have to be processed outside the
+pipeline.
 
-For single-end data, trim with:
+ENCODE DNase-seq data exists in both SE and PE formats. For single-end data,
+trim with:
 ```bash
 trim_galore \
     --quality 20 \

@@ -476,7 +476,7 @@ Different data types require different normalization. Using the wrong normalizat
 ### Step 1: Collect all available marks for brain
 
 ```
-encode_get_facets(facet_field="target.label", organ="brain", assay_title="Histone ChIP-seq", organism="Homo sapiens")
+encode_get_facets(organ="brain", assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -495,7 +495,7 @@ encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="G
 ### Step 3: Download peak files for all marks
 
 ```
-encode_download_files(accessions=["ENCFF001AC", "ENCFF002K4", "ENCFF003K27", "ENCFF004K4M1"], download_dir="/data/integrative")
+encode_download_files(file_accessions=["ENCFF001AC", "ENCFF002K4", "ENCFF003K27", "ENCFF004K4M1"], download_dir="/data/integrative")
 ```
 
 ### Step 4: Run ChromHMM for chromatin state segmentation
@@ -517,19 +517,22 @@ ChromHMM.sh LearnModel -p 8 input_marks/ output_model/ 15 GRCh38
 
 ### 1. Find all histone marks for a biosample
 ```
-encode_get_facets(facet_field="target.label", assay_title="Histone ChIP-seq", biosample_term_name="GM12878", organism="Homo sapiens")
+encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="GM12878", organism="Homo sapiens", limit=100)
 ```
 
-Expected output:
+Expected output (one entry per experiment; tally the `target` values to see which marks are covered):
 ```json
 {
-  "facets": {"target.label": {"H3K27ac": 3, "H3K4me3": 3, "H3K27me3": 2, "H3K4me1": 2, "H3K36me3": 2}}
+  "total": 12,
+  "results": [
+    {"accession": "ENCSR000AKC", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "GM12878"}
+  ]
 }
 ```
 
 ### 2. Download signal tracks for ChromHMM input
 ```
-encode_search_files(file_format="bigWig", output_type="fold change over control", biosample_term_name="GM12878", assembly="GRCh38")
+encode_search_files(file_format="bigWig", output_type="fold change over control", assay_title="Histone ChIP-seq", search_term="GM12878", assembly="GRCh38")
 ```
 
 Expected output:

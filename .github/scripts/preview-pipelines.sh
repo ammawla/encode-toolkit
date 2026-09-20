@@ -23,16 +23,20 @@ for f in genome.fa genome.fa.bwt genome.1.bt2 spike.1.bt2 chrom.sizes blacklist.
     : > "$WORK/ref/$f"
 done
 : > "$WORK/gencode.v38.kallisto.idx"; : > "$WORK/hg38_RefSeq.bed"
+: > "$WORK/ref/kallisto.idx"; : > "$WORK/ref/genes.bed"
 
 READS="$WORK/fq/*_R{1,2}.fastq.gz"
 REF="$WORK/ref"
 failures=0
 
-preview() {   # preview <pipeline> <label> <expected: pass|fail> [nextflow args...]
-    local pipeline=$1 label=$2 expected=$3; shift 3
+preview() {   # preview <pipeline> <label> <expected: pass|fail|error text> [nextflow args...]
+    # Any expectation other than pass or fail is text the run must fail with.
+    local pipeline=$1 label=$2 expected=$3 message=""; shift 3
     local scripts="$SKILLS_DIR/pipeline-$pipeline/scripts" status=pass
+    if [ "$expected" != pass ] && [ "$expected" != fail ]; then message=$expected; expected=fail; fi
     (cd "$WORK" && nextflow -q run "$scripts/main.nf" -c "$scripts/nextflow.config" -preview \
         --outdir "$WORK/out" "$@" > "$WORK/log.txt" 2>&1) || status=fail
+    if [ -n "$message" ] && ! grep -qF -- "$message" "$WORK/log.txt"; then status="fail without '$message'"; fi
     if [ "$status" = "$expected" ]; then
         echo "  ok    $pipeline: $label"
     else
@@ -56,10 +60,14 @@ echo "== nextflow run -preview =="
 preview atacseq "defaults" pass --reads "$READS" --blacklist "$REF/blacklist.bed"
 preview atacseq "unsupported genome is rejected" fail --reads "$READS" --genome hg19
 preview atacseq "single-end input is rejected" fail --reads "$READS" --blacklist "$REF/blacklist.bed" --single_end
+preview atacseq "explicit --bowtie2_index" pass --reads "$READS" --blacklist "$REF/blacklist.bed" \
+    --bowtie2_index "$WORK/GRCh38_bowtie2_index"
 preview chipseq "samples with control" pass --reads "$READS" --control "$WORK/ctl/*_R{1,2}.fastq.gz" \
     --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed"
-preview chipseq "no control, broad peaks" pass --reads "$READS" --peak_type broad \
-    --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed"
+preview chipseq "no control, broad peaks, explicit --bwa_index" pass --reads "$READS" --peak_type broad \
+    --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed" --bwa_index "$WORK/GRCh38_index"
+preview chipseq "missing --chrom_sizes is rejected" "Missing required parameter: --chrom_sizes" --reads "$READS" \
+    --blacklist "$REF/blacklist.bed"
 CUTANDRUN=(--reads "$READS" --bowtie2_index "$REF/genome" --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed")
 preview cutandrun "minimal" pass "${CUTANDRUN[@]}"
 preview cutandrun "control + spike-in + both callers" pass "${CUTANDRUN[@]}" --spikein_index "$REF/spike" \
@@ -73,11 +81,29 @@ preview dnaseseq "skip footprinting needs no RGT data" pass "${DNASE[@]}" --hots
 preview dnaseseq "footprinting without --rgt_data is rejected" fail "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch"
 preview dnaseseq "missing center sites is rejected" fail "${DNASE[@]}" --skip_footprint
 preview hic "defaults" pass --reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes"
-preview rnaseq "RSEM reference given as a prefix" pass --reads "$READS" --star_index "$REF/star_index" \
-    --rsem_index "$REF/rsem/GRCh38"
+RNASEQ=(--reads "$READS" --star_index "$REF/star_index" --rsem_index "$REF/rsem/GRCh38")
+preview rnaseq "RSEM reference given as a prefix" pass "${RNASEQ[@]}"
+preview rnaseq "explicit kallisto index and RSeQC gene model, unstranded" pass "${RNASEQ[@]}" --strandedness none \
+    --kallisto_index "$REF/kallisto.idx" --rseqc_bed "$REF/genes.bed"
+preview rnaseq "invalid --strandedness is rejected" "Invalid --strandedness" "${RNASEQ[@]}" --strandedness auto
 preview wgbs "defaults" pass --reads "$READS" --genome_dir "$REF/bismark_genome"
 preview wgbs "skip dedup, per-cytosine output" pass --reads "$READS" --genome_dir "$REF/bismark_genome" \
     --skip_dedup --merge_context false
+
+echo "== cloud profiles need a bucket work directory and a project or queue =="
+for pipeline in atacseq chipseq cutandrun dnaseseq hic rnaseq wgbs; do
+    case $pipeline in
+        atacseq)   ARGS=(--reads "$READS" --blacklist "$REF/blacklist.bed") ;;
+        chipseq)   ARGS=(--reads "$READS" --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed") ;;
+        cutandrun) ARGS=("${CUTANDRUN[@]}") ;;
+        dnaseseq)  ARGS=("${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch" --skip_footprint) ;;
+        hic)       ARGS=(--reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes") ;;
+        rnaseq)    ARGS=("${RNASEQ[@]}") ;;
+        wgbs)      ARGS=(--reads "$READS" --genome_dir "$REF/bismark_genome") ;;
+    esac
+    preview "$pipeline" "-profile gcp without project and work directory" "requires --gcp_project" -profile gcp "${ARGS[@]}"
+    preview "$pipeline" "-profile aws without queue and work directory" "requires --aws_queue" -profile aws "${ARGS[@]}"
+done
 
 echo "== config profiles =="
 for dir in "$SKILLS_DIR"/pipeline-*/scripts; do

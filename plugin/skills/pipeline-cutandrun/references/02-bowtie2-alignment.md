@@ -130,7 +130,7 @@ grep "overall alignment rate" sample_bowtie2.log
 
 Expected mapping rates:
 - **Target genome**: >80% for standard samples
-- **Spike-in**: 1-10% of unmapped reads should map to E. coli
+- **Spike-in**: spike-in reads should be 1-10% of all reads (spike-in / (spike-in + genome), as computed above)
 
 Low genome mapping rate may indicate:
 - Contamination (check FastQ Screen)

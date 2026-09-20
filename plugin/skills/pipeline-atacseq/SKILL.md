@@ -1,6 +1,6 @@
 ---
 name: pipeline-atacseq
-description: "Execute ENCODE ATAC-seq processing pipeline from FASTQ to peaks and signal tracks. Child of pipeline-guide. Provides stage-by-stage Nextflow execution with Docker containers and cloud deployment. Handles Tn5 transposase offset correction, mitochondrial read removal, nucleosome-free fragment selection, and TSS enrichment scoring. Use when users need to process ATAC-seq data following ENCODE standards. Trigger on: ATAC-seq pipeline, run ATAC-seq, process ATAC-seq, chromatin accessibility, open chromatin, Tn5 shift, TSS enrichment."
+description: "Execute ENCODE ATAC-seq processing pipeline from FASTQ to peaks and signal tracks. Child of pipeline-guide. Provides stage-by-stage Nextflow execution with Docker containers and cloud deployment. Handles Tn5 transposase offset correction, mitochondrial read removal, and nucleosome-free fragment selection. Use when users need to process ATAC-seq data following ENCODE standards. Trigger on: ATAC-seq pipeline, run ATAC-seq, process ATAC-seq, chromatin accessibility, open chromatin, Tn5 shift, TSS enrichment."
 ---
 
 # ENCODE ATAC-seq Pipeline
@@ -14,20 +14,27 @@ description: "Execute ENCODE ATAC-seq processing pipeline from FASTQ to peaks an
 
 Execute the ENCODE ATAC-seq processing pipeline from raw FASTQ files through Tn5 offset
 correction, peak calling, IDR analysis, and signal track generation. This skill provides
-a complete Nextflow DSL2 implementation following ENCODE uniform analysis standards.
+a Nextflow DSL2 implementation following ENCODE uniform analysis standards.
+
+TSS enrichment scoring is a **manual post-processing step**; the workflow does not compute
+it (see "Manual QC steps" below and `references/05-qc-metrics.md`).
 
 ## Overview
 
 ATAC-seq (Assay for Transposase-Accessible Chromatin using sequencing) uses the Tn5
-transposase to probe open chromatin regions. The ENCODE pipeline processes ATAC-seq data
-through quality control, alignment with Bowtie2, Tn5 insertion site correction (+4/-5 bp
-offset), mitochondrial read removal, nucleosome-free fragment selection, peak calling
-with MACS2, and IDR-based replicate consistency analysis.
+transposase to probe open chromatin regions. This pipeline processes ATAC-seq data
+through quality control, alignment with Bowtie2, mitochondrial read removal, duplicate
+removal, Tn5 insertion site correction (+4/-5 bp offset), blacklist filtering,
+nucleosome-free fragment selection, MACS2 peak calling, and one IDR comparison between
+two replicates.
 
 Key differences from ChIP-seq: Bowtie2 aligner (optimized for short fragments), Tn5
-transposase shift correction, aggressive mitochondrial read filtering (can be 30-80%
-of reads), nucleosomal fragment size distribution as a QC metric, and TSS enrichment
-score as the primary quality indicator.
+transposase shift correction, mitochondrial read filtering (chrM can be 30-80% of reads),
+and no input control.
+
+The workflow is **paired-end only**. Passing `--single_end` stops the run with an error,
+because Tn5 shifting, nucleosome-free selection and BAMPE peak calling all depend on
+fragment length.
 
 ## Key Literature
 
@@ -43,50 +50,62 @@ score as the primary quality indicator.
 ## Pipeline Stages
 
 ```
-FASTQ ──> FastQC / Trim Galore ──> Bowtie2 ──> Mito Removal + Tn5 Shift
-  │                                                       │
-  │           ┌──────────────────────────────────────────┘
+FASTQ ──> FastQC / Trim Galore ──> Bowtie2 ──> Mito Removal ──> Picard MarkDuplicates
+  │                                            (chrM dropped)   (duplicates REMOVED)
+  │                                                                       │
+  │           ┌───────────────────────────────────────────────────────────┘
   │           v
-  │     Picard MarkDup ──> Blacklist Filter ──> Size Selection
-  │                                                   │
-  │                    ┌─────────────────┬────────────┘
-  │                    v                 v
-  │             NFR Fragments     Mono-Nucleosome
-  │                    │
-  │                    v
-  │           MACS2 Peak Calling ──> IDR Analysis
-  │                    │                    │
-  │                    v                    v
-  │             Signal Tracks         QC Report (MultiQC + ataqv)
+  │     Tn5 Shift (alignmentSieve --ATACshift) ──> Blacklist Filter ──> Size Selection
+  │                                                       │                    │
+  │                                                       │        ┌───────────┴────────┐
+  │                                                       v        v                    v
+  │                                               Signal Track   NFR (<150 bp)   Mono-nucleosome
+  │                                                (all frags)      │              (150-300 bp)
+  │                                                                 v
+  │                                                   MACS2 Peak Calling ──> IDR
   v
- Raw QC Report
+ QC reports ────────────────────────────────────────────────────────────────> MultiQC
 ```
+
+The Tn5 shift runs **after** duplicate removal, and peaks are called on the
+nucleosome-free BAM only. The signal track is built from all fragments in the
+blacklist-filtered BAM, not from the NFR BAM.
 
 ### Stage Summary
 
 | Stage | Tool | Input | Output | Reference |
 |-------|------|-------|--------|-----------|
-| 1. QC & Trimming | FastQC, Trim Galore | Raw FASTQ | Trimmed FASTQ | references/01-qc-trimming.md |
-| 2. Alignment | Bowtie2 | Trimmed FASTQ | Sorted BAM | references/02-alignment.md |
-| 3. Tn5 Shift & Filtering | Samtools, bedtools, Picard | Sorted BAM | Shifted, filtered BAM | references/03-tn5-filtering.md |
-| 4. Peak Calling & IDR | MACS2, IDR | Filtered BAM | Peaks (narrowPeak) | references/04-peak-calling.md |
-| 5. QC & Signal | deeptools, ataqv, MultiQC | Filtered BAM, Peaks | bigWig, QC report | references/05-qc-metrics.md |
+| 1. QC & Trimming | FastQC, Trim Galore | Raw FASTQ | Trimmed FASTQ, FastQC reports | references/01-qc-trimming.md |
+| 2. Alignment | Bowtie2, samtools | Trimmed FASTQ | Sorted BAM, flagstat, bowtie2 log | references/02-alignment.md |
+| 3. Filtering & Tn5 shift | samtools, Picard, deeptools `alignmentSieve`, bedtools | Sorted BAM | Shifted, filtered, size-selected BAMs | references/03-tn5-filtering.md |
+| 4. Peak Calling & IDR | MACS2, IDR | NFR BAM | narrowPeak, idr_peaks.txt | references/04-peak-calling.md |
+| 5. Signal & QC report | deeptools `bamCoverage`, MultiQC | Filtered BAM, QC logs | bigWig, multiqc_report.html | references/05-qc-metrics.md |
 
 ## Input Requirements
 
-### Required Files
-- **ATAC-seq FASTQ**: Paired-end reads (required: Tn5 shifting, nucleosome-free selection, and BAMPE peak calling depend on fragment length)
-- **Reference genome**: Bowtie2-indexed genome (GRCh38 for human, mm10 for mouse)
+### Required
+- **ATAC-seq FASTQ** (`--reads`): paired-end reads, gzipped. A Nextflow file-pair glob,
+  e.g. `'fastq/*_R{1,2}.fq.gz'`.
+- **Bowtie2 index directory** (`--bowtie2_index`): Bowtie2 is invoked as
+  `bowtie2 ... -x <dir>/<genome>`, so the directory must hold index files named after the
+  genome:
 
-### Sample Sheet Format
-```csv
-sample_id,read1,read2,replicate
-SAMPLE1_rep1,atac_R1.fq.gz,atac_R2.fq.gz,1
-SAMPLE1_rep2,atac_R1.fq.gz,atac_R2.fq.gz,2
+```
+GRCh38_bowtie2_index/
+  GRCh38.1.bt2  GRCh38.2.bt2  GRCh38.3.bt2  GRCh38.4.bt2
+  GRCh38.rev.1.bt2  GRCh38.rev.2.bt2
 ```
 
-**No input control needed**: Unlike ChIP-seq, ATAC-seq does not require a separate
-input or IgG control. MACS2 calls peaks against a local background model.
+  Build it once with `bowtie2-build GRCh38.fa GRCh38_bowtie2_index/GRCh38`. If the flag is
+  omitted, the workflow looks for `./<genome>_bowtie2_index` in the launch directory. The
+  workflow does not build or download the index.
+
+### Optional
+- **Blacklist** (`--blacklist`): defaults to the ENCODE Blacklist v2 URL for `--genome`.
+
+There is no sample sheet and no input control. Inputs are globs, and every sample in a run
+shares one `--genome`. Unlike ChIP-seq, ATAC-seq does not need a separate input or IgG
+control; MACS2 calls peaks against a local background model.
 
 ## Tn5 Transposase Offset Correction
 
@@ -95,7 +114,9 @@ reads on the actual cut site:
 - **Forward strand (+)**: shift +4 bp
 - **Reverse strand (-)**: shift -5 bp
 
-This correction is essential for accurate footprinting and motif analysis.
+The workflow applies this with `alignmentSieve --ATACshift` (deeptools) after duplicate
+removal and before blacklist filtering. The correction is essential for footprinting and
+motif analysis.
 
 ## Fragment Size Distribution
 
@@ -108,27 +129,67 @@ ATAC-seq produces a characteristic nucleosomal ladder pattern:
 | Di-nucleosome | 300-500 bp | Two nucleosomes |
 | Tri-nucleosome | 500-700 bp | Three nucleosomes |
 
-For peak calling, use **nucleosome-free reads (<150 bp)** only.
+The workflow calls peaks on the nucleosome-free BAM. The NFR/mono-nucleosome boundary is
+`--nfr_max` (default 150); the mono-nucleosome selection is `--nfr_max` to 300 bp. The
+workflow does not plot the fragment size distribution.
+
+## Parameters
+
+### Pipeline parameters (`main.nf`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--reads` | none (required) | Glob for the paired-end FASTQ file pairs |
+| `--bowtie2_index` | `./<genome>_bowtie2_index` | Directory holding the Bowtie2 index files named `<genome>.*.bt2` |
+| `--genome` | `GRCh38` | `GRCh38` or `mm10`; sets the MACS2 genome size, the default index directory and the default blacklist |
+| `--blacklist` | ENCODE Blacklist v2 URL for `--genome` | BED (or `.bed.gz`) of artifact regions removed from the BAM |
+| `--mito_name` | `chrM` | Name of the mitochondrial contig to drop |
+| `--nfr_max` | `150` | Maximum nucleosome-free fragment length, and the lower bound of the mono-nucleosome selection |
+| `--skip_idr` | `false` | Skip the IDR step |
+| `--single_end` | `false` | Accepted but always rejected: the workflow stops with an error because it is paired-end only |
+| `--outdir` | `results` | Where results are published |
+
+### Infrastructure parameters (`nextflow.config`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--container` | `encode-toolkit/pipeline-atacseq:1.0.0` | Image built from `scripts/Dockerfile`. Pass a registry image for `gcp`/`aws`, or a `.sif` file for `slurm` |
+| `--max_cpus`, `--max_memory`, `--max_time` | `16`, `64.GB`, `24.h` | Upper bounds applied to every process |
+| `--slurm_queue`, `--slurm_account` | `normal`, none | SLURM partition and account |
+| `--gcp_project`, `--gcp_workdir` | none (both required for `-profile gcp`) | Google Cloud project and `gs://` work directory |
+| `--gcp_location`, `--gcp_disk` | `us-central1`, `200.GB` | Google Batch region and per-task disk |
+| `--aws_queue`, `--aws_workdir` | none (both required for `-profile aws`) | AWS Batch job queue and `s3://` work directory |
+| `--aws_region`, `--aws_cli_path` | `us-east-1`, `/home/ec2-user/miniconda/bin/aws` | AWS region, and the AWS CLI path inside the Batch AMI |
+
+Profiles are `local`, `slurm`, `gcp` and `aws`.
 
 ## QC Thresholds
 
-| Metric | Threshold | Category | Source |
-|--------|-----------|----------|--------|
-| Total sequenced reads | >=50M (recommended) | Read depth | ENCODE |
-| Mapping rate | >80% | Alignment | ENCODE |
-| Mitochondrial fraction | <20% (ideal <5%) | Sample quality | ENCODE |
-| NRF (non-redundant fraction) | >=0.8 | Library complexity | ENCODE |
-| PBC1 | >=0.8 | Library complexity | ENCODE |
-| TSS enrichment score | >=5 | Signal quality | ENCODE standard |
-| FRiP | >=0.3 | Peak quality | ENCODE |
-| NFR fraction | >0.4 of fragments <150bp | Fragment distribution | Buenrostro 2013 |
-| IDR optimal peaks | >50,000 | Reproducibility | ENCODE |
+**The workflow computes only the metrics marked "workflow" below.** TSS enrichment, FRiP,
+NRF/PBC and fragment-size plots are manual post-processing steps documented in
+`references/05-qc-metrics.md`.
 
-### TSS Enrichment Score
+| Metric | Threshold | Computed by | Source |
+|--------|-----------|-------------|--------|
+| Total sequenced reads | >=50M (recommended) | workflow (FastQC, flagstat) | ENCODE |
+| Mapping rate | >80% | workflow (bowtie2 log, `samtools flagstat`) | ENCODE |
+| Mitochondrial fraction | <20% (ideal <5%) | workflow (`qc/<sample>.mito_stats.txt`) | ENCODE |
+| Duplication rate | <30% | workflow (Picard `dup_metrics.txt`) | ENCODE |
+| IDR peaks at 0.05 | >50,000 | workflow (`peaks/idr/idr_peaks.txt`) | ENCODE |
+| NRF (non-redundant fraction) | >=0.8 | manual | ENCODE |
+| PBC1 | >=0.8 | manual | ENCODE |
+| TSS enrichment score | >=5 (GRCh38), >=6 (hg19), >=10 (mm10) | manual (deeptools + a TSS BED) | ENCODE standard |
+| FRiP | >=0.3 | manual (bedtools + samtools) | ENCODE |
+| NFR fraction | >0.4 of fragments <150bp | manual | Buenrostro 2013 |
+
+### TSS Enrichment Score (manual)
 
 The TSS enrichment score measures the fold enrichment of ATAC-seq signal at
 transcription start sites compared to flanking regions. It is the single most
-informative QC metric for ATAC-seq:
+informative QC metric for ATAC-seq, but **this workflow does not compute it**: there is no
+TSS BED input and no `computeMatrix`/`plotProfile` step. Run it manually against
+`signal/<sample>.signal.bw` with a TSS BED for your assembly; the commands are in
+`references/05-qc-metrics.md`.
 
 | Score | Quality | Interpretation |
 |-------|---------|---------------|
@@ -145,99 +206,136 @@ nextflow run scripts/main.nf \
   -profile local \
   --reads 'fastq/*_R{1,2}.fq.gz' \
   --genome GRCh38 \
+  --bowtie2_index GRCh38_bowtie2_index \
+  --blacklist hg38-blacklist.v2.bed.gz \
   --outdir results/
 ```
+
+`--blacklist` is optional; without it the workflow downloads the ENCODE Blacklist v2 for
+`--genome`. Give the glob at least two replicates if you want the IDR step to run.
 
 ### SLURM HPC
+
+The `slurm` profile runs through Singularity, so pass a local image file rather than the
+default Docker image name:
+
 ```bash
+singularity build pipeline-atacseq.sif docker-daemon://encode-toolkit/pipeline-atacseq:1.0.0
+
 nextflow run scripts/main.nf \
   -profile slurm \
+  --container /path/to/pipeline-atacseq.sif \
+  --slurm_queue normal \
   --reads 'fastq/*_R{1,2}.fq.gz' \
   --genome GRCh38 \
+  --bowtie2_index GRCh38_bowtie2_index \
   --outdir results/
 ```
 
-### Google Cloud
+### Cloud
+
 ```bash
-nextflow run scripts/main.nf \
-  -profile gcp \
-  --reads 'gs://bucket/fastq/*_R{1,2}.fq.gz' \
-  --genome GRCh38 \
-  --outdir 'gs://bucket/results/'
+# Google Cloud Batch
+nextflow run scripts/main.nf -profile gcp \
+    --container us-docker.pkg.dev/<project>/<repo>/pipeline-atacseq:1.0.0 \
+    --gcp_project <project> \
+    --gcp_workdir gs://<bucket>/work \
+    --reads 'gs://<bucket>/fastq/*_R{1,2}.fq.gz' \
+    --genome GRCh38 \
+    --bowtie2_index gs://<bucket>/reference/GRCh38_bowtie2_index \
+    --outdir gs://<bucket>/results
+
+# AWS Batch
+nextflow run scripts/main.nf -profile aws \
+    --container <account>.dkr.ecr.<region>.amazonaws.com/pipeline-atacseq:1.0.0 \
+    --aws_queue <job-queue> \
+    --aws_workdir s3://<bucket>/work \
+    --reads 's3://<bucket>/fastq/*_R{1,2}.fq.gz' \
+    --genome GRCh38 \
+    --bowtie2_index s3://<bucket>/reference/GRCh38_bowtie2_index \
+    --outdir s3://<bucket>/results
 ```
 
-### AWS Batch
-```bash
-nextflow run scripts/main.nf \
-  -profile aws \
-  --reads 's3://bucket/fastq/*_R{1,2}.fq.gz' \
-  --genome GRCh38 \
-  --outdir 's3://bucket/results/'
-```
+`--outdir` only sets where results are published; Google Batch and AWS Batch stage every
+task through the work directory, and the workflow stops with an error if it or the
+project/queue is missing.
 
 ## Cloud Cost Estimates
 
 | Platform | Instance | Cost/Sample | Time/Sample | Notes |
 |----------|----------|-------------|-------------|-------|
-| GCP | n1-standard-8 | ~$2-4 | 2-3 hours | Preemptible recommended |
+| GCP | n1-standard-8 | ~$2-4 | 2-3 hours | Spot VMs enabled in the `gcp` profile |
 | AWS | m5.2xlarge | ~$2-4 | 2-3 hours | Spot instances recommended |
 | Local | 8 cores, 32GB | $0 | 3-5 hours | Docker required |
-| SLURM | 8 cores, 32GB | Varies | 2-3 hours | Singularity recommended |
+| SLURM | 8 cores, 32GB | Varies | 2-3 hours | Singularity image required |
 
 ## Output Directory Structure
 
 ```
 results/
-  fastqc/                   # Raw and trimmed QC reports
-  trimmed/                  # Trimmed FASTQ files
-  aligned/                  # Sorted BAM files (pre-filtering)
-  filtered/
-    shifted/                # Tn5-corrected BAM files
-    nfr/                    # Nucleosome-free fragments (<150 bp)
-    mononuc/                # Mono-nucleosome fragments (150-300 bp)
+  fastqc/                   # FastQC reports for raw and trimmed reads (.html, .zip)
+  trimmed/                  # Trimmed FASTQ (*_val_1.fq.gz / *_val_2.fq.gz) + trimming reports
+  aligned/                  # <sample>.bam, .bam.bai, <sample>.flagstat.txt,
+                            #   <sample>.bowtie2.log
+  filtered/                 # <sample>.dup_metrics.txt, <sample>.final.bam(.bai),
+                            #   <sample>.final.flagstat.txt
+    shifted/                # <sample>.shifted.bam(.bai) -- Tn5-corrected, pre-blacklist
+    nfr/                    # <sample>.nfr.bam(.bai) and <sample>.mononuc.bam
   peaks/
-    narrow/                 # MACS2 narrowPeak files
-    idr/                    # IDR-filtered reproducible peaks
-  signal/                   # bigWig signal tracks
+    narrow/                 # <sample>_peaks.narrowPeak, _summits.bed, _peaks.xls,
+                            #   _treat_pileup.bdg, _control_lambda.bdg
+    idr/                    # idr_peaks.txt (+ idr_peaks.txt.png)
+  signal/                   # <sample>.signal.bw (all fragments, RPKM)
   qc/
-    tss_enrichment/         # TSS enrichment scores and plots
-    fragment_size/          # Fragment size distribution plots
-    ataqv/                  # Comprehensive ATAC-seq QC (ataqv)
-    multiqc/                # Aggregated QC report
-  logs/                     # Nextflow execution logs
+    <sample>.mito_stats.txt # total_reads / mito_reads / mito_frac
+    multiqc/                # multiqc_report.html, multiqc_data/
+  pipeline_info/            # timeline.html, report.html, trace.txt
 ```
+
+The nucleosome-free and mono-nucleosome BAMs are both written to `filtered/nfr/`; there is
+no `filtered/mononuc/` directory, and `mononuc.bam` has no index.
 
 ## Common Pitfalls
 
 ### 1. High Mitochondrial Read Fraction
 Mitochondrial DNA lacks chromatin and is highly accessible, often capturing 30-80%
-of reads. This is the most common ATAC-seq quality issue. Filter chrM reads before
-analysis. If >50% mito, consider optimizing the cell lysis step.
+of reads. This is the most common ATAC-seq quality issue. The workflow removes `--mito_name`
+reads and records the fraction in `qc/<sample>.mito_stats.txt`. If >50% mito, consider
+optimizing the cell lysis step.
 
-### 2. Missing Tn5 Shift Correction
-Without the +4/-5 bp offset correction, cut-site positions are shifted by ~4.5 bp.
-This matters for footprinting and motif analysis but has minimal effect on peak calling.
-Always apply the shift for publication-quality results.
+### 2. Wrong mitochondrial contig name
+`--mito_name` defaults to `chrM`. Assemblies that call the contig `MT` need
+`--mito_name MT`. Confirm the name with `samtools idxstats` on a BAM from your index
+before running.
 
 ### 3. Using BWA Instead of Bowtie2
 Bowtie2 handles the short fragments from ATAC-seq (especially NFR <150bp) better
-than BWA-MEM. Use Bowtie2 with `--very-sensitive` for optimal ATAC-seq alignment.
+than BWA-MEM. The workflow uses Bowtie2 with `--very-sensitive`.
 
-### 4. Not Separating Nucleosomal Fractions
-Peak calling on all fragments mixes nucleosome-free signal (TF binding) with
-nucleosomal signal. Always size-select NFR (<150 bp) for peak calling.
+### 4. Only one replicate in the `--reads` glob
+The IDR step needs at least two per-sample peak files. With one sample, IDR is skipped
+silently and `peaks/idr/` is never created.
 
-### 5. Ignoring TSS Enrichment
-TSS enrichment is the most informative single metric for ATAC-seq quality.
-A score <5 indicates a failed experiment regardless of other metrics.
+### 5. TSS enrichment is not in the output
+TSS enrichment is the most informative single metric for ATAC-seq, but the workflow does
+not compute it. Run the manual `computeMatrix`/`plotProfile` step in
+`references/05-qc-metrics.md` before judging a library.
 
 ## Pipeline Scripts
 
-| File | Description | Lines |
-|------|-------------|-------|
-| `scripts/main.nf` | Nextflow DSL2 pipeline | ~120 |
-| `scripts/nextflow.config` | Execution profiles (local/slurm/gcp/aws) | ~60 |
-| `scripts/Dockerfile` | Multi-stage Docker build with all tools | ~30 |
+| File | Description |
+|------|-------------|
+| `scripts/main.nf` | Nextflow DSL2 pipeline |
+| `scripts/nextflow.config` | Execution profiles (local/slurm/gcp/aws) |
+| `scripts/Dockerfile` | Docker image with all pipeline tools |
+
+The image is pinned to `linux/amd64`; on an arm64 host it runs under emulation.
+
+Tool versions in the image: Bowtie2 2.5.1, samtools 1.17, bedtools 2.31.0, Picard 2.27.5,
+Trim Galore 0.6.7, FastQC 0.11.9, MACS2 2.2.9.1, IDR 2.0.4.2, deeptools 3.5.5,
+MultiQC 1.14. The conda environment
+`bioinformatics-installer/environments/atacseq-env.yml` is an alternative route for the
+manual steps and may ship different point releases of the same tools.
 
 ## ENCODE Data Integration
 
@@ -263,17 +361,31 @@ encode_batch_download(
 
 ## Pitfalls & Edge Cases
 
-- **Tn5 shift is critical**: ATAC-seq reads must be shifted +4/-5 bp to center on the Tn5 insertion site. Without this correction, footprinting analysis will be offset by ~5 bp and motif enrichment will be degraded.
-- **Mitochondrial reads dominate**: Expect 30-80% mitochondrial reads in ATAC-seq. Filter chrM reads AFTER alignment, BEFORE peak calling. High mitoChRM (>80%) indicates dead/dying cells or poor nuclei isolation.
-- **Fragment size distribution is diagnostic**: A nucleosomal ladder (sub-nucleosomal <150bp, mono-nucleosomal ~200bp, di-nucleosomal ~400bp) confirms successful transposition. Absence of the ladder suggests incomplete or failed transposition.
-- **TSS enrichment threshold**: ENCODE requires TSS enrichment ≥5 (GRCh38), ≥6 (hg19), or ≥10 (mm10) for ATAC-seq (ENCODE data standards). Values below 4 indicate poor signal-to-noise. This is the single most informative QC metric for ATAC-seq.
-- **Peak caller choice matters**: MACS2 with `--nomodel --shift -100 --extsize 200` is standard for ATAC-seq. Do NOT use the ChIP-seq default MACS2 settings — they assume sonicated fragment distributions.
-- **Paired-end vs single-end**: ATAC-seq should always be paired-end to capture fragment sizes. Single-end ATAC-seq cannot distinguish nucleosome-free from nucleosomal fragments.
+- **Tn5 shift is critical**: ATAC-seq reads must be shifted +4/-5 bp to center on the Tn5
+  insertion site. The workflow does this with `alignmentSieve --ATACshift` after duplicate
+  removal. Without the correction, footprinting is offset by ~5 bp.
+- **Mitochondrial reads dominate**: Expect 30-80% mitochondrial reads. The workflow drops
+  them right after alignment, before duplicate removal and peak calling. >80% chrM
+  indicates dead/dying cells or poor nuclei isolation.
+- **Fragment size distribution is diagnostic**: a nucleosomal ladder (sub-nucleosomal
+  <150bp, mono-nucleosomal ~200bp, di-nucleosomal ~400bp) confirms successful
+  transposition. The workflow does not plot it; use `bamPEFragmentSize` manually.
+- **TSS enrichment threshold**: ENCODE requires TSS enrichment >=5 (GRCh38), >=6 (hg19), or
+  >=10 (mm10) for ATAC-seq (ENCODE data standards). Values below 4 indicate poor
+  signal-to-noise. Computed manually, not by this workflow.
+- **MACS2 `--shift`/`--extsize` do not apply here**: the workflow calls peaks in `-f BAMPE`
+  mode, where MACS2 takes fragment coordinates from read pairs, forces `--nomodel` and
+  neutralises `--shift` internally. Shift/extension values only matter when calling peaks
+  on BED or single-end input. See `references/04-peak-calling.md`.
+- **Paired-end only**: `--single_end` is rejected with an error. Single-end ATAC-seq cannot
+  distinguish nucleosome-free from nucleosomal fragments.
 
 ## Walkthrough: Processing ENCODE ATAC-seq from FASTQ to Accessible Chromatin Peaks
 
-**Goal**: Process raw ATAC-seq FASTQ files through the ENCODE pipeline to generate nucleosome-free region peaks and signal tracks for chromatin accessibility analysis.
-**Context**: ATAC-seq requires Tn5 transposase insertion site correction (+4/-5 bp shift) and nucleosomal fragment size filtering, handled by the ENCODE ATAC-seq pipeline.
+**Goal**: Process raw ATAC-seq FASTQ files through this pipeline to generate
+nucleosome-free region peaks and a signal track.
+**Context**: Bowtie2 alignment, chrM removal, duplicate removal, Tn5 shift (+4/-5),
+blacklist filtering, NFR selection and MACS2 peak calling.
 
 ### Step 1: Find ATAC-seq experiment
 
@@ -295,7 +407,7 @@ Expected output:
 ### Step 2: List FASTQ files
 
 ```
-encode_list_files(accession="ENCSR637ENO", file_format="fastq")
+encode_list_files(experiment_accession="ENCSR637ENO", file_format="fastq")
 ```
 
 Expected output:
@@ -303,44 +415,74 @@ Expected output:
 {
   "files": [
     {"accession": "ENCFF100ATQ", "output_type": "reads", "paired_end": "1", "biological_replicates": [1], "file_size_mb": 1800},
-    {"accession": "ENCFF101ATQ", "output_type": "reads", "paired_end": "2", "biological_replicates": [1], "file_size_mb": 1900}
+    {"accession": "ENCFF101ATQ", "output_type": "reads", "paired_end": "2", "biological_replicates": [1], "file_size_mb": 1900},
+    {"accession": "ENCFF102ATQ", "output_type": "reads", "paired_end": "1", "biological_replicates": [2], "file_size_mb": 1750},
+    {"accession": "ENCFF103ATQ", "output_type": "reads", "paired_end": "2", "biological_replicates": [2], "file_size_mb": 1820}
   ]
 }
 ```
 
-### Step 3: Run the ATAC-seq pipeline
+Both replicates are needed for the IDR step.
+
+### Step 3: Download and name the FASTQs so a read-pair glob can find them
+
+```
+encode_download_files(file_accessions=["ENCFF100ATQ", "ENCFF101ATQ", "ENCFF102ATQ", "ENCFF103ATQ"], download_dir="/data/atacseq/fastq")
+```
+
+ENCODE accessions do not share a prefix within a pair, and the workflow matches file pairs
+with a `{1,2}` glob:
 
 ```bash
-nextflow run pipeline-atacseq/main.nf \
-  --fastq_r1 ENCFF100ATQ.fastq.gz \
-  --fastq_r2 ENCFF101ATQ.fastq.gz \
+cd /data/atacseq/fastq
+ln -s ENCFF100ATQ.fastq.gz gm12878_rep1_R1.fq.gz
+ln -s ENCFF101ATQ.fastq.gz gm12878_rep1_R2.fq.gz
+ln -s ENCFF102ATQ.fastq.gz gm12878_rep2_R1.fq.gz
+ln -s ENCFF103ATQ.fastq.gz gm12878_rep2_R2.fq.gz
+```
+
+### Step 4: Run the ATAC-seq pipeline
+
+```bash
+nextflow run scripts/main.nf \
+  -profile local \
+  --reads '/data/atacseq/fastq/gm12878_*_R{1,2}.fq.gz' \
   --genome GRCh38 \
-  --blacklist encode_blacklist_v2.bed \
-  --mitochondrial_chr chrM \
-  -profile docker
+  --bowtie2_index /data/reference/GRCh38_bowtie2_index \
+  --blacklist /data/reference/hg38-blacklist.v2.bed.gz \
+  --mito_name chrM \
+  --outdir /data/atacseq/results
 ```
 
-Key pipeline steps:
-1. Adapter trimming (Trimmomatic/cutadapt)
-2. Alignment (Bowtie2, very-sensitive mode)
-3. Tn5 shift correction (+4/-5 bp)
-4. Mitochondrial read removal
-5. Nucleosome-free fragment selection (<150 bp)
-6. Peak calling (MACS2, --nomodel --shift -75 --extsize 150)
+Pipeline steps, in the order the workflow runs them:
+1. FastQC on raw reads
+2. Adapter trimming with Trim Galore (`--nextera`), plus FastQC on the trimmed reads
+3. Alignment (Bowtie2 `--very-sensitive`, MAPQ 30, properly paired only)
+4. Mitochondrial read removal, with the fraction recorded in `qc/<sample>.mito_stats.txt`
+5. Duplicate removal (Picard `REMOVE_DUPLICATES=true`)
+6. Tn5 shift correction (+4/-5, `alignmentSieve --ATACshift`)
+7. Blacklist filtering of the BAM
+8. Nucleosome-free (<150 bp) and mono-nucleosome (150-300 bp) selection
+9. Peak calling on the NFR BAM (MACS2 `-f BAMPE --nomodel --keep-dup all --call-summits --qvalue 0.05 -B`)
+10. IDR on two replicates, signal track from all fragments, MultiQC
 
-### Step 4: Validate output quality
+### Step 5: Validate output quality
 
-| Metric | Threshold | Purpose |
-|---|---|---|
-| TSS enrichment | >= 5 (GRCh38), >= 6 (hg19), >= 10 (mm10) | Signal enrichment at transcription start sites |
-| Fragment size distribution | Nucleosomal ladder | ~200bp, ~400bp, ~600bp periodicity |
-| Mitochondrial reads | < 20% | Excessive = failed library |
-| FRiP | >= 0.2 | Fraction of reads in peaks |
+From the workflow:
+| Output | What to check |
+|---|---|
+| `qc/multiqc/multiqc_report.html` | Mapping rate (>80%), adapter content, duplication rate |
+| `qc/<sample>.mito_stats.txt` | Mitochondrial fraction (<20%, ideal <5%) |
+| `peaks/narrow/<sample>_peaks.narrowPeak` | Peak count per replicate |
+| `peaks/idr/idr_peaks.txt` | IDR peaks at 0.05 (>50,000) |
 
-### Step 5: Track and log provenance
+Manual follow-ups (not run by this workflow): TSS enrichment, fragment-size distribution
+plots, FRiP, NRF/PBC and ataqv. Commands are in `references/05-qc-metrics.md`.
+
+### Step 6: Track and log provenance
 
 ```
-encode_track_experiment(accession="ENCSR637ENO", notes="GM12878 ATAC-seq processed through ENCODE pipeline")
+encode_track_experiment(accession="ENCSR637ENO", notes="GM12878 ATAC-seq processed through the pipeline-atacseq skill")
 ```
 
 ### Integration with downstream skills
@@ -380,7 +522,7 @@ Expected output:
 
 ```
 encode_list_files(
-  accession="ENCSR789PAN",
+  experiment_accession="ENCSR789PAN",
   file_format="fastq"
 )
 ```
@@ -410,8 +552,8 @@ Expected output:
 | Signal tracks (bigWig) | **visualization-workflow** | Genome browser accessibility display |
 | Nucleosome-free peaks | **regulatory-elements** | Classify accessible regions as enhancers/promoters |
 | Peak coordinates | **variant-annotation** | Identify variants in accessible chromatin |
-| TSS enrichment scores | **quality-assessment** | Validate against ENCODE ATAC-seq standards |
-| Pipeline parameters | **data-provenance** | Record Tn5 shift, fragment filters, tool versions |
+| QC outputs (`mito_stats.txt`, MultiQC) | **quality-assessment** | Validate against ENCODE ATAC-seq standards |
+| `pipeline_info/` reports | **data-provenance** | Record Tn5 shift, fragment filters, tool versions |
 | Peak files | **jaspar-motifs** | Scan accessible regions for known TF motifs |
 
 ## Related Skills
@@ -428,13 +570,21 @@ Expected output:
 
 When reporting ATAC-seq pipeline results:
 
-- **TSS enrichment score**: Report the TSS enrichment score prominently -- this is the single most informative ATAC-seq QC metric. Include the quality tier (Excellent >=7, Good 5-7, Marginal 3-5, Poor <3)
-- **Fragment size distribution**: Report NFR fraction (% fragments <150 bp) and confirm the characteristic nucleosomal ladder pattern (NFR, mono-, di-, tri-nucleosome peaks)
-- **Peak counts**: Report IDR optimal peak count and total MACS2 peaks before IDR filtering
-- **NFR/mono-nucleosome ratio**: Present the ratio of nucleosome-free to mono-nucleosomal fragments as a library quality indicator
-- **Mitochondrial fraction**: Report % mitochondrial reads removed (ideal <5%, acceptable <20%)
-- **Key QC metrics**: Present mapping rate, FRiP (>=0.3 for ATAC-seq), NRF, and duplication rate in a summary table
-- **Output paths**: List key outputs (peaks/idr/, signal/, qc/tss_enrichment/, qc/fragment_size/)
-- **Next steps**: Suggest `motif-analysis` for TF footprinting and de novo motif discovery, or `visualization-workflow` for genome browser session generation
+- **Mitochondrial fraction**: Report the value from `qc/<sample>.mito_stats.txt`
+  (ideal <5%, acceptable <20%)
+- **Key QC metrics from the run**: mapping rate (bowtie2 log, `samtools flagstat`),
+  duplication rate (Picard `dup_metrics.txt`), and read counts, all aggregated in
+  `qc/multiqc/multiqc_report.html`
+- **Peak counts**: Report the per-replicate MACS2 peak count and the IDR peak count at the
+  0.05 threshold. IDR is skipped when fewer than two samples were processed
+- **TSS enrichment**: State plainly that the workflow does not compute it. Report it only
+  if the user ran the manual step, with the quality tier (Excellent >=7, Good 5-7,
+  Marginal 3-5, Poor <3)
+- **Fragment size distribution / NFR fraction / FRiP**: also manual; do not report values
+  the run did not produce
+- **Output paths**: List key outputs (`peaks/narrow/`, `peaks/idr/`, `signal/`,
+  `filtered/nfr/`, `qc/`, `pipeline_info/`)
+- **Next steps**: Suggest `motif-analysis` for TF footprinting and de novo motif discovery,
+  or `visualization-workflow` for genome browser session generation
 
 ## For the request: "$ARGUMENTS"

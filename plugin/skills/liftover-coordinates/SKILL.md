@@ -422,7 +422,7 @@ Expected output:
 ### Step 2: Download the hg19 peak file
 
 ```
-encode_list_files(accession="ENCSR100OLD", file_format="bed", assembly="hg19")
+encode_list_files(experiment_accession="ENCSR100OLD", file_format="bed", assembly="hg19")
 ```
 
 ### Step 3: Run UCSC liftOver
@@ -442,9 +442,9 @@ Count converted vs. unmapped:
 ```
 encode_log_derived_file(
   source_accessions=["ENCFF100OLD"],
-  derived_file="/data/peaks_GRCh38.bed",
+  file_path="/data/peaks_GRCh38.bed",
   description="Lifted from hg19 to GRCh38 using UCSC liftOver",
-  tool="liftOver (UCSC, chain: hg19ToHg38.over.chain.gz)"
+  tool_used="liftOver (UCSC, chain: hg19ToHg38.over.chain.gz)"
 )
 ```
 
@@ -472,7 +472,7 @@ Expected output:
 
 ### 2. Find GRCh38 version of same experiment
 ```
-encode_list_files(accession="ENCSR100OLD", file_format="bed", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR100OLD", file_format="bed", assembly="GRCh38")
 ```
 
 Expected output:
@@ -488,9 +488,9 @@ Expected output:
 ```
 encode_log_derived_file(
   source_accessions=["ENCFF100OLD"],
-  derived_file="/data/peaks_GRCh38.bed",
+  file_path="/data/peaks_GRCh38.bed",
   description="hg19→GRCh38 liftOver",
-  tool="UCSC liftOver"
+  tool_used="UCSC liftOver"
 )
 ```
 

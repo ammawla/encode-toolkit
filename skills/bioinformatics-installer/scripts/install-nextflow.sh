@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Install Nextflow and container runtime for ENCODE pipelines
+# Install the pinned Nextflow release and check for a container runtime.
+# Docker and Singularity are only checked: when one is missing, the script prints how to get it.
 # Usage: bash install-nextflow.sh [--docker | --singularity | --both]
 #
 # Options:
-#   --docker       Install Nextflow + Docker (default, for local/cloud)
-#   --singularity  Install Nextflow + Singularity (for HPC clusters)
-#   --both         Install Nextflow + Docker + Singularity
+#   --docker       Nextflow, then check for Docker (default, for local/cloud)
+#   --singularity  Nextflow, then check for Singularity/Apptainer (for HPC clusters)
+#   --both         Nextflow, then check for both
 
 set -euo pipefail
 
@@ -35,9 +36,19 @@ MODE="${1:---docker}"
 # --- Install Nextflow ---
 install_nextflow() {
     echo "--- Installing Nextflow ---"
+    # Only an existing install of exactly the pinned release is accepted. Otherwise the pinned,
+    # checksum-verified release is installed; a launcher it would overwrite is kept as a backup.
+    local existing_version=""
     if command -v nextflow &> /dev/null; then
-        echo "Nextflow already installed: $(nextflow -version 2>&1 | head -3)"
+        # A launcher that cannot start (no Java, broken install) counts as "no usable version"
+        existing_version="$(nextflow -version 2>&1 | awk '$1 == "version" {print $2; exit}' || true)"
+    fi
+    if [ "$existing_version" = "$NEXTFLOW_VERSION" ]; then
+        echo "Nextflow ${NEXTFLOW_VERSION} already installed: $(command -v nextflow)"
     else
+        if [ -n "$existing_version" ]; then
+            echo "Found Nextflow ${existing_version} at $(command -v nextflow); the pipelines are validated against ${NEXTFLOW_VERSION}."
+        fi
         # Check Java
         if ! command -v java &> /dev/null; then
             echo "ERROR: Java 17+ is required for Nextflow."
@@ -79,14 +90,18 @@ install_nextflow() {
             mkdir -p "$install_dir"
         fi
         local nextflow_bin="$install_dir/nextflow"
+        if [ -e "$nextflow_bin" ]; then
+            mv "$nextflow_bin" "$nextflow_bin.previous"
+            echo "Kept the launcher that was there as $nextflow_bin.previous"
+        fi
         mv "$tmp_file" "$nextflow_bin"
         chmod 755 "$nextflow_bin"
         echo "Nextflow installed to $nextflow_bin"
 
-        case ":$PATH:" in
-            *":$install_dir:"*) ;;
-            *) echo "Add it to your PATH: export PATH=\"\$PATH:$install_dir\"" ;;
-        esac
+        # Put the pinned release ahead of any other Nextflow on PATH
+        if [ "$(command -v nextflow || true)" != "$nextflow_bin" ]; then
+            echo "Put it first on your PATH: export PATH=\"$install_dir:\$PATH\""
+        fi
 
         # Call the installed file directly: it may not be on PATH yet in this shell
         "$nextflow_bin" -version

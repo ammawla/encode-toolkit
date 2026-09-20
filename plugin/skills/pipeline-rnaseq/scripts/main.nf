@@ -4,15 +4,17 @@ nextflow.enable.dsl=2
 // ENCODE RNA-seq Pipeline — Nextflow DSL2
 // FASTQ -> QC -> STAR 2-pass -> RSEM -> Kallisto (optional) -> Signal -> RSeQC
 
-params.reads         = null
-params.genome        = 'GRCh38'
-params.outdir        = 'results'
-params.single_end    = false
-params.strandedness  = 'reverse'
-params.skip_kallisto = false
-params.star_index    = null
-params.rsem_index    = null   // RSEM reference prefix (rsem-prepare-reference output), not a directory
-params.chrom_sizes   = null
+params.reads          = null
+params.genome         = 'GRCh38'
+params.outdir         = 'results'
+params.single_end     = false
+params.strandedness   = 'reverse'   // reverse (dUTP), forward, or none
+params.skip_kallisto  = false
+params.star_index     = null
+params.rsem_index     = null   // RSEM reference prefix (rsem-prepare-reference output), not a directory
+params.kallisto_index = null   // kallisto index file; not read with --skip_kallisto
+params.rseqc_bed      = null   // BED12 gene model for RSeQC
+params.chrom_sizes    = null
 
 // Genome-specific defaults. Kept in a function because scripts that declare processes
 // cannot also hold top-level variables. The annotation is part of the STAR and RSEM
@@ -20,16 +22,12 @@ params.chrom_sizes   = null
 def genomeDefaults() {
     return [
     'GRCh38': [
-        fasta:       'GRCh38.primary_assembly.genome.fa',
-        gtf:         'gencode.v38.primary_assembly.annotation.gtf',
         star_index:  'GRCh38_star_index',
         rsem_index:  'GRCh38_rsem_index/GRCh38',
         kallisto_idx: 'gencode.v38.kallisto.idx',
         rseqc_bed:   'hg38_RefSeq.bed'
     ],
     'mm10': [
-        fasta:       'mm10.primary_assembly.genome.fa',
-        gtf:         'gencode.vM27.primary_assembly.annotation.gtf',
         star_index:  'mm10_star_index',
         rsem_index:  'mm10_rsem_index/mm10',
         kallisto_idx: 'gencode.vM27.kallisto.idx',
@@ -56,7 +54,8 @@ process FASTQC {
 
 process TRIM_GALORE {
     tag "$sample_id"
-    publishDir "${params.outdir}/trimmed", mode: 'copy'
+    publishDir "${params.outdir}/trimmed", mode: 'copy', pattern: '*{.fq.gz,trimming_report.txt}'
+    publishDir "${params.outdir}/fastqc",  mode: 'copy', pattern: '*_fastqc.{html,zip}'
 
     input:
     tuple val(sample_id), path(reads)
@@ -64,6 +63,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*{val_1.fq.gz,val_2.fq.gz,trimmed.fq.gz}"), emit: trimmed
     path("*trimming_report.txt"),                                             emit: log
+    path("*_fastqc.{html,zip}"),                                              emit: fastqc
 
     script:
     if (params.single_end)
@@ -95,6 +95,7 @@ process STAR_ALIGN {
 
     script:
     def input_reads = params.single_end ? "${reads}" : "${reads[0]} ${reads[1]}"
+    def wig_strand  = params.strandedness == 'none' ? 'Unstranded' : 'Stranded'
     """
     STAR --genomeDir ${star_index} \\
       --readFilesIn ${input_reads} \\
@@ -113,7 +114,7 @@ process STAR_ALIGN {
       --quantMode TranscriptomeSAM GeneCounts \\
       --twopassMode Basic \\
       --outWigType bedGraph \\
-      --outWigStrand Stranded \\
+      --outWigStrand ${wig_strand} \\
       --outFileNamePrefix ${sample_id}.
 
     samtools index ${sample_id}.Aligned.sortedByCoord.out.bam
@@ -190,18 +191,22 @@ process SIGNAL_TRACKS {
     path(chrom_sizes)
 
     output:
-    path("${sample_id}_plus.bw"),  emit: plus_bw
-    path("${sample_id}_minus.bw"), emit: minus_bw
+    path("${sample_id}_*.bw"), emit: bigwig
 
     script:
+    // STAR writes str1 for fragments whose read 1 maps to the + strand. Read 1 of a
+    // reverse-stranded (dUTP) library is antisense, so str1 is minus-strand signal and str2 is
+    // plus-strand signal, as in ENCODE's STAR_RSEM.sh (str[1]=-; str[2]=+). Forward-stranded
+    // libraries are the opposite, and unstranded libraries give a single str1 track.
+    def tracks = params.strandedness == 'reverse' ? [str1: 'minus', str2: 'plus'] :
+                 params.strandedness == 'forward' ? [str1: 'plus', str2: 'minus'] :
+                                                    [str1: 'unstranded']
+    def commands = tracks.collect { str, strand ->
+        "sort -k1,1 -k2,2n ${sample_id}.Signal.UniqueMultiple.${str}.out.bg > ${strand}_sorted.bg\n" +
+        "    bedGraphToBigWig ${strand}_sorted.bg ${chrom_sizes} ${sample_id}_${strand}.bw"
+    }.join('\n    ')
     """
-    # Sort and convert plus strand bedGraph to bigWig
-    sort -k1,1 -k2,2n ${sample_id}.Signal.UniqueMultiple.str1.out.bg > plus_sorted.bg
-    bedGraphToBigWig plus_sorted.bg ${chrom_sizes} ${sample_id}_plus.bw
-
-    # Sort and convert minus strand bedGraph to bigWig
-    sort -k1,1 -k2,2n ${sample_id}.Signal.UniqueMultiple.str2.out.bg > minus_sorted.bg
-    bedGraphToBigWig minus_sorted.bg ${chrom_sizes} ${sample_id}_minus.bw
+    ${commands}
     """
 }
 
@@ -252,6 +257,20 @@ workflow {
     if (!genomeDefaults().containsKey(params.genome)) {
         error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
     }
+    if (!(params.strandedness in ['reverse', 'forward', 'none'])) {
+        error "Invalid --strandedness '${params.strandedness}': expected 'reverse', 'forward', or 'none'"
+    }
+
+    // Google Batch and AWS Batch stage every task through object storage, so the matching
+    // profile cannot run without a bucket work directory and a project or job queue.
+    def active_profiles = workflow.profile.tokenize(',')
+    def work_uri        = workflow.workDir.toUriString()
+    if (active_profiles.contains('gcp') && !(params.gcp_project && work_uri.startsWith('gs://'))) {
+        error "-profile gcp requires --gcp_project <project-id> and --gcp_workdir gs://<bucket>/work"
+    }
+    if (active_profiles.contains('aws') && !(params.aws_queue && work_uri.startsWith('s3://'))) {
+        error "-profile aws requires --aws_queue <job-queue> and --aws_workdir s3://<bucket>/work"
+    }
 
     // ---- Input channels ----
     def defaults      = genomeDefaults()[params.genome]
@@ -262,7 +281,7 @@ workflow {
     ch_star_idx   = channel.fromPath(star_idx_path, type: 'dir', checkIfExists: true)
     // rsem_idx_path is a prefix such as .../GRCh38, so stage every file that starts with it
     ch_rsem_idx   = channel.fromPath("${rsem_idx_path}*", checkIfExists: true)
-    ch_rseqc_bed  = channel.fromPath(defaults.rseqc_bed, checkIfExists: true)
+    ch_rseqc_bed  = channel.fromPath(params.rseqc_bed ?: defaults.rseqc_bed, checkIfExists: true)
 
     // Stage 1: QC and Trimming
     FASTQC(ch_reads)
@@ -276,7 +295,7 @@ workflow {
 
     // Kallisto (optional)
     if (!params.skip_kallisto) {
-        ch_kallisto_idx = channel.fromPath(defaults.kallisto_idx, checkIfExists: true)
+        ch_kallisto_idx = channel.fromPath(params.kallisto_index ?: defaults.kallisto_idx, checkIfExists: true)
         KALLISTO_QUANT(TRIM_GALORE.out.trimmed, ch_kallisto_idx.collect())
     }
 
@@ -292,6 +311,7 @@ workflow {
     // MultiQC aggregation
     ch_multiqc = FASTQC.out.reports
         .mix(TRIM_GALORE.out.log)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(STAR_ALIGN.out.log)
         .mix(RSEM_QUANT.out.stats)
         .mix(RSEQC.out.strandedness)

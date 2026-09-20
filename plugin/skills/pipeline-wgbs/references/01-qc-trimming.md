@@ -20,7 +20,8 @@ This is normal and expected because unmethylated C is converted to T.
 
 ## Adapter Trimming with Trim Galore
 
-Trim Galore auto-detects Illumina adapters and applies bisulfite-aware trimming:
+Trim Galore auto-detects Illumina adapters and applies bisulfite-aware trimming. This is
+the command the workflow runs, with `--cores` set from the process CPU count:
 
 ```bash
 trim_galore \
@@ -28,14 +29,18 @@ trim_galore \
     --quality 20 \
     --phred33 \
     --length 36 \
-    --fastqc \
     --cores 4 \
     --clip_R2 10 \
     --three_prime_clip_R1 1 \
-    --output_dir trim_galore/ \
+    --fastqc \
     sample_R1.fastq.gz \
     sample_R2.fastq.gz
 ```
+
+The trimmed reads, the trimming reports and the FastQC reports that `--fastqc` produces
+for the trimmed reads are all published to `trim_galore/`, and the trimming and trimmed-read
+FastQC reports are fed to MultiQC. FastQC on the *raw* reads is a separate process and
+lands in `fastqc/`.
 
 ### Parameter Rationale
 
@@ -47,9 +52,13 @@ trim_galore \
 | `--three_prime_clip_R1 1` | 1 bp | Remove filled-in C from end repair |
 | `--cores 4` | 4 | Parallel processing (Trim Galore uses 3x cores internally) |
 
-### RRBS-Specific Trimming
+### RRBS-Specific Trimming (not reachable from this workflow)
 
-For RRBS data, use the `--rrbs` flag to handle MspI-digested fragments:
+The trimming above is hardcoded and WGBS-specific: there is no `--rrbs` switch and no
+parameter that changes the clip settings, and the workflow re-trims whatever it is given.
+For RRBS data, run Trim Galore by hand with the `--rrbs` flag to handle MspI-digested
+fragments, and then run Bismark and MethylDackel on the result yourself rather than through
+this workflow:
 
 ```bash
 trim_galore \
