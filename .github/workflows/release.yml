@@ -116,6 +116,9 @@ jobs:
     needs: [build, test]
     runs-on: ubuntu-latest
     environment: release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -124,6 +127,12 @@ jobs:
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing (OIDC) needs npm >= 11.5.1. When a trusted publisher is
+      # configured for the package on npmjs.com, no token is required; NPM_TOKEN
+      # remains as a fallback.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       - name: Determine npm tag
         id: npm-tag
