@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uvx --refresh encode-toolkit` (or `uv cache clean encode-toolkit`); pip users can run
   `pip install --upgrade encode-toolkit`.
 
+### Security
+
+- The ChIP-seq, ATAC-seq, and RNA-seq pipeline Dockerfiles now download the UCSC
+  `bedGraphToBigWig` executable over HTTPS instead of plain HTTP.
+
+### Changed
+
+- The source distribution now contains only the Python package, tests, and project documents.
+  It previously bundled the whole repository, including editor configuration and a duplicate
+  copy of the plugin tree (1.6 MB down to 118 KB). The wheel is unchanged.
+- Updated dead GREAT links in the `peak-annotation` and `multi-omics-integration` skills.
+
 ### Added
 
 - Packaging regression test that fails if the `mcp` dependency loses its upper bound.

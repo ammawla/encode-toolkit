@@ -61,6 +61,19 @@ Issues = "https://github.com/ammawla/encode-toolkit/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/encode_connector"]
 
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "src",
+    "tests",
+    "conftest.py",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CITATION.cff",
+    "SECURITY.md",
+    "PRIVACY.md",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
