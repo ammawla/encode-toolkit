@@ -253,6 +253,17 @@ workflow {
         error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
     }
 
+    // Google Batch and AWS Batch stage every task through object storage, so the matching
+    // profile cannot run without a bucket work directory and a project or job queue.
+    def active_profiles = workflow.profile.tokenize(',')
+    def work_uri        = workflow.workDir.toUriString()
+    if (active_profiles.contains('gcp') && !(params.gcp_project && work_uri.startsWith('gs://'))) {
+        error "-profile gcp requires --gcp_project <project-id> and --gcp_workdir gs://<bucket>/work"
+    }
+    if (active_profiles.contains('aws') && !(params.aws_queue && work_uri.startsWith('s3://'))) {
+        error "-profile aws requires --aws_queue <job-queue> and --aws_workdir s3://<bucket>/work"
+    }
+
     // ---- Input channels ----
     def defaults      = genomeDefaults()[params.genome]
     def star_idx_path = params.star_index ?: defaults.star_index

@@ -7,9 +7,10 @@ LABEL description="ENCODE Toolkit WGBS pipeline: Bismark + MethylDackel"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# perl is listed explicitly: FastQC, Trim Galore and Bismark are Perl programs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl unzip gzip pigz \
-    build-essential \
+    build-essential perl \
     python3 python3-pip \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \

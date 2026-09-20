@@ -207,6 +207,9 @@ process COMPUTE_SCALE_FACTOR {
 
 process FRAGMENT_BEDGRAPH {
     tag "${sample_id}"
+    // Publish each sample's fragment BED; the IgG control's copy is an intermediate
+    publishDir "${params.outdir}/signal", mode: 'copy', pattern: '*.fragments.bed',
+        saveAs: { name -> sample_id == '__control__' ? null : name }
     cpus 2
     memory '4 GB'
 
@@ -216,6 +219,7 @@ process FRAGMENT_BEDGRAPH {
 
     output:
     tuple val(sample_id), path("${sample_id}_fragments.bedGraph"), emit: bedgraph
+    path("${sample_id}.fragments.bed"), emit: fragments
 
     script:
     """
@@ -226,9 +230,9 @@ process FRAGMENT_BEDGRAPH {
     bedtools bamtobed -bedpe -i namesorted.bam \\
         | awk 'BEGIN {OFS="\\t"} \$1 == \$4 && \$6 - \$2 < 1000 {print \$1, \$2, \$6}' \\
         | sort -k1,1 -k2,2n -k3,3n \\
-        > fragments.bed
+        > ${sample_id}.fragments.bed
 
-    bedtools genomecov -bg -i fragments.bed -g ${chrom_sizes} \\
+    bedtools genomecov -bg -i ${sample_id}.fragments.bed -g ${chrom_sizes} \\
         > ${sample_id}_fragments.bedGraph
 
     rm namesorted.bam
@@ -378,6 +382,17 @@ workflow {
     def use_spikein = !params.skip_spikein && params.spikein_index
     def use_seacr   = params.peak_caller in ['seacr', 'both']
     def use_macs2   = params.peak_caller in ['macs2', 'both']
+
+    // Google Batch and AWS Batch stage every task through object storage, so the matching
+    // profile cannot run without a bucket work directory and a project or job queue.
+    def active_profiles = workflow.profile.tokenize(',')
+    def work_uri        = workflow.workDir.toUriString()
+    if (active_profiles.contains('gcp') && !(params.gcp_project && work_uri.startsWith('gs://'))) {
+        error "-profile gcp requires --gcp_project <project-id> and --gcp_workdir gs://<bucket>/work"
+    }
+    if (active_profiles.contains('aws') && !(params.aws_queue && work_uri.startsWith('s3://'))) {
+        error "-profile aws requires --aws_queue <job-queue> and --aws_workdir s3://<bucket>/work"
+    }
 
     // ---- Channels ----
     ch_reads       = channel.fromFilePairs(params.reads, checkIfExists: true)

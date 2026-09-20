@@ -5,9 +5,10 @@ LABEL description="ENCODE Toolkit Hi-C pipeline: BWA + pairtools + Juicer + cool
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# perl is listed explicitly: FastQC is a Perl program
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gzip pigz unzip \
-    build-essential \
+    build-essential perl \
     python3 python3-pip python3-dev \
     default-jre \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
