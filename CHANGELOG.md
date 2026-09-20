@@ -50,8 +50,8 @@ Skills only. The Python package (MCP server) is unchanged.
   layouts, step lists and QC tables now describe what the workflow does. Analyses it does not
   run (for example FRiP, NSC/RSC, TSS enrichment, TAD and compartment calling, bisulfite
   conversion rate) are labelled as manual steps instead of being listed as outputs.
-- 135 `encode_*` tool calls across 40 skills used parameter names the server does not have
-  (for example `encode_list_files(accession=...)` instead of `experiment_accession=`). All are
+- `encode_*` tool calls in 40 skills used 135 parameter names the server does not have (for
+  example `encode_list_files(accession=...)` instead of `experiment_accession=`). All are
   corrected.
 - Reference commands were checked against the pinned tool versions (Hotspot2, MethylDackel,
   SEACR, Juicer tools, pairtools, RGT, MPRAflow) and corrected.
