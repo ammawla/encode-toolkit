@@ -5,6 +5,22 @@ All notable changes to the ENCODE Toolkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-09-20
+
+Maintenance release. The Python package is functionally identical to 0.3.1.
+
+### Fixed
+
+- `bioinformatics-installer` skill: the ChIP-seq walkthrough pointed at `scripts/chipseq-env.yml`
+  (the file lives in `environments/`) and at an `annotation-env.yml` that did not exist. The first
+  path is corrected and the second is replaced with an explicit `conda create` command.
+
+### Changed
+
+- Removed local tooling configuration files from the repository and ignored them going forward.
+- `CONTRIBUTING.md` and `docs/SHOWCASE.md` now use the ENCODE Toolkit name and the current skill
+  count (47).
+
 ## [0.3.1] - 2026-09-20
 
 ### Fixed
