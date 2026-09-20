@@ -16,6 +16,7 @@ params.outdir               = './results'
 params.fdr                  = 0.05
 params.skip_footprint       = false
 params.organism             = 'hg38' // genome name registered in the RGT data directory (HINT)
+params.rgt_data             = null   // populated RGT data directory; required unless --skip_footprint
 
 // ---- Processes ----
 
@@ -222,12 +223,17 @@ process FOOTPRINTING {
 
     input:
     tuple val(sample_id), path(bam), path(bai), path(peaks)
+    path rgt_data
 
     output:
     path("${sample_id}.footprints.bed"), emit: footprints
 
     script:
     """
+    # RGT reads its genome data from \$RGTDATA (default ~/rgtdata), which does not exist for the
+    # unprivileged user the container runs as, so point it at the staged directory.
+    export RGTDATA="\$PWD/${rgt_data}"
+
     rgt-hint footprinting \\
         --dnase-seq \\
         --paired-end \\
@@ -290,6 +296,9 @@ workflow {
     if (!params.chrom_sizes)          { error "Missing required parameter: --chrom_sizes" }
     if (!params.hotspot_center_sites) { error "Missing required parameter: --hotspot_center_sites" }
     if (!params.blacklist)            { error "Missing required parameter: --blacklist" }
+    if (!params.skip_footprint && !params.rgt_data) {
+        error "Footprinting needs --rgt_data (an RGT data directory set up for --organism '${params.organism}'); pass it or use --skip_footprint"
+    }
 
     // ---- Channels ----
     ch_reads        = channel.fromFilePairs(params.reads, checkIfExists: true)
@@ -310,8 +319,9 @@ workflow {
     INSERT_SIZES(FILTER_DEDUP.out.bam)
 
     if (!params.skip_footprint) {
+        ch_rgt_data = channel.fromPath(params.rgt_data, type: 'dir', checkIfExists: true).collect()
         // join on sample_id so each BAM is footprinted against its own peaks
-        FOOTPRINTING(FILTER_DEDUP.out.bam.join(HOTSPOT2.out.peaks))
+        FOOTPRINTING(FILTER_DEDUP.out.bam.join(HOTSPOT2.out.peaks), ch_rgt_data)
     }
 
     ch_multiqc = FASTQC_RAW.out.reports

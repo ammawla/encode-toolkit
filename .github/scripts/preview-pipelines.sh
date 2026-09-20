@@ -12,7 +12,7 @@ trap 'rm -rf "$WORK"' EXIT
 export NXF_ANSI_LOG=false
 
 mkdir -p "$WORK/fq" "$WORK/ctl" "$WORK/ref/rsem" "$WORK/ref/star_index" "$WORK/ref/bismark_genome" \
-         "$WORK/GRCh38_index" "$WORK/GRCh38_bowtie2_index"
+         "$WORK/GRCh38_index" "$WORK/GRCh38_bowtie2_index" "$WORK/ref/rgtdata"
 for sample in sampleA sampleB; do
     : > "$WORK/fq/${sample}_R1.fastq.gz"; : > "$WORK/fq/${sample}_R2.fastq.gz"
 done
@@ -66,9 +66,12 @@ preview cutandrun "control + spike-in + both callers" pass "${CUTANDRUN[@]}" --s
     --control "$REF/control.bam" --peak_caller both --seacr_mode both
 preview cutandrun "invalid --seacr_mode is rejected" fail "${CUTANDRUN[@]}" --seacr_mode bogus
 DNASE=(--reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed")
-preview dnaseseq "center sites + mappable" pass "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch" \
-    --hotspot_mappable "$REF/mappable.bed"
-preview dnaseseq "missing center sites is rejected" fail "${DNASE[@]}"
+preview dnaseseq "center sites + mappable + footprinting" pass "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch" \
+    --hotspot_mappable "$REF/mappable.bed" --rgt_data "$REF/rgtdata"
+preview dnaseseq "skip footprinting needs no RGT data" pass "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch" \
+    --skip_footprint
+preview dnaseseq "footprinting without --rgt_data is rejected" fail "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch"
+preview dnaseseq "missing center sites is rejected" fail "${DNASE[@]}" --skip_footprint
 preview hic "defaults" pass --reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes"
 preview rnaseq "RSEM reference given as a prefix" pass --reads "$READS" --star_index "$REF/star_index" \
     --rsem_index "$REF/rsem/GRCh38"
