@@ -78,6 +78,7 @@ nextflow run main.nf \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
     --hotspot_center_sites '/ref/hotspot2/hg38.center_sites.n100.starch' \
     --hotspot_mappable '/ref/hotspot2/hg38.mappable_only.bed' \
+    --rgt_data '/ref/rgtdata' \
     --blacklist '/ref/hg38-blacklist.v2.bed' \
     --outdir results/ \
     -resume
@@ -93,6 +94,7 @@ nextflow run main.nf \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
     --hotspot_center_sites '/ref/hotspot2/hg38.center_sites.n100.starch' \
     --hotspot_mappable '/ref/hotspot2/hg38.mappable_only.bed' \
+    --rgt_data '/ref/rgtdata' \
     --blacklist '/ref/hg38-blacklist.v2.bed' \
     --outdir results/ \
     -resume
@@ -108,6 +110,7 @@ nextflow run main.nf \
     --chrom_sizes 'gs://bucket/ref/hg38.chrom.sizes' \
     --hotspot_center_sites 'gs://bucket/ref/hotspot2/hg38.center_sites.n100.starch' \
     --hotspot_mappable 'gs://bucket/ref/hotspot2/hg38.mappable_only.bed' \
+    --rgt_data 'gs://bucket/ref/rgtdata' \
     --blacklist 'gs://bucket/ref/hg38-blacklist.v2.bed' \
     --outdir 'gs://bucket/results/' \
     -resume
@@ -138,6 +141,7 @@ nextflow run main.nf \
 | `--fdr` | `0.05` | Hotspot2 FDR threshold |
 | `--skip_footprint` | `false` | Skip footprinting analysis |
 | `--organism` | `hg38` | Genome name registered in the RGT data directory, used by HINT footprinting |
+| `--rgt_data` | required unless `--skip_footprint` | RGT data directory with the genome for `--organism` set up (see below) |
 
 ## Output Files
 
@@ -227,6 +231,17 @@ extractCenterSites.sh -c chrom_sizes.bed -M hg38.mappable_only.bed -o hg38.cente
 
 The workflow ends at footprint calling; motif matching against JASPAR is a separate
 downstream step (see the `jaspar-motifs` skill).
+
+### RGT Data Directory (footprinting)
+HINT reads genome sequence and annotation from an RGT data directory, which is several GB and
+is not part of the image. Create it once, then pass it with `--rgt_data`:
+
+```bash
+pip install RGT==1.0.2            # creates ~/rgtdata with setupGenomicData.py
+cd ~/rgtdata && python setupGenomicData.py --hg38
+```
+
+Then run with `--rgt_data ~/rgtdata`, or use `--skip_footprint` to stop after hotspot calling.
 
 Mappable-regions files:
 - hg38 / 36 bp: Use ENCODE-provided index

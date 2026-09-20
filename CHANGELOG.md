@@ -28,6 +28,8 @@ Pipeline skills release. The Python package (MCP server) is functionally identic
   center-sites file; the image pinned a Hotspot2 tag that does not exist and lacked `modwt`
   and `bc`. Footprinting could pair a BAM with another sample's peaks. `--hotspot_index` is
   replaced by `--hotspot_center_sites` and `--hotspot_mappable`.
+  HINT footprinting needs an RGT data directory that the container's unprivileged user could
+  never find; it is now an explicit input, `--rgt_data`, checked before the run starts.
 - **WGBS**: the bedMethyl conversion divided by zero on MethylDackel's header line, so
   extraction always failed; only CpG was converted although CHG and CHH were promised;
   `--no_overlap` toggled `--mergeContext`, which is unrelated to mate overlap (renamed
