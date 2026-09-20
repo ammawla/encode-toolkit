@@ -28,7 +28,6 @@ RUN wget -qO- https://github.com/broadinstitute/picard/releases/download/2.27.5/
 
 RUN pip3 install --no-cache-dir trim-galore==0.6.7
 
-RUN wget -qO /usr/local/bin/fastqc https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip || true
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir deeptools==3.5.4
