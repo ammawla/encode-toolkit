@@ -1,7 +1,9 @@
-FROM ubuntu:22.04
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
-LABEL maintainer="ENCODE DCC"
-LABEL description="ENCODE CUT&RUN Pipeline: Bowtie2 + SEACR + MACS2 + deepTools"
+LABEL maintainer="Dr. Alex M. Mawla, PhD <https://github.com/ammawla/encode-toolkit>"
+LABEL description="ENCODE Toolkit CUT&RUN pipeline: Bowtie2 + SEACR + MACS2 + deepTools"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
