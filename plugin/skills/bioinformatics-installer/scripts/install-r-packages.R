@@ -9,7 +9,7 @@
 #   --rnaseq         DESeq2, edgeR, limma
 #   --singlecell     Seurat, Signac, scater, scran
 #   --methylation    DMRcate, bsseq, methylKit
-#   --deconvolution  BayesPrism, InstaPrism, DWLS, BisqueRNA
+#   --deconvolution  BisqueRNA, DWLS (prints the GitHub install lines for BayesPrism and InstaPrism)
 #   --visualization  ComplexHeatmap, EnhancedVolcano, Gviz, ggplot2
 #   --stats          sva, WGCNA, ReactomePA
 

@@ -340,6 +340,7 @@ workflow {
         .mix(TRIM_GALORE.out.fastqc)
         .mix(FILTER_DEDUP.out.flagstat)
         .mix(FILTER_DEDUP.out.dup_metrics)
+        .mix(INSERT_SIZES.out.metrics)
         .mix(HOTSPOT2.out.spot)
         .collect()
 

@@ -36,11 +36,12 @@ MODE="${1:---docker}"
 # --- Install Nextflow ---
 install_nextflow() {
     echo "--- Installing Nextflow ---"
-    # Only an existing install of exactly the pinned release is accepted. Any other version
-    # is left untouched, and the pinned, checksum-verified release is installed next to it.
+    # Only an existing install of exactly the pinned release is accepted. Otherwise the pinned,
+    # checksum-verified release is installed; a launcher it would overwrite is kept as a backup.
     local existing_version=""
     if command -v nextflow &> /dev/null; then
-        existing_version="$(nextflow -version 2>&1 | awk '$1 == "version" {print $2; exit}')"
+        # A launcher that cannot start (no Java, broken install) counts as "no usable version"
+        existing_version="$(nextflow -version 2>&1 | awk '$1 == "version" {print $2; exit}' || true)"
     fi
     if [ "$existing_version" = "$NEXTFLOW_VERSION" ]; then
         echo "Nextflow ${NEXTFLOW_VERSION} already installed: $(command -v nextflow)"
@@ -89,6 +90,10 @@ install_nextflow() {
             mkdir -p "$install_dir"
         fi
         local nextflow_bin="$install_dir/nextflow"
+        if [ -e "$nextflow_bin" ]; then
+            mv "$nextflow_bin" "$nextflow_bin.previous"
+            echo "Kept the launcher that was there as $nextflow_bin.previous"
+        fi
         mv "$tmp_file" "$nextflow_bin"
         chmod 755 "$nextflow_bin"
         echo "Nextflow installed to $nextflow_bin"

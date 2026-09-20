@@ -35,12 +35,19 @@ def tool_signatures() -> dict[str, set[str]]:
 
 
 def call_arguments(text: str, start: int) -> str | None:
-    """Return the text between the parentheses that open at ``start - 1``."""
-    depth, quote = 1, None
+    """Return the text between the parentheses that open at ``start - 1``, without # comments."""
+    depth, quote, comment, arguments = 1, None, False, ""
     for index in range(start, len(text)):
         char = text[index]
-        if quote:
+        if comment:
+            comment = char != "\n"
+            if comment:
+                continue
+        elif quote:
             quote = None if char == quote else quote
+        elif char == "#":  # an inline comment may hold an apostrophe: "# user's tissue"
+            comment = True
+            continue
         elif char in "\"'":
             quote = char
         elif char == "(":
@@ -48,7 +55,8 @@ def call_arguments(text: str, start: int) -> str | None:
         elif char == ")":
             depth -= 1
             if depth == 0:
-                return text[start:index]
+                return arguments
+        arguments += char
     return None
 
 
@@ -78,9 +86,10 @@ def check_tool_calls(signatures: dict[str, set[str]]) -> list[str]:
         for match in CALL_RE.finditer(text):
             tool = match.group(1)
             arguments = call_arguments(text, match.end())
-            if arguments is None:
-                continue
             where = f"{doc.relative_to(ROOT)}:{text.count(chr(10), 0, match.start()) + 1}"
+            if arguments is None:
+                problems.append(f"{where}: could not find the end of this {tool}(...) call")
+                continue
             if tool not in signatures:
                 problems.append(f"{where}: unknown tool {tool}")
                 continue
@@ -100,7 +109,7 @@ def pipeline_contract(scripts: Path) -> tuple[set[str], set[str]]:
     params_block = re.search(r"^params\s*\{(.*?)^\}", config, re.S | re.M)
     if params_block:
         params |= set(re.findall(r"^\s*(\w+)\s*=", params_block.group(1), re.M))
-    profiles_block = re.search(r"^profiles\s*\{(.*)^\}", config, re.S | re.M)
+    profiles_block = re.search(r"^profiles\s*\{(.*?)^\}", config, re.S | re.M)
     profiles = set(re.findall(r"^    (\w+)\s*\{", profiles_block.group(1), re.M)) if profiles_block else set()
     return params, profiles
 
