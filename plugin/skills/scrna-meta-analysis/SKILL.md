@@ -421,7 +421,7 @@ Expected output:
 ### Step 2: Download count matrices
 
 ```
-encode_list_files(accession="ENCSR700SCR", file_format="h5ad", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR700SCR", file_format="h5ad", assembly="GRCh38")
 ```
 
 Expected output:
@@ -475,7 +475,7 @@ Expected output:
 
 ### 1. Survey scRNA-seq data availability
 ```
-encode_get_facets(assay_title="scRNA-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -489,7 +489,7 @@ Expected output:
 
 ### 2. Compare experiments for batch effect awareness
 ```
-encode_compare_experiments(accession_1="ENCSR700SCR", accession_2="ENCSR701FRC")
+encode_compare_experiments(accession1="ENCSR700SCR", accession2="ENCSR701FRC")
 ```
 
 Expected output:

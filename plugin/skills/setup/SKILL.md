@@ -107,7 +107,7 @@ Ask: "Search for ATAC-seq experiments on human brain"
 
 ### Step 3: Test facets
 Ask: "What organs have the most ENCODE data?"
-- This calls `encode_get_facets(facet_field="organ")`
+- This calls `encode_get_facets()`
 - Expected: Returns organ counts showing brain, liver, heart, etc. ranked by experiment count
 
 If all three work, your setup is complete.
@@ -155,7 +155,7 @@ This walkthrough demonstrates a complete workflow from installation to data expl
 ### 1. Explore what's available
 ```
 "What ENCODE assay types are available for human pancreas?"
-→ encode_get_facets(facet_field="assay_title", organ="pancreas", organism="Homo sapiens")
+→ encode_get_facets(organ="pancreas", organism="Homo sapiens")
 ```
 
 ### 2. Find specific experiments
@@ -173,13 +173,14 @@ This walkthrough demonstrates a complete workflow from installation to data expl
 ### 4. Find the right files
 ```
 "List the preferred BED files for ENCSR123ABC"
-→ encode_list_files(accession="ENCSR123ABC", file_format="bed", assembly="GRCh38")
+→ encode_list_files(experiment_accession="ENCSR123ABC", file_format="bed", assembly="GRCh38")
 ```
 
 ### 5. Download data
 ```
 "Download the IDR-thresholded peaks for ENCSR123ABC"
-→ encode_download_files(accession="ENCSR123ABC", file_format="bed", output_type="IDR thresholded peaks")
+→ encode_list_files(experiment_accession="ENCSR123ABC", file_format="bed", output_type="IDR thresholded peaks")
+→ encode_download_files(file_accessions=["ENCFF..."], download_dir="/data/encode")
 ```
 
 ### 6. Track your experiment
@@ -273,7 +274,7 @@ Expected output:
 
 ### 3. Test facet exploration
 ```
-encode_get_facets(facet_field="organ", organism="Homo sapiens")
+encode_get_facets(organism="Homo sapiens")
 ```
 
 Expected output:

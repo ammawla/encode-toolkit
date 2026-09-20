@@ -425,7 +425,7 @@ Expected output:
 ### Step 2: List loop files for each experiment
 
 ```
-encode_list_files(accession="ENCSR000AKA", file_format="bedpe", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000AKA", file_format="bedpe", assembly="GRCh38")
 ```
 
 Expected output:
@@ -443,7 +443,7 @@ Expected output:
 ### Step 3: Download loop files
 
 ```
-encode_download_files(accessions=["ENCFF002DEF", "ENCFF003GHI", "ENCFF004JKL"], download_dir="/data/hic_loops")
+encode_download_files(file_accessions=["ENCFF002DEF", "ENCFF003GHI", "ENCFF004JKL"], download_dir="/data/hic_loops")
 ```
 
 Expected output:
@@ -483,7 +483,7 @@ awk '$1=="chr8" && $2>=127700000 && $3<=128000000' union_loops.bedpe > myc_loops
 
 ### 1. Survey available Hi-C data by tissue
 ```
-encode_get_facets(assay_title="Hi-C", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="Hi-C", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -515,7 +515,7 @@ Expected output:
 
 ### 3. Compare loop sets between two cell types
 ```
-encode_compare_experiments(accession_1="ENCSR000AKA", accession_2="ENCSR489OCU")
+encode_compare_experiments(accession1="ENCSR000AKA", accession2="ENCSR489OCU")
 ```
 
 Expected output:

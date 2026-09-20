@@ -391,7 +391,7 @@ Expected output:
 ### Step 2: Download peaks and extract variant positions
 
 ```
-encode_download_files(accessions=["ENCFF500ISL"], download_dir="/data/variant_annotation")
+encode_download_files(file_accessions=["ENCFF500ISL"], download_dir="/data/variant_annotation")
 ```
 
 ### Step 3: Layer 1 — Ensembl VEP consequence prediction
@@ -473,7 +473,7 @@ Expected output:
 
 ### 2. Get peak files for variant intersection
 ```
-encode_list_files(accession="ENCSR400PAN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR400PAN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
 Expected output:

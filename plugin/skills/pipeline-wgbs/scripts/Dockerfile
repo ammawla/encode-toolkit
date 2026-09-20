@@ -60,7 +60,7 @@ RUN wget -q https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.
     unzip -q fastqc_v0.12.1.zip -d /opt/ && chmod +x /opt/FastQC/fastqc && \
     ln -s /opt/FastQC/fastqc /usr/local/bin/ && rm fastqc_v0.12.1.zip
 
-# MultiQC + Picard
+# MultiQC
 RUN pip3 install --no-cache-dir multiqc==1.21
 
 WORKDIR /data

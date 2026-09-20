@@ -41,8 +41,11 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 | Hotspot2 | 2.1.2 | DHS calling (ENCODE standard) | John et al. 2011 |
 | modwt | 1.0 | Wavelet smoothing used by Hotspot2 | Stam Lab |
 | bedtools | 2.31.0 | Genomic arithmetic | Quinlan & Hall 2010 |
+| BEDOPS | apt (Ubuntu 22.04) | `sort-bed` and `unstarch` for the Hotspot2 starch archives | Neph et al. 2012 |
 | HINT (RGT) | 1.0.2 | TF footprinting | Li et al. 2019 |
 | FastQC | 0.12.1 | Read quality | Andrews (Babraham) |
+| Trim Galore | 0.6.10 | Adapter and quality trimming | Krueger (Babraham) |
+| cutadapt | 4.6 | Adapter removal backend for Trim Galore | Martin 2011 |
 | MultiQC | 1.21 | Aggregated QC | Ewels et al. 2016 |
 
 ## Key Literature
@@ -71,7 +74,7 @@ FASTQ -> Trim -> BWA-MEM align -> Filter/dedup -> Hotspot2 -> DHS peaks
 ### Quick Start (Local)
 
 ```bash
-nextflow run main.nf \
+nextflow run scripts/main.nf \
     -profile local \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
@@ -84,11 +87,19 @@ nextflow run main.nf \
     -resume
 ```
 
+Drop `--rgt_data` and add `--skip_footprint` to stop after hotspot calling.
+
 ### SLURM HPC
 
+The `slurm` profile runs through Singularity, which cannot resolve the default
+Docker image name, so pass the converted `.sif` with `--container`:
+
 ```bash
-nextflow run main.nf \
+singularity build pipeline-dnaseseq.sif docker-daemon://encode-toolkit/pipeline-dnaseseq:1.0.0
+
+nextflow run scripts/main.nf \
     -profile slurm \
+    --container /path/to/pipeline-dnaseseq.sif \
     --reads '/data/fastq/*_R{1,2}.fastq.gz' \
     --bwa_index '/ref/bwa_index/genome.fa' \
     --chrom_sizes '/ref/hg38.chrom.sizes' \
@@ -103,18 +114,38 @@ nextflow run main.nf \
 ### Cloud (GCP / AWS)
 
 ```bash
-nextflow run main.nf \
-    -profile gcp \
-    --reads 'gs://bucket/fastq/*_R{1,2}.fastq.gz' \
-    --bwa_index 'gs://bucket/ref/genome.fa' \
-    --chrom_sizes 'gs://bucket/ref/hg38.chrom.sizes' \
-    --hotspot_center_sites 'gs://bucket/ref/hotspot2/hg38.center_sites.n100.starch' \
-    --hotspot_mappable 'gs://bucket/ref/hotspot2/hg38.mappable_only.bed' \
-    --rgt_data 'gs://bucket/ref/rgtdata' \
-    --blacklist 'gs://bucket/ref/hg38-blacklist.v2.bed' \
-    --outdir 'gs://bucket/results/' \
-    -resume
+# Google Cloud Batch
+nextflow run scripts/main.nf -profile gcp \
+    --container us-docker.pkg.dev/<project>/<repo>/pipeline-dnaseseq:1.0.0 \
+    --gcp_project <project> \
+    --gcp_workdir gs://<bucket>/work \
+    --reads 'gs://<bucket>/fastq/*_R{1,2}.fastq.gz' \
+    --bwa_index gs://<bucket>/ref/bwa_index/genome.fa \
+    --chrom_sizes gs://<bucket>/ref/hg38.chrom.sizes \
+    --hotspot_center_sites gs://<bucket>/ref/hotspot2/hg38.center_sites.n100.starch \
+    --hotspot_mappable gs://<bucket>/ref/hotspot2/hg38.mappable_only.bed \
+    --rgt_data gs://<bucket>/ref/rgtdata \
+    --blacklist gs://<bucket>/ref/hg38-blacklist.v2.bed \
+    --outdir gs://<bucket>/results
+
+# AWS Batch
+nextflow run scripts/main.nf -profile aws \
+    --container <account>.dkr.ecr.<region>.amazonaws.com/pipeline-dnaseseq:1.0.0 \
+    --aws_queue <job-queue> \
+    --aws_workdir s3://<bucket>/work \
+    --reads 's3://<bucket>/fastq/*_R{1,2}.fastq.gz' \
+    --bwa_index s3://<bucket>/ref/bwa_index/genome.fa \
+    --chrom_sizes s3://<bucket>/ref/hg38.chrom.sizes \
+    --hotspot_center_sites s3://<bucket>/ref/hotspot2/hg38.center_sites.n100.starch \
+    --hotspot_mappable s3://<bucket>/ref/hotspot2/hg38.mappable_only.bed \
+    --rgt_data s3://<bucket>/ref/rgtdata \
+    --blacklist s3://<bucket>/ref/hg38-blacklist.v2.bed \
+    --outdir s3://<bucket>/results
 ```
+
+`--outdir` only sets where results are published; Google Batch and AWS Batch
+stage every task through the work directory, and the workflow stops with an
+error if it or the project/queue is missing.
 
 ## Resource Requirements
 
@@ -131,41 +162,69 @@ nextflow run main.nf \
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--reads` | required | Glob pattern to paired FASTQ files |
-| `--bwa_index` | required | Path to BWA genome index (.fa) |
-| `--chrom_sizes` | required | Chromosome sizes file |
-| `--hotspot_center_sites` | required | Hotspot2 center-sites file (`.starch`), made once per genome with `extractCenterSites.sh` |
-| `--hotspot_mappable` | `null` | Mappable-regions BED that the center sites were made from (recommended) |
-| `--blacklist` | required | ENCODE blacklist BED file |
+| `--reads` | required | Glob pattern to paired FASTQ files (e.g. `'/data/*_R{1,2}.fastq.gz'`). Paired-end only |
+| `--bwa_index` | required | BWA index **prefix**, i.e. the FASTA path. Every file matching `<prefix>*` (the `.fa` plus `.amb .ann .bwt .pac .sa`) is staged |
+| `--chrom_sizes` | required | Two-column chromosome sizes file. Used for the bigWig track and converted to BED for Hotspot2 `-c` |
+| `--hotspot_center_sites` | required | Hotspot2 center-sites archive (`.starch`), made once per genome with `extractCenterSites.sh` (Hotspot2 `-C`) |
+| `--hotspot_mappable` | `null` | Mappable-regions BED that the center sites were made from (Hotspot2 `-M`; recommended) |
+| `--blacklist` | required | ENCODE blacklist BED. Applied to the BAM before hotspot calling |
 | `--outdir` | `./results` | Output directory |
-| `--fdr` | `0.05` | Hotspot2 FDR threshold |
+| `--fdr` | `0.05` | Hotspot2 hotspot FDR (`-f`). Names every Hotspot2 output file. `-F` is passed as `max(--fdr, 0.05)` because it may not be stricter than `-f` |
 | `--skip_footprint` | `false` | Skip footprinting analysis |
 | `--organism` | `hg38` | Genome name registered in the RGT data directory, used by HINT footprinting |
 | `--rgt_data` | required unless `--skip_footprint` | RGT data directory with the genome for `--organism` set up (see below) |
+
+There is no `--genome`, `--single_end`, or `--fastq_r1/--fastq_r2` parameter.
+
+### Infrastructure parameters (`nextflow.config`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--container` | `encode-toolkit/pipeline-dnaseseq:1.0.0` | Image built from `scripts/Dockerfile`. Pass a registry image for `gcp`/`aws`, or a `.sif` file for `slurm` |
+| `--max_cpus`, `--max_memory`, `--max_time` | `16`, `32.GB`, `24.h` | Upper bounds applied to every process |
+| `--slurm_queue`, `--slurm_account` | `normal`, none | SLURM partition and account |
+| `--gcp_project`, `--gcp_workdir` | none (both required for `-profile gcp`) | Google Cloud project and `gs://` work directory |
+| `--gcp_location`, `--gcp_disk` | `us-central1`, `200.GB` | Google Batch region and per-task disk |
+| `--aws_queue`, `--aws_workdir` | none (both required for `-profile aws`) | AWS Batch job queue and `s3://` work directory |
+| `--aws_region`, `--aws_cli_path` | `us-east-1`, `/home/ec2-user/miniconda/bin/aws` | AWS region, and the AWS CLI path inside the Batch AMI |
 
 ## Output Files
 
 ```
 results/
-  fastqc/                          # Raw read quality
+  fastqc/                          # FastQC on the raw reads
+  trim_galore/
+    {sample}_R1_val_1.fq.gz        # Trimmed reads
+    {sample}_R2_val_2.fq.gz
+    *_trimming_report.txt          # Trim Galore reports
+    *_fastqc.{html,zip}            # FastQC on the trimmed reads
   alignment/
-    {sample}.filtered.bam          # Filtered, deduplicated BAM
+    {sample}.filtered.bam          # Filtered, deduplicated, blacklist-free BAM
     {sample}.filtered.bam.bai
+    {sample}.flagstat.txt          # samtools flagstat on the filtered BAM
+    {sample}.dup_metrics.txt       # Picard MarkDuplicates metrics
   hotspots/
-    {sample}.hotspots.fdr0.05.bed  # DHS peaks (primary output)
-    {sample}.peaks.narrowPeak      # narrowPeak format
-    {sample}.density.bw            # Signal track (bigWig)
-    {sample}.allcalls.bed          # All hotspot calls (unfiltered)
+    {sample}.hotspots.fdr0.05.bed  # DHS hotspots (primary output; unstarched)
+    {sample}.peaks.narrowPeak      # Peaks within hotspots (unstarched)
+    {sample}.allcalls.bed          # All site calls before FDR filtering (unstarched)
     {sample}.SPOT.txt              # SPOT score
+    {sample}.density.bw            # RPM fragment-coverage signal track (bigWig)
   footprints/
-    {sample}.footprints.bed        # TF footprints
-    {sample}.footprint_scores.txt  # Per-motif footprint scores
+    {sample}.footprints.bed        # TF footprints (omitted with --skip_footprint)
   qc/
-    {sample}.flagstat.txt
-    {sample}.insert_sizes.txt
+    {sample}.insert_sizes.txt      # samtools stats output (insert sizes in the IS block)
   multiqc/
     multiqc_report.html
+  pipeline_info/
+    timeline.html
+    report.html
+    trace.txt
 ```
+
+The `.bed`, `.narrowPeak` and `.SPOT.txt` files under `hotspots/` are the
+`unstarch`-ed forms of the Hotspot2 `.starch` archives; the raw archives stay in
+the Nextflow work directory. `{sample}.density.bw` is the bedtools RPM fragment
+coverage track, not the per-base cut-count bigWig Hotspot2 writes internally.
 
 ## QC Thresholds (ENCODE Standards)
 
@@ -178,6 +237,14 @@ results/
 | NRF (Non-Redundant Fraction) | >0.8 | 0.7-0.8 | <0.7 |
 | PBC1 (PCR Bottleneck Coefficient 1) | >0.9 | 0.7-0.9 | <0.7 |
 | Insert size peak | 50-150 bp | Variable | Abnormal |
+
+The workflow produces everything the first four rows and the last row need:
+the SPOT score (`hotspots/{sample}.SPOT.txt`), the hotspot BED to count, the
+mapping and duplication rates (`alignment/{sample}.flagstat.txt` and
+`{sample}.dup_metrics.txt`), and the insert-size distribution
+(`qc/{sample}.insert_sizes.txt`). NRF, PBC1 and PBC2 are **not** computed;
+derive them manually from the alignment BAM as shown in
+`references/03-filtering.md`.
 
 ### SPOT Score
 
@@ -229,6 +296,15 @@ awk 'BEGIN{OFS="\t"} {print $1, 0, $2}' hg38.chrom.sizes | sort-bed - > chrom_si
 extractCenterSites.sh -c chrom_sizes.bed -M hg38.mappable_only.bed -o hg38.center_sites.n100.starch
 ```
 
+Pass the same mappable-regions BED to the workflow as `--hotspot_mappable` that
+was used to build the center sites.
+
+Mappable-regions files:
+- hg38 / 36 bp: Use ENCODE-provided index
+- hg38 / 76 bp: Use ENCODE-provided index
+- hg38 / 150 bp: May need to generate custom index
+- Wrong mappability index = incorrect peak calls
+
 The workflow ends at footprint calling; motif matching against JASPAR is a separate
 downstream step (see the `jaspar-motifs` skill).
 
@@ -243,34 +319,37 @@ cd ~/rgtdata && python setupGenomicData.py --hg38
 
 Then run with `--rgt_data ~/rgtdata`, or use `--skip_footprint` to stop after hotspot calling.
 
-Mappable-regions files:
-- hg38 / 36 bp: Use ENCODE-provided index
-- hg38 / 76 bp: Use ENCODE-provided index
-- hg38 / 150 bp: May need to generate custom index
-- Wrong mappability index = incorrect peak calls
-
 ### Blacklist Filtering
-Always filter peaks against the ENCODE blacklist (Amemiya et al. 2019):
+`--blacklist` is required and the workflow removes blacklisted reads from the
+BAM (Amemiya et al. 2019) before Hotspot2 runs, so the published peaks are
+already blacklist-free. Blacklist regions produce artifactual signal in
+accessibility assays.
+
+Filter at the peak level only when the peaks came from a BAM that was not
+filtered, or when applying an additional list:
 ```bash
 bedtools intersect -a hotspots.bed -b hg38-blacklist.v2.bed -v > hotspots_filtered.bed
 ```
 
-Blacklist regions produce artifactual signal in accessibility assays.
-
 ## Footprinting Analysis
 
-Transcription factor footprinting detects bound TFs from DNase-seq signal:
+Transcription factor footprinting detects bound TFs from DNase-seq signal.
+This is what the workflow runs:
 
-### HINT-ATAC Footprinting
+### HINT Footprinting (DNase-seq mode)
 ```bash
 rgt-hint footprinting \
-    --atac-seq \
+    --dnase-seq \
     --paired-end \
     --organism hg38 \
     --output-location footprints/ \
+    --output-prefix sample \
     sample.filtered.bam \
-    hotspots.narrowPeak
+    sample.peaks.narrowPeak
 ```
+
+Use `--dnase-seq`, not `--atac-seq`: the two apply different cleavage-bias
+models, and the wrong one silently produces wrong footprints.
 
 ### Interpretation
 - Footprints are depressions in the DNase signal where a bound TF protects DNA
@@ -301,7 +380,7 @@ Detailed step-by-step documentation is provided in the `references/` directory:
 2. `02-alignment.md` -- BWA-MEM alignment for DNase-seq
 3. `03-filtering.md` -- BAM filtering, deduplication, blacklist removal
 4. `04-hotspot-calling.md` -- Hotspot2 DHS detection and signal generation
-5. `05-footprinting.md` -- TF footprint detection with HINT-ATAC
+5. `05-footprinting.md` -- TF footprint detection with HINT
 
 ## Walkthrough: Processing ENCODE DNase-seq from FASTQ to Hypersensitive Sites
 
@@ -327,33 +406,43 @@ Expected output:
 ### Step 2: List and download FASTQ files
 
 ```
-encode_list_files(accession="ENCSR000DNS", file_format="fastq")
+encode_list_files(experiment_accession="ENCSR000DNS", file_format="fastq")
 ```
 
 ### Step 3: Run the DNase-seq pipeline
 
+`--reads` is a glob that `fromFilePairs` has to resolve, so name the downloaded
+FASTQs `<sample>_R1.fastq.gz` / `<sample>_R2.fastq.gz` first (ENCODE delivers
+them as `ENCFF*.fastq.gz`):
+
 ```bash
-nextflow run pipeline-dnaseseq/main.nf \
-  --fastq_r1 ENCFF700DN1.fastq.gz \
-  --genome GRCh38 \
-  --blacklist encode_blacklist_v2.bed \
-  -profile docker
+nextflow run scripts/main.nf \
+  -profile local \
+  --reads '/data/fastq/*_R{1,2}.fastq.gz' \
+  --bwa_index /ref/bwa_index/genome.fa \
+  --chrom_sizes /ref/hg38.chrom.sizes \
+  --hotspot_center_sites /ref/hotspot2/hg38.center_sites.n100.starch \
+  --hotspot_mappable /ref/hotspot2/hg38.mappable_only.bed \
+  --rgt_data /ref/rgtdata \
+  --blacklist /ref/hg38-blacklist.v2.bed \
+  --outdir results/ \
+  -resume
 ```
 
 Key pipeline steps:
 1. Quality trimming
 2. BWA-MEM alignment
-3. Duplicate removal
+3. Duplicate removal and blacklist filtering
 4. Hotspot2 DHS calling
 5. Signal track generation
-6. Footprint analysis (HINT-ATAC)
+6. Footprint analysis (HINT, DNase-seq mode)
 
 ### Step 4: Validate output quality
 
 | Metric | Threshold | Purpose |
 |---|---|---|
 | SPOT score | > 0.4 | Signal portion of tags |
-| Hotspot count | > 100,000 | Sensitivity |
+| Hotspot count | > 50,000 | Sensitivity |
 | Duplicate rate | < 30% | Library complexity |
 
 ### Step 5: Compare with ATAC-seq
@@ -375,7 +464,7 @@ encode_search_experiments(assay_title="ATAC-seq", biosample_term_name="K562", or
 ### 1. Survey DNase-seq availability
 
 ```
-encode_get_facets(assay_title="DNase-seq", facet_field="organ", organism="Homo sapiens")
+encode_get_facets(assay_title="DNase-seq", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -390,7 +479,7 @@ Expected output:
 ### 2. Check for existing DHS peaks
 
 ```
-encode_list_files(accession="ENCSR000DNS", file_format="bed", output_type="peaks", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000DNS", file_format="bed", output_type="peaks", assembly="GRCh38")
 ```
 
 Expected output:
@@ -445,9 +534,8 @@ When reporting DNase-seq pipeline results:
 
 - **Hotspot counts**: Report total Hotspot2 DHS calls at the specified FDR threshold and the number remaining after blacklist filtering
 - **Signal-to-noise (SPOT score)**: Report the SPOT score prominently (>0.4 pass, 0.2-0.4 warning, <0.2 fail). This is the DNase-seq equivalent of FRiP
-- **Footprint depth**: If footprinting was performed, report the number of TF footprints detected and note the sequencing depth (>100M reads recommended for reliable footprints)
-- **FRiP equivalent**: Report the fraction of reads in hotspots as a complementary enrichment metric
-- **Key QC metrics**: Present mapping rate (>80%), duplication rate (<30%), NRF (>0.8), PBC1 (>0.9), and insert size peak in a summary table
+- **Footprint depth**: If footprinting was performed, report the number of lines in `footprints/{sample}.footprints.bed` and note the sequencing depth (>100M reads recommended for reliable footprints)
+- **Key QC metrics**: Present mapping rate (>80%) and duplication rate (<30%) from `alignment/{sample}.flagstat.txt` and `alignment/{sample}.dup_metrics.txt`, and the insert size peak from the `IS` block of `qc/{sample}.insert_sizes.txt`. NRF (>0.8) and PBC1 (>0.9) are not produced by the workflow -- state that they were computed manually (`references/03-filtering.md`) or that they are unavailable
 - **Output paths**: Provide paths to hotspot BED files, narrowPeak files, signal bigWig tracks, and footprint results
 - **Mappability note**: Confirm which Hotspot2 mappability index was used and that it matches the read length
 - **Next steps**: Suggest `motif-analysis` for TF motif enrichment in DHS peaks, or `accessibility-aggregation` for merging DHS data across samples

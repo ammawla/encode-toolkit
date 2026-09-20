@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 // ============================================================================
 // ENCODE DNase-seq Pipeline — FASTQ to Hotspots and Footprints
-// Tools: BWA-MEM, Hotspot2, HINT-ATAC
+// Tools: BWA-MEM, Hotspot2, HINT (RGT)
 // ============================================================================
 
 params.reads                = null

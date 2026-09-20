@@ -4,9 +4,11 @@ Bisulfite-converted reads require a specialized aligner that accounts for
 C-to-T conversion. Bismark handles this by aligning to both C-to-T and G-to-A
 converted genomes simultaneously.
 
-## Genome Preparation
+## Genome Preparation (one-time prep, outside the workflow)
 
-Build the bisulfite-converted genome index (one-time step):
+Build the bisulfite-converted genome index. The directory you prepare is what you pass as
+`--genome_dir`, and it must still contain the genome `.fa`, because MethylDackel reads the
+FASTA from the same directory later.
 
 ```bash
 bismark_genome_preparation \
@@ -24,7 +26,10 @@ Requires approximately 12 GB disk space for human genome.
 
 ## Bismark Alignment
 
+This is what the workflow runs, in the task directory:
+
 ```bash
+mkdir -p tmp
 bismark \
     --genome /ref/genome/ \
     --bowtie2 \
@@ -33,11 +38,15 @@ bismark \
     --no_mixed \
     --no_discordant \
     --maxins 1000 \
-    --temp_dir /tmp/bismark/ \
-    -1 sample_R1_trimmed.fq.gz \
-    -2 sample_R2_trimmed.fq.gz \
-    --output_dir bismark_out/
+    --temp_dir $PWD/tmp \
+    -1 sample_R1_val_1.fq.gz \
+    -2 sample_R2_val_2.fq.gz
 ```
+
+Of the two outputs, only the `*_PE_report.txt` is published (to
+`bismark/alignments/`). The raw unsorted BAM stays in the work directory; what reaches
+`bismark/alignments/<sample>.sorted.bam` is the deduplicated, coordinate-sorted BAM from
+the later step.
 
 ### Key Parameters
 
@@ -51,8 +60,10 @@ bismark \
 
 ### Memory Requirements
 
-Bismark parallel mode uses approximately 6 GB per Bowtie2 instance.
-With `--parallel 4`, expect ~24 GB peak RAM for human genome alignment.
+Bismark parallel mode runs several Bowtie2 instances, each holding its own copy of a
+converted genome index. `nextflow.config` allocates 48 GB to `BISMARK_ALIGN` with
+`--parallel 4` on a human genome, doubling on each retry up to `--max_memory` (64 GB by
+default). Budget for the 48 GB figure rather than a per-instance estimate.
 
 ## Alternative: bwa-meth
 
@@ -81,17 +92,18 @@ samtools index sample_bwameth.bam
 | Feature | Bismark | bwa-meth |
 |---------|---------|----------|
 | Speed | Slower (~2x) | Faster |
-| RAM | ~48 GB (parallel) | ~16 GB |
+| RAM | 48 GB allocated (parallel) | ~16 GB |
 | Accuracy | Gold standard | Comparable |
-| ENCODE pipeline | Primary | Supported |
+| This workflow | The only aligner it runs | Not available; manual only |
 | Methylation calling | Built-in | Requires MethylDackel |
 
-Recommendation: Use Bismark for ENCODE compatibility. Use bwa-meth when
-processing many samples and speed is critical.
+Recommendation: Use Bismark for ENCODE compatibility. Use bwa-meth outside this workflow
+when processing many samples and speed is critical.
 
-## Lambda/pUC19 Spike-in Alignment
+## Lambda/pUC19 Spike-in Alignment (not run by this workflow)
 
-If spike-in DNA was used, align to the spike-in genome to measure conversion rate:
+If spike-in DNA was used, align to the spike-in genome by hand to measure the conversion
+rate. The workflow does not do this and reports no conversion rate:
 
 ```bash
 bismark \
@@ -108,7 +120,8 @@ incomplete bisulfite conversion. Expect conversion rate ≥98%.
 
 ## Alignment QC Checks
 
-After alignment, verify in the Bismark report:
+After alignment, verify in the Bismark report (`bismark/alignments/*_PE_report.txt`,
+also parsed into the MultiQC report):
 - **Mapping efficiency**: >70% for WGBS (lower than standard WGS due to conversion)
 - **Unique alignments**: Should dominate over multimappers
 - **C methylated in CpG context**: Typically 70-85% for mammalian somatic tissue

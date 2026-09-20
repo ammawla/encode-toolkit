@@ -482,7 +482,7 @@ For detailed biological meaning of each histone mark, ChromHMM combinatorial sta
 ### Step 1: Gather all data types for the tissue
 
 ```
-encode_get_facets(facet_field="assay_title", organ="heart", organism="Homo sapiens")
+encode_get_facets(organ="heart", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -506,7 +506,7 @@ encode_search_experiments(assay_title="Hi-C", organ="heart", organism="Homo sapi
 ### Step 3: Download processed files
 
 ```
-encode_download_files(accessions=["ENCFF100H3K", "ENCFF200ATK", "ENCFF300RNA", "ENCFF400HIC"], download_dir="/data/multiomics")
+encode_download_files(file_accessions=["ENCFF100H3K", "ENCFF200ATK", "ENCFF300RNA", "ENCFF400HIC"], download_dir="/data/multiomics")
 ```
 
 ### Step 4: Integrate at a gene locus
@@ -529,7 +529,7 @@ Focus on MYH7 locus (chr14:23,380,000-23,500,000) — cardiac myosin gene:
 
 ### 1. Survey available omics layers for a tissue
 ```
-encode_get_facets(facet_field="assay_title", organ="heart", organism="Homo sapiens")
+encode_get_facets(organ="heart", organism="Homo sapiens")
 ```
 
 Expected output:
@@ -541,7 +541,7 @@ Expected output:
 
 ### 2. Compare experiments across omics
 ```
-encode_compare_experiments(accession_1="ENCSR100CHI", accession_2="ENCSR200ATK")
+encode_compare_experiments(accession1="ENCSR100CHI", accession2="ENCSR200ATK")
 ```
 
 Expected output:

@@ -162,6 +162,7 @@ process MACS2_CALLPEAK {
     tuple val(sample_id), path("${sample_id}*Peak"),    emit: peaks
     tuple val(sample_id), path("${sample_id}*.bdg"),    emit: bdg
     path("${sample_id}*.xls"),                           emit: xls
+    path("${sample_id}*_summits.bed"),                   emit: summits, optional: true   // narrow peaks only
 
     script:
     def format_flag  = params.single_end ? 'BAM' : 'BAMPE'

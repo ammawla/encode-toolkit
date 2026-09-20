@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Install Nextflow and container runtime for ENCODE pipelines
+# Install the pinned Nextflow release and check for a container runtime.
+# Docker and Singularity are only checked: when one is missing, the script prints how to get it.
 # Usage: bash install-nextflow.sh [--docker | --singularity | --both]
 #
 # Options:
-#   --docker       Install Nextflow + Docker (default, for local/cloud)
-#   --singularity  Install Nextflow + Singularity (for HPC clusters)
-#   --both         Install Nextflow + Docker + Singularity
+#   --docker       Nextflow, then check for Docker (default, for local/cloud)
+#   --singularity  Nextflow, then check for Singularity/Apptainer (for HPC clusters)
+#   --both         Nextflow, then check for both
 
 set -euo pipefail
 

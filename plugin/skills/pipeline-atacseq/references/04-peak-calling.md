@@ -1,48 +1,44 @@
 # Stage 4: Peak Calling and IDR
 
 ## Tools
-- **MACS2 v2.2.7+**: Peak caller (Zhang et al. 2008)
-- **IDR v2.0.4+**: Irreproducible Discovery Rate (Li et al. 2011)
+- **MACS2 2.2.9.1** (image version): Peak caller (Zhang et al. 2008)
+- **IDR 2.0.4.2** (image version): Irreproducible Discovery Rate (Li et al. 2011)
 
 ## MACS2 Parameters for ATAC-seq
 
 ATAC-seq peak calling differs from ChIP-seq in several key ways:
-1. **No control/input file** -- peaks are called against local background
-2. **Shift and extension** -- correct for Tn5 insertion site
-3. **Use NFR BAM only** -- nucleosome-free fragments for accessibility peaks
+1. **No control/input file** -- peaks are called against the local background model
+2. **Use the NFR BAM only** -- nucleosome-free fragments for accessibility peaks
+3. **BAMPE mode** -- fragment coordinates come from the read pairs
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
 | `--format` | BAMPE | Use actual fragment sizes |
-| `--gsize` | hs (2.7e9) | Use mm for mouse |
-| `--nomodel` | yes | Do not build shifting model |
-| `--shift` | -75 | Center on Tn5 cut site |
-| `--extsize` | 150 | Extend to 150bp from cut site |
+| `--gsize` | hs (2.7e9) | `mm` when `--genome mm10` |
+| `--nomodel` | yes | Do not build a shifting model |
 | `--qvalue` | 0.05 | FDR threshold |
-| `--keep-dup` | all | Already deduplicated |
+| `--keep-dup` | all | Duplicates were already removed in Stage 3 |
 | `--call-summits` | yes | Identify sub-peak summits |
-| `-B` | yes | Generate bedGraph for signal |
+| `-B` | yes | Generate bedGraphs |
 
-**Note**: When using BAMPE format with Tn5-shifted BAM, the `--shift` and `--extsize`
-parameters are not needed because BAMPE uses actual fragment coordinates. Use them
-only when calling peaks on BED format or single-end data.
+**`--shift` and `--extsize` are not used, and would have no effect here.** In `-f BAMPE`
+mode MACS2 takes fragment coordinates from the read pairs: it forces `nomodel = True` and
+sets `shift = 0` internally, without warning. Shift/extension values such as
+`--shift -100 --extsize 200` or `--shift -75 --extsize 150` apply only when calling peaks
+on BED or single-end input, which this workflow does not do.
 
 ## Commands
 
+The workflow runs the equivalent of:
+
 ```bash
-# Peak calling on NFR fragments (primary)
-macs2 callpeak -t nfr.bam \
-  -f BAMPE -g hs -n sample_nfr \
+# Peak calling on NFR fragments
+macs2 callpeak -t sample.nfr.bam \
+  -f BAMPE -g hs -n sample \
   --nomodel --keep-dup all --call-summits \
   --qvalue 0.05 -B
 
-# Alternative: Peak calling on all fragments with shift correction
-macs2 callpeak -t final.bam \
-  -f BAMPE -g hs -n sample_all \
-  --nomodel --keep-dup all --call-summits \
-  --qvalue 0.05 -B
-
-# IDR on true replicates
+# IDR on the first two replicate peak files, sorted by name
 idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
   --input-file-type narrowPeak \
   --rank p.value \
@@ -51,27 +47,56 @@ idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
   --idr-threshold 0.05
 ```
 
+Calling peaks on the blacklist-filtered all-fragment BAM (`filtered/<sample>.final.bam`)
+instead of the NFR BAM is a reasonable manual variant, but the workflow always uses NFR.
+
+## What the workflow publishes
+
+- `peaks/narrow/<sample>_peaks.narrowPeak`
+- `peaks/narrow/<sample>_peaks.xls`
+- `peaks/narrow/<sample>_treat_pileup.bdg` and `<sample>_control_lambda.bdg`
+- `peaks/idr/idr_peaks.txt` and, when IDR emits it, `idr_peaks.txt.png`
+
+`<sample>_summits.bed` is produced by `--call-summits` but is not declared as an output, so
+it stays in the Nextflow work directory. Only narrow peaks are called; there is no broad
+mode.
+
+## What the IDR step does and does not do
+
+The workflow collects the per-sample peak files, sorts them by file name, and runs `idr`
+once on the first two. Consequently:
+
+- With fewer than two peak files, IDR is skipped silently and `peaks/idr/` is not created.
+- With more than two, the extra files are dropped and a warning is logged.
+- There are **no** pooled-replicate calls, **no** pseudoreplicates, and **no** optimal /
+  conservative peak sets.
+- Rescue ratio and self-consistency ratio are **not computed**; they require pooled and
+  pseudoreplicated peak calls that this workflow does not produce.
+
+`--skip_idr` turns the step off entirely.
+
 ## IDR Interpretation
 
-| Metric | Expected (Good) | Concern |
-|--------|-----------------|---------|
-| IDR peaks (0.05 threshold) | 50,000-150,000 | <30,000 suggests poor signal |
-| Rescue ratio | <2 | >2 suggests replicate discordance |
-| Self-consistency ratio | <2 | >2 suggests noisy data |
+| Metric | Expected (Good) | Concern | Computed here? |
+|--------|-----------------|---------|----------------|
+| IDR peaks (0.05 threshold) | 50,000-150,000 | <30,000 suggests poor signal | yes |
+| Rescue ratio | <2 | >2 suggests replicate discordance | no |
+| Self-consistency ratio | <2 | >2 suggests noisy data | no |
 
 ## QC Checkpoints
 
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
-| FRiP | >=0.3 (ATAC-seq standard) | Poor accessibility signal |
+| FRiP (manual) | >=0.3 (ATAC-seq standard) | Poor accessibility signal |
 | Peak count | >50,000 (IDR filtered) | Low enrichment |
 | Peak width distribution | Median 200-500 bp | Check if calling mode correct |
-| Peaks at TSS | Enrichment visible | Fundamental ATAC-seq signal |
+| Peaks at TSS (manual) | Enrichment visible | Fundamental ATAC-seq signal |
 
 ## Notes
 
 - ATAC-seq FRiP is typically much higher than ChIP-seq (0.3-0.6 vs 0.01-0.1)
-  because open chromatin is a large fraction of the genome.
-- Always call peaks on NFR fragments for accessibility analysis.
-- For nucleosome positioning, use the mono-nucleosomal fragments separately.
+  because open chromatin is a large fraction of the genome. FRiP is a manual calculation;
+  see `references/05-qc-metrics.md`.
+- The workflow always calls peaks on NFR fragments for accessibility analysis.
+- For nucleosome positioning, use `filtered/nfr/<sample>.mononuc.bam` separately.
 - IDR is standard for ATAC-seq with biological replicates.

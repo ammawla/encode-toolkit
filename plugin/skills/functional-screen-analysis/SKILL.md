@@ -252,13 +252,22 @@ Step 5: Allelic comparison → Test for allele-specific activity (if applicable)
 Standardized computational pipeline:
 
 ```bash
-# Run MPRAflow
-nextflow run MPRAflow/MPRAflow.nf \
-    --design design_file.txt \
-    --fastq_insert insert_reads/ \
-    --fastq_bc barcode_reads/ \
-    --outdir results/
+# 1. Associate barcodes with the designed elements
+nextflow run association.nf \
+    --fastq-insert "insert_R1.fastq.gz" \
+    --fastq-bc "barcode_R2.fastq.gz" \
+    --design "ordered_candidate_sequences.fa"
+
+# 2. Count barcodes in the DNA and RNA libraries listed in experiment.csv
+nextflow run count.nf \
+    --dir "bulk_FASTQ_directory" \
+    --e "experiment.csv" \
+    --design "ordered_candidate_sequences.fa" \
+    --association "dictionary_of_candidate_sequences_to_barcodes.p"
 ```
+
+Both commands run inside a clone of https://github.com/shendurelab/MPRAflow; `nextflow run count.nf --help`
+lists the barcode and UMI length options.
 
 MPRAflow handles:
 - Barcode-to-element association
@@ -559,7 +568,7 @@ Expected output:
 ### Step 3: List screen result files
 
 ```
-encode_list_files(accession="ENCSR000CRI", file_format="tsv", assembly="GRCh38")
+encode_list_files(experiment_accession="ENCSR000CRI", file_format="tsv", assembly="GRCh38")
 ```
 
 Expected output:
@@ -577,7 +586,7 @@ Expected output:
 ### Step 4: Download and analyze screen results
 
 ```
-encode_download_files(accessions=["ENCFF500SCR"], download_dir="/data/crispr_screen")
+encode_download_files(file_accessions=["ENCFF500SCR"], download_dir="/data/crispr_screen")
 ```
 
 Analysis steps:
@@ -605,7 +614,7 @@ Overlay significant enhancer hits with:
 
 ### 1. Survey available functional screens by assay type
 ```
-encode_get_facets(assay_title="CRISPR screen", facet_field="biosample_ontology.term_name", organism="Homo sapiens")
+encode_get_facets(assay_title="CRISPR screen", organism="Homo sapiens")
 ```
 
 Expected output:

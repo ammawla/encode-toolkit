@@ -76,9 +76,9 @@ jobs:
             smoke: >-
               shows 'FastQC v' fastqc --version && shows 'version 0.6' trim_galore --version && shows 'Version:[0-9]' picard MarkDuplicates --version && shows 'Usage' hotspot2.sh -h && shows 'Usage' extractCenterSites.sh -h && shows '[0-9]' rgt-hint --version && shows '33' bash -c 'echo "scale=2; 1/3" | bc'
           - pipeline: hic
-            tools: fastqc bwa samtools pairtools cooler java multiqc
+            tools: fastqc trim_galore bwa samtools pairtools cooler java multiqc
             smoke: >-
-              shows 'FastQC v' fastqc --version && shows '1.1.2' pairtools --version && shows 'cooler' cooler --version && shows 'Juicer' java -jar /opt/juicer_tools.jar -h
+              shows 'FastQC v' fastqc --version && shows 'version 0.6' trim_galore --version && shows '1.1.2' pairtools --version && shows 'cooler' cooler --version && shows 'Juicer' java -jar /opt/juicer_tools.jar -h
           - pipeline: rnaseq
             tools: fastqc trim_galore STAR rsem-calculate-expression kallisto samtools bedGraphToBigWig infer_experiment.py multiqc
             smoke: >-

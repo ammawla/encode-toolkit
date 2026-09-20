@@ -3,6 +3,11 @@
 Generate multi-resolution contact matrices in .hic (Juicer) and .mcool
 (cooler) formats from deduplicated .pairs files.
 
+The "Matrix Quality Assessment" commands that use cooltools (distance decay,
+A/B compartments) are manual steps: the workflow does not run them, and
+cooltools is not installed in the container image. Use the conda environment
+(`hic-env.yml`) or install cooltools separately for those.
+
 ## Juicer Tools: Generate .hic File
 
 The .hic format is the ENCODE standard for Hi-C contact matrices.
@@ -98,12 +103,12 @@ for res in 1000 5000 10000 25000; do
 done
 ```
 
-### Distance Decay Curve
+### Distance Decay Curve (manual, not run by this workflow)
 
 The contact frequency vs distance curve is a fundamental QC metric:
 
 ```bash
-# Using cooltools
+# Using cooltools (not in the container image)
 cooltools expected-cis \
     --nproc 4 \
     sample.mcool::resolutions/10000 \
@@ -115,11 +120,13 @@ Deviations indicate:
 - Steeper slope: Over-digestion or poor ligation
 - Shallower slope: Incomplete digestion
 
-### Compartment Calling (A/B)
+### Compartment Calling (A/B) -- manual, not run by this workflow
 
-At 100 kb resolution, call A/B compartments using eigenvector decomposition:
+The workflow has no compartment step. To call A/B compartments yourself, run
+eigenvector decomposition on the published `.mcool` at 100 kb resolution:
 
 ```bash
+# cooltools is not in the container image
 cooltools eigs-cis \
     --n-eigs 3 \
     --phasing-track /ref/gene_density.bedGraph \

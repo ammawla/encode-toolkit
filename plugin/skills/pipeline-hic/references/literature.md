@@ -48,7 +48,7 @@
 - **Citation:** Hitz BC, Lee JW, Jolanki O, et al. The ENCODE Uniform Analysis Pipelines. Research Square (preprint), 2023.
 - **DOI:** [10.21203/rs.3.rs-311127/v1](https://doi.org/10.21203/rs.3.rs-311127/v1)
 - **Citations:** ~84
-- **Key findings:** Documents the official ENCODE Hi-C pipeline specification: BWA-MEM for per-mate alignment, pairtools for pair classification and deduplication, Juicer tools for .hic file generation with KR normalization, cooler for .mcool generation, and HiCCUPS for loop calling. Specifies MAPQ >= 30 filtering, restriction site-aware pair classification, and multi-resolution matrix generation. Pipeline infrastructure uses Docker containers and WDL for reproducible execution.
+- **Key findings:** Documents the official ENCODE Hi-C pipeline specification: BWA-MEM with `-SP5M` for chimeric Hi-C alignment, pairtools for pair classification and deduplication, Juicer tools for .hic file generation with KR normalization, cooler for .mcool generation, and HiCCUPS for loop calling. Specifies MAPQ >= 30 filtering, restriction site-aware pair classification, and multi-resolution matrix generation. Pipeline infrastructure uses Docker containers and WDL for reproducible execution.
 
 ---
 
@@ -122,7 +122,7 @@ See pipeline-chipseq/references/literature.md for detailed descriptions of share
 ### Li et al. 2009 — SAMtools
 
 - **DOI:** [10.1093/bioinformatics/btp352](https://doi.org/10.1093/bioinformatics/btp352) | **PMID:** 19505943 | **Citations:** ~53,700
-- **Hi-C role:** BAM operations including sorting, merging, and indexing of per-mate alignments. Used before pairtools parse to prepare aligned BAM files for pair classification.
+- **Hi-C role:** BAM operations: converting the `bwa mem -SP5M` stream to the BAM that pairtools parse reads for pair classification.
 
 ---
 

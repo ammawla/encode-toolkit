@@ -1,8 +1,8 @@
 # Stage 2: STAR Alignment
 
 ## Tools
-- **STAR v2.7.10b+**: Splice-aware aligner (Dobin et al. 2013, ~12,000 citations)
-- **Samtools v1.17+**: BAM conversion, sorting, indexing, and statistics
+- **STAR 2.7.10b**: Splice-aware aligner (Dobin et al. 2013, ~12,000 citations)
+- **Samtools 1.17**: BAM conversion, sorting, indexing, and statistics
 
 ## Why STAR Instead of HISAT2 or Bowtie2
 STAR is preferred for ENCODE RNA-seq because:
@@ -21,11 +21,14 @@ STAR is preferred for ENCODE RNA-seq because:
 | Mouse | mm10 (GRCm38) | Build from ENCODE FASTA | GENCODE vM27+ (comprehensive) |
 
 Use the ENCODE "no alt" analysis set FASTA with GENCODE comprehensive gene annotation.
+The GTF is consumed here, when the index is built, and is not a parameter of the
+workflow — the directory produced below is what you pass as `--star_index`, and its
+`chrNameLength.txt` is the default `--chrom_sizes`.
 
-## STAR Index Generation
+## STAR Index Generation (one-time prep, outside the workflow)
 
 ```bash
-# Generate genome index (run once, requires ~32GB RAM for human)
+# Generate genome index (run once, requires ~32 GB RAM for human)
 STAR --runMode genomeGenerate \
   --genomeDir star_index/ \
   --genomeFastaFiles GRCh38.primary_assembly.genome.fa \
@@ -60,6 +63,14 @@ STAR --genomeDir star_index/ \
   --outWigStrand Stranded
 ```
 
+`--outWigStrand` is the only part of the command the workflow varies: it passes
+`Stranded` for `--strandedness reverse|forward` and `Unstranded` for
+`--strandedness none`. Everything else is fixed.
+
+The ~32 GB above is the figure for `genomeGenerate`. Alignment is a separate budget: the
+`STAR_ALIGN` process is configured for 36 GB (see `nextflow.config`), doubling on each
+retry up to `--max_memory`.
+
 ## Parameters
 
 | Parameter | Value | Notes |
@@ -72,16 +83,23 @@ STAR --genomeDir star_index/ \
 | Intron min | `--alignIntronMin 20` | Minimum intron length |
 | Intron max | `--alignIntronMax 1000000` | Maximum intron length (1 Mb) |
 | Quant mode | `TranscriptomeSAM GeneCounts` | Output transcriptome BAM + gene counts |
-| Signal output | `--outWigType bedGraph --outWigStrand Stranded` | Strand-specific bedGraph |
+| Signal output | `--outWigType bedGraph --outWigStrand Stranded` | Strand-specific bedGraph (`Unstranded` when `--strandedness none`) |
 
 ## Expected Output
-- `Aligned.sortedByCoord.out.bam` -- genome-sorted BAM
-- `Aligned.toTranscriptome.out.bam` -- transcriptome BAM (input for RSEM)
-- `ReadsPerGene.out.tab` -- STAR gene counts (column 1: unstranded, 2: sense, 3: antisense)
-- `SJ.out.tab` -- splice junction table (novel + annotated)
-- `Signal.UniqueMultiple.str1.out.bg` -- plus-strand bedGraph
-- `Signal.UniqueMultiple.str2.out.bg` -- minus-strand bedGraph
-- `Log.final.out` -- alignment summary statistics
+
+All of these are published to `star/`, prefixed with the sample ID:
+
+- `<sample>.Aligned.sortedByCoord.out.bam` (+ `.bai`) -- genome-sorted BAM
+- `<sample>.Aligned.toTranscriptome.out.bam` -- transcriptome BAM (input for RSEM)
+- `<sample>.ReadsPerGene.out.tab` -- STAR gene counts (column 2: unstranded, 3: sense, 4: antisense)
+- `<sample>.SJ.out.tab` -- splice junction table (novel + annotated)
+- `<sample>.Signal.UniqueMultiple.str1.out.bg` -- fragments whose read 1 maps to the + strand
+- `<sample>.Signal.UniqueMultiple.str2.out.bg` -- the remaining fragments (absent when `--strandedness none`)
+- `<sample>.Log.final.out` -- alignment summary statistics
+
+Which transcript strand str1 and str2 correspond to depends on the library; see
+`04-signal-tracks.md`. STAR also writes `Signal.Unique.str*.out.bg`, but those are not
+declared outputs and stay in the Nextflow work directory.
 
 ## QC Checkpoints
 
@@ -91,7 +109,7 @@ STAR --genomeDir star_index/ \
 | Multi-mapped reads | <10% | High multi-map suggests repetitive contamination |
 | Unmapped: too short | <10% | High rate suggests aggressive trimming or poor quality |
 | Unmapped: too many mismatches | <5% | Check for contamination (wrong organism) |
-| Chimeric reads | <1% (unless fusion analysis) | High rate may indicate structural variants |
+| Chimeric reads | 0 unless chimeric detection is enabled | The workflow passes no `--chim*` options |
 | Splice junctions (novel) | Thousands expected | Very few suggests annotation mismatch |
 
 ## Notes
@@ -99,5 +117,5 @@ STAR --genomeDir star_index/ \
 - The transcriptome BAM (`Aligned.toTranscriptome.out.bam`) must NOT be coordinate-sorted;
   RSEM requires it in its native transcript-coordinate order.
 - `--outFilterMultimapNmax 20` is essential for RSEM. Do not reduce this before RSEM.
-- For chimeric/fusion detection, add `--chimSegmentMin 12 --chimJunctionOverhangMin 8
-  --chimOutType Junctions WithinBAM SoftClip`.
+- Chimeric/fusion detection is not part of this workflow. To do it, run STAR by hand with
+  `--chimSegmentMin 12 --chimJunctionOverhangMin 8 --chimOutType Junctions WithinBAM SoftClip`.

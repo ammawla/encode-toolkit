@@ -7,8 +7,9 @@ description: "Install bioinformatics tools for ENCODE data analysis. Covers CLI 
 
 Install all bioinformatics tools needed for ENCODE data analysis, organized by assay type.
 This skill provides ready-to-use conda environment definitions, R/Bioconductor install scripts,
-Python package lists, and Nextflow pipeline infrastructure setup. Every environment is version-pinned
-for reproducibility and tested against ENCODE uniform processing standards.
+Python package lists, and Nextflow pipeline infrastructure setup. Every primary tool is
+version-pinned for reproducibility; a few utility packages (`bedops`, `ucsc-bedgraphtobigwig`,
+`pigz`, `openjdk`, `r-base`) float so the solver can satisfy the pinned tools around them.
 
 ## When to Use
 
@@ -28,9 +29,12 @@ new users and a reproducibility concern for experienced analysts.
 
 This skill solves that by providing:
 - **7 assay-specific conda environments** with pinned tool versions matching ENCODE pipeline standards
-- **R/Bioconductor install script** covering 50+ packages across 8 categories
-- **Python install script** for single-cell, Hi-C, and genomics packages
-- **Nextflow + container setup** for pipeline execution on local, HPC, and cloud platforms
+- **R/Bioconductor install script** covering 47 packages across 8 categories
+- **Python install script** for single-cell, Hi-C, and genomics packages, locked by `scripts/constraints.txt`
+- **Nextflow install script + container checks** for pipeline execution on local, HPC, and cloud platforms
+
+The environment files, `scripts/requirements.in` and `scripts/install-r-packages.R` are the
+authoritative package lists; the tables below summarise them.
 
 All environments use the same channel priority (conda-forge > bioconda). Every file is dry-run
 solved for Linux x86_64 in CI, so the pinned versions exist and install together. Several tools
@@ -78,7 +82,7 @@ Rscript skills/bioinformatics-installer/scripts/install-r-packages.R --all
 # All Python packages
 bash skills/bioinformatics-installer/scripts/install-python-packages.sh --all
 
-# Nextflow + Docker
+# Install the pinned Nextflow release and check for a Docker runtime
 bash skills/bioinformatics-installer/scripts/install-nextflow.sh --docker
 ```
 
@@ -91,7 +95,7 @@ uniform pipeline standards (Landt et al. 2012, ENCODE Consortium 2020).
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| BWA-MEM | 0.7.17 | Read alignment to reference genome (Li & Durbin 2009) |
+| BWA-MEM | 0.7.18 | Read alignment to reference genome (Li & Durbin 2009) |
 | samtools | 1.19 | BAM manipulation, sorting, indexing, flagstat (Li et al. 2009) |
 | MACS2 | 2.2.9.1 | Peak calling for narrow (TF) and broad (histone) marks (Zhang et al. 2008) |
 | Picard | 3.1.1 | Duplicate marking and library complexity metrics (Broad Institute) |
@@ -119,7 +123,8 @@ For chromatin accessibility profiling via ATAC-seq following ENCODE standards
 | Tool | Version | Purpose |
 |------|---------|---------|
 | Bowtie2 | 2.5.4 | Alignment (preferred over BWA for ATAC-seq short fragments) (Langmead & Salzberg 2012) |
-| MACS2 | 2.2.9.1 | Peak calling with --nomodel --shift -100 --extsize 200 for ATAC (Zhang et al. 2008) |
+| MACS2 | 2.2.9.1 | Peak calling (`pipeline-atacseq` calls it with `-f BAMPE` on Tn5-shifted reads) (Zhang et al. 2008) |
+| IDR | 2.0.4.2 | Irreproducible Discovery Rate for replicate consistency (Li et al. 2011) |
 | samtools | 1.19 | BAM manipulation, mitochondrial read filtering |
 | Picard | 3.1.1 | Duplicate marking, insert size metrics |
 | deeptools | 3.5.5 | alignmentSieve (Tn5 offset), bamCoverage (signal tracks), plotFingerprint |
@@ -168,10 +173,10 @@ For chromatin conformation capture processing following ENCODE Hi-C standards
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| BWA-MEM | 0.7.17 | Chimeric read alignment (each mate aligned independently) |
+| BWA-MEM | 0.7.18 | Chimeric read alignment (each mate aligned independently) |
 | pairtools | 1.1.2 | Parse, sort, deduplicate, filter contact pairs (Open2C) |
 | cooler | 0.9.3 | Multi-resolution contact matrix storage and balancing (Abdennur & Mirny 2020) |
-| Juicer | 2.20.00 | Contact matrix generation and HiCCUPS loop calling (Durand et al. 2016) |
+| openjdk | >=11 | Java runtime for Juicer Tools (the jar itself is installed separately, see below) |
 | samtools | 1.19 | BAM handling for chimeric alignment parsing |
 | bedtools | 2.31.0 | Restriction fragment and TAD boundary operations |
 | FastQC | 0.12.1 | Read quality assessment |
@@ -181,8 +186,11 @@ For chromatin conformation capture processing following ENCODE Hi-C standards
 **Key Hi-C parameters**: Cis/trans ratio > 60%, long-range cis contacts (> 20 kb) > 40%.
 Resolution depends on sequencing depth: ~1 billion valid pairs for 5 kb resolution on human.
 
-**Note**: Juicer requires Java 11+. Install via `conda install -c bioconda juicer_tools` or
-download the `.jar` directly from the Aiden Lab GitHub.
+**Juicer Tools is not in this environment.** The YAML installs only the Java runtime it needs.
+Download `juicer_tools.2.20.00.jar` from the `aidenlab/Juicebox` GitHub releases and invoke it
+with `java -jar`. The Hi-C pipeline image (`pipeline-hic/scripts/Dockerfile`) already contains it.
+
+The environment also installs `cooltools`, `hic-straw` and `pyGenomeTracks` from PyPI (unpinned).
 
 **Environment file**: `environments/hic-env.yml`
 
@@ -202,8 +210,8 @@ For whole-genome bisulfite sequencing (DNA methylation) following ENCODE standar
 | FastQC | 0.12.1 | Read quality assessment (note: bisulfite libraries have biased base composition) |
 | Trim Galore | 0.6.10 | Adapter trimming with --rrbs or default mode |
 | MultiQC | 1.21 | Aggregate QC reporting with Bismark module |
-| tabix | 1.19 | Index methylation BED files for random access |
-| bgzip | 1.19 | Block-gzip compression for indexed access |
+| htslib | 1.19 | Provides `tabix` and `bgzip` for indexed, block-gzipped methylation BED files |
+| Bowtie2 | 2.5.4 | Backend aligner required by Bismark |
 
 **Key WGBS parameters**: Bisulfite conversion rate ≥ 98% (check unmethylated spike-in lambda DNA).
 CpG coverage >= 10x for reliable DMR calling. M-bias plots should be checked for end-repair artifacts.
@@ -219,8 +227,9 @@ For DNase I hypersensitive site mapping following ENCODE standards
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| BWA-MEM | 0.7.17 | Read alignment to reference genome |
-| Hotspot2 | 2.1.2 | DNase-seq hotspot detection (John et al. 2011); not on conda, built from source in the pipeline image |
+| BWA-MEM | 0.7.18 | Read alignment to reference genome |
+| Picard | 3.1.1 | Duplicate marking and library complexity metrics |
+| BEDOPS | unpinned | `sort-bed` and `unstarch` for the Hotspot2 `.starch` archives (Neph et al. 2012) |
 | HINT (RGT) | 1.0.2 | TF footprinting from DNase-seq data (Li et al. 2019); installed from PyPI |
 | F-Seq2 | 2.0.3 | Feature density estimation for peak calling (Boyle et al. 2008, Zhao et al. 2020); installed from PyPI |
 | samtools | 1.19 | BAM handling and filtering |
@@ -228,6 +237,11 @@ For DNase I hypersensitive site mapping following ENCODE standards
 | FastQC | 0.12.1 | Read quality assessment |
 | Trim Galore | 0.6.10 | Adapter trimming |
 | MultiQC | 1.21 | Aggregate QC reporting |
+| bedGraphToBigWig | unpinned | Convert bedGraph signal to bigWig |
+
+**Hotspot2 2.1.2 and its `modwt` dependency are not in this environment** — neither is packaged
+for conda. Build both from source (`pipeline-dnaseseq/scripts/Dockerfile` shows the exact steps)
+or run the pipeline through that image, which is what `pipeline-dnaseseq` does.
 
 **Environment file**: `environments/dnaseseq-env.yml`
 
@@ -241,7 +255,7 @@ CUT&Tag (Kaya-Okur et al. 2019).
 | Tool | Version | Purpose |
 |------|---------|---------|
 | Bowtie2 | 2.5.4 | Alignment (recommended for shorter CUT&RUN/Tag fragments) |
-| SEACR | 1.3 | Sparse Enrichment Analysis for CUT&RUN (Meers et al. 2019) |
+| r-base | >=4.3 | R runtime that the SEACR shell script calls (SEACR itself is installed separately, see below) |
 | MACS2 | 2.2.9.1 | Alternative peak calling with adjusted parameters |
 | samtools | 1.19 | BAM handling, spike-in alignment filtering |
 | Picard | 3.1.1 | Duplicate marking (low duplication expected for CUT&RUN/Tag) |
@@ -250,6 +264,11 @@ CUT&Tag (Kaya-Okur et al. 2019).
 | FastQC | 0.12.1 | Read quality assessment |
 | Trim Galore | 0.6.10 | Adapter trimming |
 | MultiQC | 1.21 | Aggregate QC reporting |
+
+**SEACR 1.3 is not in this environment.** It is a shell script plus an R script; download the
+`v1.3` tarball from `FredHutch/SEACR` and put both `SEACR_1.3.sh` and `SEACR_1.3.R` on the PATH,
+alongside the `r-base` this environment installs. The CUT&RUN pipeline image
+(`pipeline-cutandrun/scripts/Dockerfile`) already contains it.
 
 **Key CUT&RUN/Tag notes**: These assays have inherently lower background than ChIP-seq. Do NOT
 apply ChIP-seq quality thresholds — use CUT&RUN-specific metrics (Nordin et al. 2023). Apply
@@ -318,11 +337,10 @@ These packages provide the foundation for all genomic data manipulation in R:
 
 | Package | Purpose |
 |---------|---------|
-| BayesPrism | Bayesian deconvolution with scRNA-seq reference (Chu et al. 2022) |
-| InstaPrism | Fast approximation of BayesPrism for large datasets (Wang et al. 2024) |
-| MuSiC_deconv | Multi-Subject Single Cell deconvolution (Wang et al. 2019) |
-| DWLS | Dampened Weighted Least Squares deconvolution (Tsoucas et al. 2019) |
 | BisqueRNA | Reference-based and marker-based deconvolution (Jew et al. 2020) |
+| DWLS | Dampened Weighted Least Squares deconvolution (Tsoucas et al. 2019) |
+| BayesPrism | Bayesian deconvolution with scRNA-seq reference (Chu et al. 2022). **GitHub only** — the script prints the `devtools::install_github()` line, it does not install it |
+| InstaPrism | Fast approximation of BayesPrism for large datasets (Wang et al. 2024). **GitHub only**, same as BayesPrism |
 
 ### DNA Methylation Analysis
 
@@ -360,8 +378,15 @@ Rscript scripts/install-r-packages.R --chipseq      # DiffBind, ChIPQC, ChIPseek
 Rscript scripts/install-r-packages.R --rnaseq       # DESeq2, edgeR, limma
 Rscript scripts/install-r-packages.R --singlecell   # Seurat, Signac, scater, scran
 Rscript scripts/install-r-packages.R --methylation   # DMRcate, bsseq, methylKit
-Rscript scripts/install-r-packages.R --deconvolution # BayesPrism, InstaPrism, MuSiC_deconv, DWLS, BisqueRNA
+Rscript scripts/install-r-packages.R --deconvolution # BisqueRNA, DWLS (+ GitHub lines for BayesPrism, InstaPrism)
+Rscript scripts/install-r-packages.R --visualization # ComplexHeatmap, EnhancedVolcano, Gviz, ggplot2
+Rscript scripts/install-r-packages.R --stats         # sva, WGCNA, ReactomePA
 ```
+
+The tables above list the main packages per category. `scripts/install-r-packages.R` holds the
+complete, authoritative lists (47 packages across 8 categories), including supporting packages
+such as `TFBSTools`, `motifmatchr`, `tximport`, `tximeta`, `celda`, `pheatmap`, `RColorBrewer`
+and `viridis`.
 
 ## Python Packages
 
@@ -404,10 +429,12 @@ and genomic data manipulation.
 | Package | Purpose |
 |---------|---------|
 | scrublet | Doublet detection for scRNA-seq (Wolock et al. 2019) |
-| CellBender | Remove ambient RNA contamination (Fleming et al. 2023) |
 | harmony-pytorch | Batch integration via Harmony in PyTorch (Korsunsky et al. 2019) |
 | scanorama | Panoramic stitching of scRNA-seq datasets (Hie et al. 2019) |
 | bbknn | Batch-balanced KNN graph construction (Polanski et al. 2020) |
+
+CellBender (ambient RNA removal, Fleming et al. 2023) is **not** installed by the script — it is
+GPU-oriented and is left to a manual `pip install cellbender`, which the script prints as a note.
 
 **Install script**: `scripts/install-python-packages.sh`
 
@@ -416,10 +443,16 @@ and genomic data manipulation.
 bash scripts/install-python-packages.sh --all
 
 # Install only specific categories
-bash scripts/install-python-packages.sh --singlecell  # scanpy, scvi-tools, harmony
-bash scripts/install-python-packages.sh --hic          # cooler, cooltools, hic-straw
-bash scripts/install-python-packages.sh --deeptools    # deeptools, pyBigWig, pysam
+bash scripts/install-python-packages.sh --genomics     # numpy, pandas, scipy, matplotlib, seaborn
+bash scripts/install-python-packages.sh --singlecell   # scanpy, scvi-tools, harmony-pytorch
+bash scripts/install-python-packages.sh --hic          # cooler, cooltools, hic-straw, bioframe
+bash scripts/install-python-packages.sh --deeptools    # deeptools, pyBigWig, pysam, pybedtools
 ```
+
+Every category except `--genomics` also installs the core genomics packages first. The complete,
+authoritative list of direct dependencies is `scripts/requirements.in`; exact versions for the
+whole dependency tree are locked in `scripts/constraints.txt`, which every install is constrained
+by.
 
 ## Nextflow and Container Setup
 
@@ -428,13 +461,23 @@ ENCODE pipeline execution requires Nextflow DSL2 and a container runtime (Docker
 ### Nextflow Installation
 
 ```bash
-# Install the pinned Nextflow release (requires Java 17+). The script downloads the
-# self-contained release from GitHub, verifies its SHA-256, and only then installs it.
+# Install the pinned Nextflow release (requires Java 17+) and check for Docker.
+# Use --singularity for HPC, or --both.
 bash scripts/install-nextflow.sh --docker
 
 # Verify
 nextflow -version
 ```
+
+What the script does:
+- Downloads the pinned, self-contained Nextflow release the pipelines are validated against
+  (the version and its SHA-256 are at the top of `scripts/install-nextflow.sh`), verifies the
+  checksum, and only then installs it to `/usr/local/bin` or `~/.local/bin`.
+- An existing Nextflow is accepted only if it is **exactly** that pinned release. Any other
+  version is left untouched; the pinned release is installed next to it and the script tells you
+  to put its directory first on `PATH`.
+- Docker and Singularity are **checked, not installed**: the script reports what it finds and
+  prints the install commands for your platform. Run those yourself.
 
 ### Docker (recommended for local/cloud)
 
@@ -551,21 +594,11 @@ conda env create -f skills/bioinformatics-installer/environments/chipseq-env.yml
 conda activate encode-chipseq
 ```
 
-The YAML includes:
-```yaml
-name: encode-chipseq
-channels: [conda-forge, bioconda]
-dependencies:
-  - bwa=0.7.17
-  - samtools=1.17
-  - macs2=2.2.9.1
-  - idr=2.0.3
-  - bedtools=2.31.0
-  - deeptools=3.5.4
-  - picard=3.1.1
-  - fastqc=0.12.1
-  - multiqc=1.17
-```
+`environments/chipseq-env.yml` is the authoritative list of what that environment installs —
+read it rather than retyping the versions. It covers alignment (BWA), BAM processing (samtools,
+Picard), peak calling (MACS2), replicate consistency (IDR), cross-correlation metrics
+(phantompeakqualtools), signal processing (deeptools), interval operations (bedtools), and
+QC/trimming (FastQC, Trim Galore, MultiQC). See the ChIP-seq table above for the pinned versions.
 
 ### Step 3: Install additional tools for downstream analysis
 
@@ -590,7 +623,7 @@ bedtools --version
 ### Step 5: Download reference data for ENCODE analysis
 
 ```
-encode_download_files(accessions=["ENCFF001ABC"], download_dir="/data/references")
+encode_download_files(file_accessions=["ENCFF001ABC"], download_dir="/data/references")
 ```
 
 Reference files needed:
@@ -659,7 +692,7 @@ Expected output:
 - **Python 2 vs Python 3**: Some legacy bioinformatics tools (MACS 1.x, old HOMER) require Python 2. Never install Python 2 tools in the same environment as Python 3 tools — use separate conda environments.
 - **ARM Mac (M1/M2/M3) compatibility**: Many bioinformatics tools lack native ARM builds. Use `CONDA_SUBDIR=osx-64` or Rosetta 2 emulation for x86_64 packages. Some tools (samtools, BWA) have ARM-native builds.
 - **Nextflow requires Java 17+**: check `java -version` before running pipelines. Install Nextflow with `scripts/install-nextflow.sh`, which pins the release the pipelines are validated against and verifies its checksum; avoid piping a remote installer straight into a shell.
-- **Docker vs Singularity on HPC**: Most HPC clusters do not allow Docker (requires root). Use Singularity instead. Nextflow supports both via `-profile singularity` or `-profile docker`.
+- **Docker vs Singularity on HPC**: Most HPC clusters do not allow Docker (requires root). Use Singularity instead. The pipeline skills express this through the execution profile, not a runtime profile: `-profile local` enables Docker, `-profile slurm` enables Singularity. There is no `docker` or `singularity` profile. With `-profile slurm`, convert the image once and pass the file: `singularity build pipeline-chipseq.sif docker-daemon://encode-toolkit/pipeline-chipseq:1.0.0`, then `--container /path/to/pipeline-chipseq.sif`.
 
 ## Literature Foundation
 

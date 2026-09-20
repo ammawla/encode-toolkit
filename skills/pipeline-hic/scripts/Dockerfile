@@ -5,7 +5,7 @@ LABEL description="ENCODE Toolkit Hi-C pipeline: BWA + pairtools + Juicer + cool
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# perl is listed explicitly: FastQC is a Perl program
+# perl is listed explicitly: FastQC and Trim Galore are Perl programs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl gzip pigz unzip \
     build-essential perl \

@@ -9,6 +9,10 @@ deduplicated .pairs files ready for matrix generation.
 Convert aligned BAM to .pairs format with pair type classification:
 
 ```bash
+# pairtools sort hands --tmpdir to GNU sort, which does not create it:
+# the directory must already exist.
+mkdir -p tmp
+
 pairtools parse \
     --chroms-path chrom.sizes \
     --min-mapq 30 \
@@ -16,12 +20,17 @@ pairtools parse \
     --max-inter-align-gap 30 \
     --nproc-in 4 \
     --nproc-out 4 \
-    sample_paired.bam \
+    --output-stats sample.parse_stats.txt \
+    sample.paired.bam \
     | pairtools sort \
         --nproc 4 \
-        --tmpdir /tmp/pairtools/ \
+        --tmpdir $PWD/tmp \
         -o sample_parsed_sorted.pairs.gz
 ```
+
+`main.nf` publishes the statistics file as `pairs/{sample}.parse_stats.txt`.
+It holds the pair-type breakdown for the whole library, which is the only
+place those counts are available (see below).
 
 ### Parse Parameters
 
@@ -33,18 +42,21 @@ pairtools parse \
 
 ### Pair Types Output
 
-pairtools assigns each pair a two-letter code:
+pairtools assigns each pair a two-letter code, one letter per side: U unique,
+R rescued, M multi, N null (unmapped), W walk, D duplicate, X corrupt.
 
 | Code | Meaning | Use |
 |------|---------|-----|
 | UU | Both uniquely mapped | Primary contacts |
 | UR/RU | One unique, one rescued | Valid with caution |
-| MU/UM | One multi-mapped | Ambiguous, usually excluded |
+| MU | One multi-mapped, one unique | Ambiguous, excluded |
 | MM | Both multi-mapped | Excluded |
-| NM/MN | One unmapped | Excluded |
+| NU | One unique, one unmapped | Excluded |
+| NM | One unmapped, one multi-mapped | Excluded |
 | NN | Both unmapped | Excluded |
-| WW | Walk pair | Ligation artifact |
+| WW | Complex walk (multiple ligations), masked by `--walks-policy mask` | Excluded |
 | DD | Duplicate | Removed in dedup step |
+| XX | Corrupt record | Excluded |
 
 ## Sort Pairs
 
@@ -67,10 +79,13 @@ pairtools dedup \
     --nproc-in 4 \
     --nproc-out 4 \
     --mark-dups \
-    --output-stats sample_dedup_stats.txt \
-    -o sample_dedup.pairs.gz \
+    --output-stats sample.dedup_stats.txt \
+    -o sample.dedup.pairs.gz \
     sample_sorted.pairs.gz
 ```
+
+Both files are published: `pairs/{sample}.dedup.pairs.gz` and
+`pairs/{sample}.dedup_stats.txt`.
 
 ### Dedup Statistics
 
@@ -90,16 +105,20 @@ Select only UU pairs for contact matrix generation:
 ```bash
 pairtools select \
     '(pair_type == "UU")' \
-    sample_dedup.pairs.gz \
+    sample.dedup.pairs.gz \
     -o sample_valid.pairs.gz
 ```
 
-For higher sensitivity (at cost of some noise), include rescued pairs:
+This is what `main.nf` does; the selected pairs file itself is an intermediate
+and is not published.
+
+For higher sensitivity (at cost of some noise), you can include rescued pairs
+manually. The workflow does not offer this as an option:
 
 ```bash
 pairtools select \
     '(pair_type == "UU") or (pair_type == "UR") or (pair_type == "RU")' \
-    sample_dedup.pairs.gz \
+    sample.dedup.pairs.gz \
     -o sample_valid_rescued.pairs.gz
 ```
 
@@ -110,31 +129,35 @@ Generate detailed contact statistics:
 ```bash
 pairtools stats \
     sample_valid.pairs.gz \
-    -o sample_pair_stats.txt
+    -o sample_contact_stats.txt
 ```
 
+`main.nf` runs exactly this on the UU-selected pairs and publishes it as
+`qc/{sample}.contact_stats.txt`.
+
 Key metrics from the stats output:
-- **cis contacts**: Same chromosome (expect >60%)
+- **cis contacts**: Same chromosome
 - **trans contacts**: Different chromosomes
 - **cis >20kb**: Long-range cis contacts (biologically meaningful)
 - **cis <20kb**: Short-range, often ligation artifacts
-- **Pair type distribution**: Should be dominated by UU
+
+Because the input is UU-only, the pair-type distribution in this file is 100%
+UU by construction. Read pair types from `pairs/{sample}.parse_stats.txt`
+instead.
 
 ## Cis/Trans Ratio
 
-The cis/trans ratio is a key QC metric:
+The cis/trans ratio is a key QC metric. Match whole keys: `pairtools stats`
+also emits `cis_1kb+` ... `cis_40kb+` rows, and a regex like `/cis/` would
+pick up the last of those instead of the `cis` total.
 
 ```bash
-awk '/cis/ {cis=$2} /trans/ {trans=$2} END {
-    print "Cis:", cis;
-    print "Trans:", trans;
-    print "Cis/Trans ratio:", cis/trans
-}' sample_pair_stats.txt
+awk '$1=="cis" {c=$2} $1=="trans" {t=$2} END {
+    print "Cis:", c;
+    print "Trans:", t;
+    print "Cis/Trans ratio:", c/t
+}' sample_contact_stats.txt
 ```
 
-| Ratio | Quality |
-|-------|---------|
-| >2.0 | Good |
-| 1.5-2.0 | Acceptable |
-| 1.0-1.5 | Warning -- possible issues |
-| <1.0 | Fail -- likely random ligation |
+For thresholds, use the single QC table in `SKILL.md` (cis/trans >1.5 pass,
+1.0-1.5 warning, <1.0 fail).

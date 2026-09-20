@@ -11,20 +11,19 @@ params.peak_type   = 'narrow'
 params.outdir      = 'results'
 params.single_end  = false
 params.skip_idr    = false
-params.blacklist   = null
-params.chrom_sizes = null
+params.blacklist   = null   // defaults to the ENCODE blacklist v2 for --genome
+params.chrom_sizes = null   // required: two-column chromosome sizes for the bigWig tracks
+params.bwa_index   = null   // directory holding <genome>.fa and its BWA index; default ./<genome>_index
 
 // Genome-specific defaults. Kept in a function because scripts that declare processes
 // cannot also hold top-level variables.
 def genomeDefaults() {
     return [
     'GRCh38': [
-        fasta:      'https://www.encodeproject.org/files/GRCh38_no_alt_analysis_set_GCA_000001405.15/@@download/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta.gz',
         blacklist:  'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/hg38-blacklist.v2.bed.gz',
         gsize:      'hs'
     ],
     'mm10': [
-        fasta:      'https://www.encodeproject.org/files/mm10_no_alt_analysis_set_ENCODE/@@download/mm10_no_alt_analysis_set_ENCODE.fasta.gz',
         blacklist:  'https://github.com/Boyle-Lab/Blacklist/raw/master/lists/mm10-blacklist.v2.bed.gz',
         gsize:      'mm'
     ]
@@ -49,7 +48,8 @@ process FASTQC {
 
 process TRIM_GALORE {
     tag "$sample_id"
-    publishDir "${params.outdir}/trimmed", mode: 'copy'
+    publishDir "${params.outdir}/trimmed", mode: 'copy', pattern: '*{.fq.gz,trimming_report.txt}'
+    publishDir "${params.outdir}/fastqc",  mode: 'copy', pattern: '*_fastqc.{html,zip}'
 
     input:
     tuple val(sample_id), path(reads)
@@ -57,6 +57,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*{val_1.fq.gz,val_2.fq.gz,trimmed.fq.gz}"), emit: trimmed
     path("*trimming_report.txt"),                                             emit: log
+    path("*_fastqc.{html,zip}"),                                              emit: fastqc
 
     script:
     if (params.single_end)
@@ -86,7 +87,7 @@ process BWA_MEM {
     """
     bwa mem -t ${task.cpus} -M ${genome_index}/${params.genome}.fa ${input_reads} | \\
       samtools view -@ ${task.cpus} -bS -q 30 - | \\
-      samtools sort -@ ${task.cpus} -m 4G -o ${sample_id}.bam -
+      samtools sort -@ ${task.cpus} -m 2G -o ${sample_id}.bam -
     samtools index ${sample_id}.bam
     samtools flagstat ${sample_id}.bam > ${sample_id}.flagstat.txt
     """
@@ -111,7 +112,7 @@ process FILTER_SORT {
 
 process MARK_DUPLICATES {
     tag "$sample_id"
-    publishDir "${params.outdir}/filtered", mode: 'copy', pattern: '*.metrics.txt'
+    publishDir "${params.outdir}/filtered", mode: 'copy', pattern: '*_metrics.txt'
 
     input:
     tuple val(sample_id), path(bam)
@@ -161,6 +162,7 @@ process MACS2_CALLPEAK {
     tuple val(sample_id), path("${sample_id}*Peak"),    emit: peaks
     tuple val(sample_id), path("${sample_id}*.bdg"),    emit: bdg
     path("${sample_id}*.xls"),                           emit: xls
+    path("${sample_id}*_summits.bed"),                   emit: summits, optional: true   // narrow peaks only
 
     script:
     def format_flag  = params.single_end ? 'BAM' : 'BAMPE'
@@ -243,7 +245,8 @@ process MULTIQC {
 
 workflow {
     // ---- Parameter validation ----
-    if (!params.reads) { error "Missing required parameter: --reads" }
+    if (!params.reads)       { error "Missing required parameter: --reads" }
+    if (!params.chrom_sizes) { error "Missing required parameter: --chrom_sizes" }
     if (!genomeDefaults().containsKey(params.genome)) {
         error "Unsupported --genome '${params.genome}': expected one of ${genomeDefaults().keySet().join(', ')}"
     }
@@ -267,9 +270,9 @@ workflow {
     def blacklist = params.blacklist ?: genomeDefaults()[params.genome].blacklist
 
     ch_treatment = channel.fromFilePairs(params.reads, size: n_reads, checkIfExists: true)
-    ch_genome    = channel.fromPath("${params.genome}_index", type: 'dir', checkIfExists: true).collect()
+    ch_genome    = channel.fromPath(params.bwa_index ?: "${params.genome}_index", type: 'dir', checkIfExists: true).collect()
     ch_black     = channel.fromPath(blacklist).collect()
-    ch_chromsz   = channel.fromPath(params.chrom_sizes ?: "chrom.sizes", checkIfExists: true).collect()
+    ch_chromsz   = channel.fromPath(params.chrom_sizes, checkIfExists: true).collect()
 
     // A process can be called only once per workflow, so control libraries travel through the
     // same steps as the ChIP samples. They are tagged with a CONTROL_ prefix and split off
@@ -320,6 +323,7 @@ workflow {
     // MultiQC
     ch_multiqc = FASTQC.out.reports
         .mix(TRIM_GALORE.out.log)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(BWA_MEM.out.flagstat)
         .mix(MARK_DUPLICATES.out.metrics)
         .mix(BLACKLIST_FILTER.out.flagstat)

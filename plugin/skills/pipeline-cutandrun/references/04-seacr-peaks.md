@@ -35,10 +35,15 @@ When no control is available, SEACR uses a numeric threshold:
 SEACR_1.3.sh \
     sample_fragments.bedGraph \
     0.01 \
-    norm \
+    non \
     stringent \
     sample_seacr_noctrl
 ```
+
+`non` is required here: the SEACR v1.3 README states that a numeric threshold
+must be paired with `non`. The v1.3 script does not error on `norm` -- it
+silently skips normalization -- so the mistake is invisible. The workflow
+always passes `non` when there is no `--control`.
 
 The `0.01` value means the top 1% of signal is used as the enrichment threshold.
 Adjust based on expected peak count:
@@ -65,20 +70,23 @@ SEACR_1.3.sh sample.bedGraph control.bedGraph norm relaxed sample_relaxed
 
 ## SEACR Output Format
 
-SEACR outputs a BED-like file:
+SEACR v1.3 outputs a 6-column BED-like file:
 
 ```
-chr1  1000  2000  500.5  100  200  150  1500  chr1:1000-2000
+chr1  1000  2000  500.5  8.2  chr1:1450-1480
 ```
 
 Columns:
-1. chr, start, end of peak
-2. Total signal in peak
-3. Max signal position start
-4. Max signal position end
-5. Max signal value
-6. AUC (area under curve)
-7. Peak ID
+1. Chromosome
+2. Peak start
+3. Peak end
+4. Total signal in the peak (AUC)
+5. Max signal in the peak
+6. Region of maximum signal, as `chr:start-end`
+
+The workflow names these files `{sample}.seacr.stringent.bed` and, with
+`--seacr_mode relaxed` or `both`, `{sample}.seacr.relaxed.bed`, published to
+`peaks/`.
 
 ## Alternative: MACS2 Peak Calling
 
@@ -110,13 +118,15 @@ macs2 callpeak \
 background. Compare with SEACR results and use the intersection for
 high-confidence peaks.
 
-## Blacklist + Suspect List Filtering
+## Blacklist + Suspect List Filtering (manual, not run by this workflow)
 
-Filter peaks against both blacklist and CUT&RUN suspect list:
+The workflow applies `--blacklist` to the BAM only and never filters peak
+files. To filter the published peaks against both the blacklist and the
+CUT&RUN suspect list, run this yourself:
 
 ```bash
 bedtools intersect \
-    -a sample_seacr.stringent.bed \
+    -a results/peaks/sample.seacr.stringent.bed \
     -b hg38-blacklist.v2.bed CUTandRUN.suspectlist.hg38.bed \
     -v \
     > sample_peaks_filtered.bed
@@ -128,8 +138,8 @@ When using both SEACR and MACS2, assess concordance:
 
 ```bash
 # Convert SEACR to 3-column BED
-cut -f1-3 sample_seacr.stringent.bed > seacr_peaks.bed
-cut -f1-3 macs2_peaks/sample_macs2_peaks.narrowPeak > macs2_peaks.bed
+cut -f1-3 results/peaks/sample.seacr.stringent.bed > seacr_peaks.bed
+cut -f1-3 results/peaks/sample.macs2_peaks.narrowPeak > macs2_peaks.bed
 
 # Overlap
 bedtools intersect -a seacr_peaks.bed -b macs2_peaks.bed -u | wc -l
@@ -142,13 +152,18 @@ echo "MACS2 peaks: $total_macs2"
 Typical overlap: 60-80% of SEACR peaks overlap MACS2 peaks.
 High-confidence set: intersection of both callers.
 
-## FRiP Calculation
+## FRiP Calculation (manual, not run by this workflow)
+
+No process computes FRiP. Compute it from the published filtered BAM and a
+peak BED:
 
 ```bash
-total_reads=$(samtools view -c -F 1804 -f 2 sample_final.bam)
+total_reads=$(samtools view -c -F 1804 -f 2 results/alignment/sample.filtered.bam)
 reads_in_peaks=$(bedtools intersect \
-    -a sample_final.bam \
-    -b sample_peaks_filtered.bed \
+    -a results/alignment/sample.filtered.bam \
+    -b results/peaks/sample.seacr.stringent.bed \
     -u -bed | wc -l)
 echo "FRiP: $(echo "scale=4; $reads_in_peaks / $total_reads" | bc)"
 ```
+
+Judge the result against the QC table in `SKILL.md`.

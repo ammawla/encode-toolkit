@@ -1,8 +1,12 @@
 # QC and Trimming for Hi-C Data
 
-Hi-C reads contain chimeric sequences from ligation junctions. Standard
-adapter trimming is applied, but ligation junction trimming is handled
-downstream by pairtools.
+Hi-C reads contain chimeric sequences from ligation junctions. Ligation
+junctions are handled downstream by pairtools.
+
+**This workflow does not trim.** `main.nf` runs FastQC on the raw reads and
+passes the same raw reads to `bwa mem -SP5M`, which soft-clips adapter
+sequence. Trim Galore is present in the container image but no process calls
+it. The trimming commands below are a manual, optional pre-processing step.
 
 ## Pre-Alignment QC with FastQC
 
@@ -19,10 +23,11 @@ Key checks:
 **Note**: Hi-C data will show unusual insert size distributions because reads
 originate from ligation junctions, not contiguous fragments. This is expected.
 
-## Adapter Trimming with Trim Galore
+## Optional: Adapter Trimming with Trim Galore (not run by this workflow)
 
-Hi-C data benefits from light adapter trimming. Do NOT aggressively trim
-quality since chimeric reads may have lower quality at the junction.
+If you choose to trim before running the workflow, keep it light: do NOT
+aggressively trim quality, since chimeric reads may have lower quality at the
+junction. Feed the resulting `*_val_{1,2}.fq.gz` files to `--reads`.
 
 ```bash
 trim_galore \
@@ -44,18 +49,15 @@ trim_galore \
 | `--length 30` | 30 bp | Short reads still carry valid contact information |
 | `--cores 4` | 4 | Trim Galore uses ~3x threads internally |
 
-### Alternative: No Trimming
+### Default here: No Trimming
 
-Some Hi-C pipelines (including Juicer) skip trimming entirely and rely on
-the aligner to handle adapter contamination via soft-clipping. This is
-acceptable for BWA-MEM:
+Like Juicer, this workflow skips trimming entirely and relies on the aligner
+to handle adapter contamination via soft-clipping, which BWA-MEM does:
 
 ```bash
-# Skip trim_galore, proceed directly to alignment
-# BWA-MEM will soft-clip adapter sequences
+# No trim_galore step; raw FASTQs go straight to bwa mem -SP5M,
+# which soft-clips adapter sequence.
 ```
-
-ENCODE recommendation: Light trimming with Trim Galore for consistency.
 
 ## Restriction Enzyme Verification
 
@@ -76,7 +78,7 @@ zcat sample_R1.fastq.gz | head -10000 | grep -c 'GATCGATC'
 If the junction sequence appears frequently (>1% of reads), the enzyme
 assignment is confirmed.
 
-## Post-Trimming Summary
+## Post-Trimming Summary (only if you trimmed manually)
 
 After trimming, verify:
 - >95% reads pass filters

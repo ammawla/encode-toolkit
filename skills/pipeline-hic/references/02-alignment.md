@@ -1,9 +1,10 @@
-# BWA Per-Mate Alignment for Hi-C
+# BWA `-SP5M` Alignment for Hi-C
 
 Hi-C reads are chimeric: each mate can originate from a different genomic
 location due to proximity ligation. Standard paired-end alignment fails
-because mates are not from a contiguous fragment. The solution is to align
-each mate independently.
+because mates are not from a contiguous fragment. The solution is `bwa mem
+-SP5M`, which skips pairing and mate rescue while still writing both mates to
+one BAM.
 
 ## Genome Index Preparation
 
@@ -14,21 +15,20 @@ bwa index -a bwtsw genome.fa
 
 Requires ~8 GB disk and ~8 GB RAM for human genome.
 
-## Per-Mate Alignment Strategy
+## Alignment Strategy Used by This Workflow
 
-Align R1 and R2 independently as single-end reads:
+Align both mates in a single `bwa mem -SP5M` call and write one BAM:
 
 ```bash
-# Align read 1
-bwa mem -t 8 -SP5M genome.fa sample_R1.fastq.gz \
-    | samtools view -@ 4 -bS - \
-    > sample_R1.bam
-
-# Align read 2
-bwa mem -t 8 -SP5M genome.fa sample_R2.fastq.gz \
-    | samtools view -@ 4 -bS - \
-    > sample_R2.bam
+bwa mem -t 8 -SP5M genome.fa \
+    sample_R1.fastq.gz sample_R2.fastq.gz \
+    | samtools view -@ 4 -bhS - \
+    > sample.paired.bam
 ```
+
+`main.nf` publishes this file as `alignment/{sample}.paired.bam`. It keeps the
+pair information in one file, which pairtools parses directly, and it is the
+ENCODE-recommended approach.
 
 ### BWA-MEM Flags for Hi-C
 
@@ -42,25 +42,28 @@ bwa mem -t 8 -SP5M genome.fa sample_R2.fastq.gz \
 These flags are CRITICAL for Hi-C. Without `-SP`, BWA will try to pair
 mates expecting a standard insert size, which fails for Hi-C contacts.
 
-## Combined Alignment (Alternative)
+## Per-Mate Alignment (Alternative, not used here)
 
-Some pipelines align both mates together with the `-SP5M` flags:
+Some pipelines align R1 and R2 independently as single-end reads and merge the
+two BAMs before parsing:
 
 ```bash
-bwa mem -t 8 -SP5M genome.fa \
-    sample_R1.fastq.gz sample_R2.fastq.gz \
-    | samtools view -@ 4 -bhS - \
-    > sample_paired.bam
+bwa mem -t 8 -SP5M genome.fa sample_R1.fastq.gz \
+    | samtools view -@ 4 -bS - > sample_R1.bam
+
+bwa mem -t 8 -SP5M genome.fa sample_R2.fastq.gz \
+    | samtools view -@ 4 -bS - > sample_R2.bam
 ```
 
-This produces a BAM with both mates, which pairtools can parse directly.
-This is the ENCODE-recommended approach as it preserves pair information
-in a single file.
+This workflow does not do this and never writes per-mate BAMs.
 
-## Alignment QC
+## Alignment QC (manual)
+
+`main.nf` runs no flagstat on the Hi-C BAM; run it yourself on the published
+file if you need it:
 
 ```bash
-samtools flagstat sample_paired.bam
+samtools flagstat alignment/sample.paired.bam
 ```
 
 Expected metrics:

@@ -10,7 +10,7 @@ dependencies:
   # IDR 2.0.4.2 is built for Python 3.10 and older on bioconda
   - python=3.10
   # Alignment
-  - bwa=0.7.17
+  - bwa=0.7.18
   # BAM processing
   - samtools=1.19
   - picard=3.1.1

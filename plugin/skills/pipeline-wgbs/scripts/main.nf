@@ -45,6 +45,7 @@ process TRIM_GALORE {
     output:
     tuple val(sample_id), path("*_val_{1,2}.fq.gz"), emit: trimmed
     path("*_trimming_report.txt"), emit: reports
+    path("*_fastqc.{html,zip}"), emit: fastqc
 
     script:
     """
@@ -63,7 +64,7 @@ process TRIM_GALORE {
 
 process BISMARK_ALIGN {
     tag "${sample_id}"
-    publishDir "${params.outdir}/bismark/alignments", mode: 'copy'
+    publishDir "${params.outdir}/bismark/alignments", mode: 'copy', pattern: '*_report.txt'
     cpus 8
     memory '48 GB'
 
@@ -77,6 +78,7 @@ process BISMARK_ALIGN {
 
     script:
     """
+    mkdir -p tmp
     bismark \\
         --genome ${genome_dir} \\
         --bowtie2 \\
@@ -115,6 +117,7 @@ process DEDUPLICATE {
 
 process SAMTOOLS_SORT_INDEX {
     tag "${sample_id}"
+    publishDir "${params.outdir}/bismark/alignments", mode: 'copy'
     cpus 4
     memory '8 GB'
 
@@ -152,7 +155,7 @@ process METHYLDACKEL_MBIAS {
         --CHG --CHH \\
         \$GENOME_FA \\
         ${bam} \\
-        ${sample_id}_mbias > ${sample_id}_mbias_report.txt
+        ${sample_id}_mbias > ${sample_id}_mbias_report.txt 2>&1
     """
 }
 
@@ -174,27 +177,26 @@ process METHYLDACKEL_EXTRACT {
     script:
     // MethylDackel never counts both mates of an overlapping pair, so there is no overlap
     // switch. --mergeContext is a separate choice: per-CpG/CHG records instead of per-cytosine.
+    // No read positions are excluded here: TRIM_GALORE already clips the end-repair bias at
+    // the 5' end of read 2. Check bismark/mbias/ before trusting the calls.
     def merge = params.merge_context ? '--mergeContext' : ''
     """
     GENOME_FA=\$(ls ${genome_dir}/*.fa | head -1)
     MethylDackel extract \\
         ${merge} \\
-        --minDepth ${params.min_coverage} \\
-        --maxDepth 8000 \\
-        --nOT 0,0,0,10 \\
-        --nOB 0,10,0,0 \\
         --CHG --CHH \\
         --opref ${sample_id} \\
         \$GENOME_FA \\
         ${bam}
 
-    # Convert each context to ENCODE bedMethyl: score = coverage capped at 1000,
-    # column 10 = coverage, column 11 = percent methylated. MethylDackel bedGraphs start
-    # with a "track" header line and carry no strand, so the header is skipped and strand is ".".
+    # Convert each context to ENCODE bedMethyl (https://www.encodeproject.org/data-standards/wgbs/):
+    # column 5 = score, the read count capped at 1000; column 10 = coverage; column 11 = percent
+    # methylated. Sites below --min_coverage are left out. MethylDackel bedGraphs start with a
+    # "track" header line and carry no strand, so the header is skipped and strand is ".".
     for context in CpG CHG CHH; do
-        awk 'BEGIN {OFS="\\t"} !/^track/ {
+        awk -v min_cov=${params.min_coverage} 'BEGIN {OFS="\\t"} !/^track/ {
             cov = \$5 + \$6
-            if (cov == 0) next
+            if (cov == 0 || cov < min_cov) next
             score = (cov > 1000) ? 1000 : cov
             print \$1, \$2, \$3, ".", score, ".", \$2, \$3, "0,0,0", cov, int((\$5 / cov) * 100 + 0.5)
         }' ${sample_id}_\${context}.bedGraph \\
@@ -222,16 +224,14 @@ process COVERAGE_STATS {
     """
     awk '!/^track/ {
         cov = \$5 + \$6; sum += cov; n++;
-        if (cov >= 1)  c1++;
         if (cov >= 5)  c5++;
         if (cov >= 10) c10++
     } END {
-        if (n == 0) { print "Total CpGs: 0"; exit }
-        printf "Total CpGs: %d\\n", n;
-        printf "Mean coverage: %.1f\\n", sum/n;
-        printf "CpGs >=1x: %d (%.1f%%)\\n", c1, c1/n*100;
-        printf "CpGs >=5x: %d (%.1f%%)\\n", c5, c5/n*100;
-        printf "CpGs >=10x: %d (%.1f%%)\\n", c10, c10/n*100
+        if (n == 0) { print "Covered CpGs: 0"; exit }
+        printf "Covered CpGs (>=1x): %d\\n", n;
+        printf "Mean coverage of covered CpGs: %.1f\\n", sum/n;
+        printf "Covered CpGs >=5x: %d (%.1f%%)\\n", c5, c5/n*100;
+        printf "Covered CpGs >=10x: %d (%.1f%%)\\n", c10, c10/n*100
     }' ${sample_id}_CpG.bedGraph > ${sample_id}.coverage_stats.txt
     """
 }
@@ -249,7 +249,7 @@ process MULTIQC {
 
     script:
     """
-    multiqc --title "ENCODE WGBS Pipeline" --force .
+    multiqc --title "ENCODE WGBS Pipeline" --filename multiqc_report --force .
     """
 }
 
@@ -283,8 +283,10 @@ workflow {
     if (!params.skip_dedup) {
         DEDUPLICATE(BISMARK_ALIGN.out.bam)
         SAMTOOLS_SORT_INDEX(DEDUPLICATE.out.bam)
+        ch_dedup_report = DEDUPLICATE.out.report
     } else {
         SAMTOOLS_SORT_INDEX(BISMARK_ALIGN.out.bam)
+        ch_dedup_report = channel.empty()
     }
 
     METHYLDACKEL_MBIAS(SAMTOOLS_SORT_INDEX.out.bam, ch_genome)
@@ -293,7 +295,9 @@ workflow {
 
     ch_multiqc = FASTQC_RAW.out.reports
         .mix(TRIM_GALORE.out.reports)
+        .mix(TRIM_GALORE.out.fastqc)
         .mix(BISMARK_ALIGN.out.report)
+        .mix(ch_dedup_report)
         .collect()
 
     MULTIQC(ch_multiqc)

@@ -283,8 +283,10 @@ workflow {
     if (!params.skip_dedup) {
         DEDUPLICATE(BISMARK_ALIGN.out.bam)
         SAMTOOLS_SORT_INDEX(DEDUPLICATE.out.bam)
+        ch_dedup_report = DEDUPLICATE.out.report
     } else {
         SAMTOOLS_SORT_INDEX(BISMARK_ALIGN.out.bam)
+        ch_dedup_report = channel.empty()
     }
 
     METHYLDACKEL_MBIAS(SAMTOOLS_SORT_INDEX.out.bam, ch_genome)
@@ -295,6 +297,7 @@ workflow {
         .mix(TRIM_GALORE.out.reports)
         .mix(TRIM_GALORE.out.fastqc)
         .mix(BISMARK_ALIGN.out.report)
+        .mix(ch_dedup_report)
         .collect()
 
     MULTIQC(ch_multiqc)

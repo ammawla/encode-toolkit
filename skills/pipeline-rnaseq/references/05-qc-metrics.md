@@ -1,32 +1,42 @@
 # Stage 5: QC Metrics
 
 ## Tools
-- **RSeQC v4.0+**: RNA-seq quality control suite (Wang et al. 2012, ~3,500 citations)
-- **MultiQC v1.14+**: Aggregated QC report generation
+- **RSeQC v4.0.0**: RNA-seq quality control suite (Wang et al. 2012, ~3,500 citations)
+- **MultiQC v1.14**: Aggregated QC report generation
+
+The workflow runs four RSeQC modules — `infer_experiment.py`, `read_distribution.py`,
+`geneBody_coverage.py` and, for paired-end runs, `inner_distance.py` — all against the
+BED12 file given by `--rseqc_bed`, and publishes their output to `qc/rseqc/`. R is not
+installed in the image, so the modules that end by calling Rscript write their `.txt` and
+`.r` files but no rendered plot.
 
 ## RSeQC Modules
 
 ### infer_experiment.py (Strandedness Check)
 
 ```bash
-infer_experiment.py -r hg38_RefSeq.bed -i Aligned.sortedByCoord.out.bam
+infer_experiment.py -r hg38_RefSeq.bed -i sample.Aligned.sortedByCoord.out.bam \
+  > sample.infer_experiment.txt
 ```
 
 Determines library strandedness by sampling read orientation relative to annotated
-transcripts. Critical first check -- wrong strandedness silently produces near-zero counts.
+transcripts. This is a post-hoc check: it does not feed back into quantification. If it
+disagrees with the `--strandedness` value the run used, rerun the pipeline with the
+correct value.
 
-| Output Pattern | Interpretation | RSEM Setting |
+| Output Pattern | Interpretation | `--strandedness` to use |
 |----------------|---------------|-------------|
-| "1++,1--,2+-,2-+" > 90% | Forward stranded | `--strandedness forward` |
-| "1+-,1-+,2++,2--" > 90% | Reverse stranded (dUTP) | `--strandedness reverse` |
-| ~50/50 split | Unstranded | `--strandedness none` |
+| "1++,1--,2+-,2-+" > 90% | Forward stranded | `forward` |
+| "1+-,1-+,2++,2--" > 90% | Reverse stranded (dUTP) | `reverse` |
+| ~50/50 split | Unstranded | `none` |
 
 **ENCODE standard**: Expect >90% reverse-stranded reads for dUTP libraries.
 
 ### read_distribution.py (Mapping Distribution)
 
 ```bash
-read_distribution.py -r hg38_RefSeq.bed -i Aligned.sortedByCoord.out.bam
+read_distribution.py -r hg38_RefSeq.bed -i sample.Aligned.sortedByCoord.out.bam \
+  > sample.read_distribution.txt
 ```
 
 Reports fraction of reads mapping to CDS exons, 5' UTR, 3' UTR, introns, and
@@ -43,12 +53,17 @@ intergenic regions.
 ### geneBody_coverage.py (Gene Body Coverage)
 
 ```bash
-geneBody_coverage.py -r hg38_HouseKeeping.bed \
-  -i Aligned.sortedByCoord.out.bam -o sample_coverage
+geneBody_coverage.py -r hg38_RefSeq.bed \
+  -i sample.Aligned.sortedByCoord.out.bam -o sample.geneBody_coverage
 ```
 
-Plots normalized coverage across gene bodies (5' to 3'). Uniform coverage indicates
-intact RNA; strong 3' bias indicates degradation.
+The workflow passes the same `--rseqc_bed` file used by the other modules. A
+housekeeping-gene BED (for example `hg38_HouseKeeping.bed`) runs faster and is the usual
+choice when calling this module by hand; both are valid inputs.
+
+Reports normalized coverage across gene bodies (5' to 3') in
+`<sample>.geneBody_coverage.geneBodyCoverage.txt`. Uniform coverage indicates intact RNA;
+strong 3' bias indicates degradation.
 
 | Pattern | Interpretation |
 |---------|---------------|
@@ -60,16 +75,17 @@ intact RNA; strong 3' bias indicates degradation.
 
 ```bash
 inner_distance.py -r hg38_RefSeq.bed \
-  -i Aligned.sortedByCoord.out.bam -o sample_inner_dist
+  -i sample.Aligned.sortedByCoord.out.bam -o sample.inner_distance
 ```
 
-Reports the inner distance between paired-end read mates. For RNA-seq, negative
-values indicate overlapping reads (common for short inserts). Peak should match
-expected library insert size (typically 150-300 bp).
+Paired-end only; skipped when the run uses `--single_end`. Reports the inner distance
+between mates across a set of files matching `<sample>.inner_distance.*`. Negative values
+indicate overlapping reads (common for short inserts). The peak should match the expected
+library insert size (typically 150-300 bp).
 
 ### STAR Log Metrics
 
-The `Log.final.out` from STAR provides critical metrics:
+The `star/<sample>.Log.final.out` from STAR provides critical metrics:
 
 | Metric | Threshold | Notes |
 |--------|-----------|-------|
@@ -77,16 +93,24 @@ The `Log.final.out` from STAR provides critical metrics:
 | Multi-mapped reads % | <10% | High suggests repetitive contamination |
 | Unmapped: too short % | <10% | High suggests over-trimming |
 | % of reads mapped to multiple loci | <10% | Expected for gene families |
-| % of chimeric reads | <1% | Unless fusion analysis |
+| % of chimeric reads | <1% | Zero unless STAR is run with chimeric detection |
 | Number of splices: Total | Millions expected | Low count suggests annotation mismatch |
+
+## Manual Checks (not run by this workflow)
+
+The metrics below are not produced by the pipeline. Run them yourself against the
+published BAM and RSEM output when you need them, and label them as separate steps when
+reporting.
 
 ### rRNA Rate Assessment
 
 ```bash
 # Count mapped reads overlapping rRNA loci. -L takes a BED file of regions; without it
 # samtools would read the file name as a region string and fail.
-samtools view -c -F 4 -L rRNA_intervals.bed Aligned.sortedByCoord.out.bam
+samtools view -c -F 4 -L rRNA_intervals.bed star/sample.Aligned.sortedByCoord.out.bam
 ```
+
+Divide by the total mapped count from `Log.final.out` to get the rate.
 
 | rRNA Rate | Interpretation |
 |-----------|---------------|
@@ -98,28 +122,50 @@ samtools view -c -F 4 -L rRNA_intervals.bed Aligned.sortedByCoord.out.bam
 ### Saturation Analysis
 
 ```bash
-# RSeQC RPKM saturation
+# RSeQC RPKM saturation (installed in the image, but never invoked by the workflow;
+# it writes an .r script that needs R to render)
 RPKM_saturation.py -r hg38_RefSeq.bed \
-  -i Aligned.sortedByCoord.out.bam -o sample_saturation
+  -i star/sample.Aligned.sortedByCoord.out.bam -o sample_saturation
 ```
 
 Subsamples reads at increasing fractions (5%, 10%, ..., 100%) and measures gene
 detection. A plateau indicates sufficient sequencing depth. If the curve is still
 rising at 100%, more sequencing is recommended.
 
+### Detected Genes
+
+```bash
+# Genes with TPM > 1; the TPM column of RSEM genes.results is column 6
+awk 'NR > 1 && $6 > 1 {n++} END {print "Genes with TPM>1:", n}' rsem/sample.genes.results
+```
+
+Expect >12,000 for a human sample at ENCODE depth.
+
+### Library Duplication Rate
+
+Picard `MarkDuplicates` and `CollectRnaSeqMetrics` are not in the container image. The
+FastQC report does carry a sequence-level duplication estimate, which is not the same
+quantity; run Picard separately if you need the alignment-based rate.
+
 ## MultiQC Aggregation
 
 ```bash
-multiqc . -o multiqc_output/ -f
+multiqc . -o . -f
 ```
 
-MultiQC aggregates reports from FastQC, Trim Galore, STAR, RSEM, RSeQC, and Picard
-into a single interactive HTML report. Review the MultiQC report as the first step
-in QC assessment.
+The workflow feeds MultiQC exactly these inputs: FastQC reports for the raw reads, the
+Trim Galore trimming reports, the FastQC reports for the trimmed reads, the STAR
+`Log.final.out`, the RSEM `.stat/` directories, and the RSeQC `infer_experiment` and
+`read_distribution` outputs. `geneBody_coverage`, `inner_distance` and the Kallisto
+output are published but are not part of the report — read those files directly. The
+report is written to `qc/multiqc/multiqc_report.html` with the parsed values in
+`qc/multiqc/multiqc_data/`.
 
 ## Expected Output
-- `infer_experiment.txt` -- strandedness inference
-- `read_distribution.txt` -- mapping distribution by genomic feature
-- `geneBody_coverage.png` -- gene body coverage plot
-- `inner_distance_plot.pdf` -- insert size distribution
-- `multiqc_report.html` -- aggregated QC report
+- `qc/rseqc/<sample>.infer_experiment.txt` -- strandedness inference
+- `qc/rseqc/<sample>.read_distribution.txt` -- mapping distribution by genomic feature
+- `qc/rseqc/<sample>.geneBody_coverage.geneBodyCoverage.txt` and `.r` -- gene body coverage
+  (RSeQC also tries to draw `.curves.pdf`, which needs R and is therefore absent)
+- `qc/rseqc/<sample>.inner_distance.*` -- insert size, paired-end runs only (RSeQC also
+  tries to draw a PDF, which needs R)
+- `qc/multiqc/multiqc_report.html` -- aggregated QC report

@@ -1,7 +1,9 @@
 # ENCODE RNA-seq Pipeline Docker Image
 # STAR 2.7.10b, RSEM 1.3.3, Kallisto 0.48.0, RSeQC, samtools, Trim Galore, FastQC
 
-FROM ubuntu:22.04 AS builder
+# Several tools below are distributed only as linux/x86_64 binaries, so the image is
+# pinned to that platform (it runs under emulation on arm64 hosts).
+FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 # perl is listed explicitly: FastQC, Trim Galore and the RSEM wrappers are Perl programs

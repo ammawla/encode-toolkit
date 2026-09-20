@@ -217,6 +217,7 @@ process MACS2_CALLPEAK {
     tuple val(sample_id), path("${sample_id}*narrowPeak"), emit: peaks
     path("${sample_id}*.bdg"),                              emit: bdg
     path("${sample_id}*.xls"),                              emit: xls
+    path("${sample_id}*_summits.bed"),                      emit: summits
 
     script:
     def gsize = genomeDefaults()[params.genome].gsize
