@@ -5,6 +5,63 @@ All notable changes to the ENCODE Toolkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-09-20
+
+Pipeline skills release. The Python package (MCP server) is functionally identical to 0.3.2.
+
+### Fixed
+
+- **All seven Nextflow pipelines now run on current Nextflow (validated on 26.04.6).** The
+  workflows mixed top-level statements with process definitions and four configs defined a
+  function, both of which the strict parser rejects. Validation and channel setup moved into the
+  `workflow` block, and `check_max` was replaced by `process.resourceLimits`.
+- **ChIP-seq**: the workflow called each process twice (samples, then controls), which Nextflow
+  does not allow, so it could not start. Controls now go through the same calls and are split
+  off before peak calling, where they are pooled. `--control` is optional. Signal tracks now
+  receive the sample ID they were missing.
+- **CUT&RUN**: SEACR was given the control BAM instead of a control bedGraph; spike-in scale
+  factors were computed but never applied to the signal track; `--seacr_mode` was ignored;
+  MACS2 peak calling always failed on a no-op `mv`; fragments were extracted from a
+  coordinate-sorted BAM, which drops most read pairs; `--control` and chromosome sizes were
+  not staged into tasks.
+- **DNase-seq**: Hotspot2 was called with options it does not have and without its mandatory
+  center-sites file; the image pinned a Hotspot2 tag that does not exist and lacked `modwt`
+  and `bc`. Footprinting could pair a BAM with another sample's peaks. `--hotspot_index` is
+  replaced by `--hotspot_center_sites` and `--hotspot_mappable`.
+- **WGBS**: the bedMethyl conversion divided by zero on MethylDackel's header line, so
+  extraction always failed; only CpG was converted although CHG and CHH were promised;
+  `--no_overlap` toggled `--mergeContext`, which is unrelated to mate overlap (renamed
+  `--merge_context`). bedMethyl score and strand now follow the ENCODE format.
+- **RNA-seq**: the RSEM reference is a file prefix but was required to be a directory.
+- **Hi-C, WGBS, ATAC-seq images** could not build (missing `build-essential`, `unzip`, or a dead
+  download URL). Index prefixes are now resolved from staged files, so cloud executors work.
+- Pipelines referenced container images that do not exist. Each config now uses an image built
+  from the skill's own Dockerfile, with a fixed tag and a `--container` override.
+- `gcp` profiles used the retired `google-lifesciences` executor; they now use `google-batch`.
+- QC references: `samtools view` needs `-L` for a BED file; the WGBS coverage one-liner never
+  counted bases at 5x or more.
+
+### Changed
+
+- **Removed parameters that had no effect**: `--aligner` and `--lambda_genome` (WGBS),
+  `--motif_db` (DNase-seq), `--restriction_site` (Hi-C), `--gtf` (RNA-seq). The skills now
+  describe what the workflows actually do.
+- `install-nextflow.sh` installs a pinned Nextflow release and verifies its SHA-256 before use,
+  instead of piping a remote script into a shell. It no longer fails when the install
+  directory is not on the `PATH`.
+- `install-python-packages.sh` installs against `constraints.txt`, a lock file with exact
+  versions for Python 3.10+, generated from `requirements.in`.
+- The pipeline guide now separates the official ENCODE WDL pipelines from this toolkit's own
+  Nextflow implementations, and no longer cites repositories or images that do not exist.
+  Pipeline images are no longer labelled as maintained by the ENCODE DCC.
+
+### Added
+
+- `Pipelines` CI workflow: `nextflow lint`, `nextflow run -preview` across parameter
+  combinations, profile resolution, a Docker build of every pipeline image with a check that
+  the tools each workflow calls are present, shellcheck, and a `skills/` vs `plugin/skills/`
+  identity check.
+
 ## [0.3.2] - 2026-09-20
 
 Maintenance release. The Python package is functionally identical to 0.3.1.
