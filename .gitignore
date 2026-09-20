@@ -37,9 +37,16 @@ node_modules/
 *.swp
 *.swo
 
-# Claude Code local files
-.claude/settings.local.json
-.claude/*.local.md
+# AI assistant configuration and notes (never commit)
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.mcp.json
+!plugin/.mcp.json
+.cursorrules
+.aider*
 
 # Runtime data
 *.db

@@ -31,6 +31,6 @@
 ## Checklist
 
 - [ ] CHANGELOG.md updated
-- [ ] CLAUDE.md updated (if architecture/tools changed)
+- [ ] README.md updated (if architecture/tools changed)
 - [ ] No secrets or credentials in code
 - [ ] No breaking changes to existing tool signatures
