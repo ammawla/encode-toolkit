@@ -99,21 +99,20 @@ process BOWTIE2_ALIGN {
 
 process MITO_FILTER {
     tag "$sample_id"
-    publishDir "${params.outdir}/qc", mode: 'copy', pattern: '*.mito_stats.txt'
+    publishDir "${params.outdir}/qc", mode: 'copy', pattern: '*.idxstats.txt'
 
     input:
     tuple val(sample_id), path(bam), path(bai)
 
     output:
     tuple val(sample_id), path("${sample_id}.no_mito.bam"), emit: bam
-    path("${sample_id}.mito_stats.txt"),                     emit: stats
+    path("${sample_id}.idxstats.txt"),                       emit: stats
 
     script:
     """
-    # Calculate mito fraction
-    TOTAL=\$(samtools view -c ${bam})
-    MITO=\$(samtools view -c ${bam} ${params.mito_name})
-    echo "total_reads=\$TOTAL mito_reads=\$MITO mito_frac=\$(echo "scale=4; \$MITO/\$TOTAL" | bc)" > ${sample_id}.mito_stats.txt
+    # Reads per chromosome before filtering: MultiQC's samtools module turns this into the
+    # mitochondrial fraction. It also works when the genome has no ${params.mito_name} contig.
+    samtools idxstats ${bam} > ${sample_id}.idxstats.txt
 
     # Remove mitochondrial reads
     samtools view -@ ${task.cpus} -b ${bam} \$(samtools idxstats ${bam} | \\
@@ -230,27 +229,21 @@ process MACS2_CALLPEAK {
 }
 
 process IDR_ANALYSIS {
-    tag "idr"
+    tag "${rep1_id}_vs_${rep2_id}"
     publishDir "${params.outdir}/peaks/idr", mode: 'copy'
 
     input:
-    path(peak_files)
+    tuple val(rep1_id), path(rep1_peaks), val(rep2_id), path(rep2_peaks)
 
     output:
-    path("idr_peaks.txt"),     emit: peaks
-    path("idr_peaks.txt.png"), emit: plot, optional: true
-
-    when:
-    !params.skip_idr
+    path("${rep1_id}_vs_${rep2_id}.idr_peaks.txt"),     emit: peaks
+    path("${rep1_id}_vs_${rep2_id}.idr_peaks.txt.png"), emit: plot, optional: true
 
     script:
-    if (peak_files.size() > 2) {
-        log.warn "IDR compares two replicates: using ${peak_files[0]} and ${peak_files[1]} of ${peak_files.size()} peak files"
-    }
     """
-    idr --samples ${peak_files[0]} ${peak_files[1]} \\
+    idr --samples ${rep1_peaks} ${rep2_peaks} \\
       --input-file-type narrowPeak --rank p.value \\
-      --output-file idr_peaks.txt --plot --idr-threshold 0.05
+      --output-file ${rep1_id}_vs_${rep2_id}.idr_peaks.txt --plot --idr-threshold 0.05
     """
 }
 
@@ -269,6 +262,39 @@ process SIGNAL_TRACKS {
     bamCoverage -b ${bam} -o ${sample_id}.signal.bw \\
       --normalizeUsing RPKM --binSize 10 \\
       --numberOfProcessors ${task.cpus} --extendReads
+    """
+}
+
+process FRIP {
+    tag "$sample_id"
+    publishDir "${params.outdir}/qc", mode: 'copy'
+
+    input:
+    tuple val(sample_id), path(bam), path(bai), path(peaks)
+
+    output:
+    path("${sample_id}.frip_mqc.tsv"), emit: frip
+
+    script:
+    // Fraction of reads in peaks: alignments of the final BAM that overlap a called peak,
+    // over all alignments of that BAM. One row per peak file, in a table MultiQC picks up.
+    """
+    total=\$(samtools view -c ${bam})
+    {
+        echo "# id: 'frip'"
+        echo "# section_name: 'Fraction of reads in peaks'"
+        echo "# description: 'Alignments of the final BAM that overlap a called peak, over all alignments of that BAM.'"
+        echo "# plot_type: 'table'"
+        echo "# pconfig:"
+        echo "#     id: 'frip_table'"
+        echo "#     namespace: 'FRiP'"
+        printf 'Peak set\\tFRiP\\treads_in_peaks\\ttotal_reads\\n'
+        for peak_file in ${peaks}; do
+            in_peaks=\$(bedtools intersect -u -a ${bam} -b "\$peak_file" | samtools view -c -)
+            frip=\$(awk -v a="\$in_peaks" -v b="\$total" 'BEGIN { printf "%.4f", (b > 0) ? a / b : 0 }')
+            printf '%s\\t%s\\t%s\\t%s\\n' "\$peak_file" "\$frip" "\$in_peaks" "\$total"
+        done
+    } > ${sample_id}.frip_mqc.tsv
     """
 }
 
@@ -336,17 +362,22 @@ workflow {
 
     // IDR (optional, with 2+ replicates)
     if (!params.skip_idr) {
-        // IDR compares two replicates. Sort by name so the pair is the same on every run,
-        // and skip IDR when fewer than two peak files exist.
-        ch_peaks = MACS2_CALLPEAK.out.peaks
-            .map { _sample_id, peaks -> peaks }
-            .toSortedList { a, b -> a.name <=> b.name }
-            .filter { peaks -> peaks.size() >= 2 }
-        IDR_ANALYSIS(ch_peaks)
+        // IDR compares two replicates at a time, so every pair of samples is compared:
+        // two samples give one comparison, three give three. One sample gives none.
+        ch_idr_pairs = MACS2_CALLPEAK.out.peaks
+            .toSortedList { a, b -> a[0] <=> b[0] }
+            .flatMap { samples ->
+                [samples, samples].combinations()
+                    .findAll { pair -> pair[0][0] < pair[1][0] }
+                    .collect { pair -> [pair[0][0], pair[0][1], pair[1][0], pair[1][1]] }
+            }
+        IDR_ANALYSIS(ch_idr_pairs)
     }
 
-    // Stage 5: Signal Tracks and QC
+    // Stage 5: Signal Tracks and QC. FRiP counts all filtered fragments (the final BAM)
+    // against the peaks called on the nucleosome-free fragments.
     SIGNAL_TRACKS(BLACKLIST_FILTER.out.bam)
+    FRIP(BLACKLIST_FILTER.out.bam.join(MACS2_CALLPEAK.out.peaks))
 
     // MultiQC
     ch_multiqc = FASTQC.out.reports
@@ -356,6 +387,7 @@ workflow {
         .mix(MITO_FILTER.out.stats)
         .mix(MARK_DUPLICATES.out.metrics)
         .mix(BLACKLIST_FILTER.out.flagstat)
+        .mix(FRIP.out.frip)
         .collect()
     MULTIQC(ch_multiqc)
 }

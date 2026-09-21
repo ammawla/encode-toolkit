@@ -407,12 +407,15 @@ encode_search_experiments(assay_title="scRNA-seq", organ="brain", organism="Homo
 Expected output:
 ```json
 {
-  "total": 22,
   "results": [
-    {"accession": "ENCSR700SCR", "assay_title": "scRNA-seq", "biosample_summary": "brain", "status": "released"},
-    {"accession": "ENCSR701FRC", "assay_title": "scRNA-seq", "biosample_summary": "frontal cortex", "status": "released"},
-    {"accession": "ENCSR702CRB", "assay_title": "scRNA-seq", "biosample_summary": "cerebellum", "status": "released"}
-  ]
+    {"accession": "ENCSR700SCR", "assay_title": "scRNA-seq", "organ": "brain", "biosample_summary": "brain tissue male adult (54 years)", "status": "released"},
+    {"accession": "ENCSR701FRC", "assay_title": "scRNA-seq", "organ": "brain", "biosample_summary": "frontal cortex tissue female adult (53 years)", "status": "released"}
+  ],
+  "total": 22,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -424,13 +427,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR700SCR", file_format="h5ad", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF800H5A", "output_type": "gene quantifications", "file_format": "h5ad", "file_size_mb": 320}
-  ]
-}
+[
+  {"accession": "ENCFF800H5A", "output_type": "gene quantifications", "file_format": "h5ad", "assembly": "GRCh38", "file_size": 335544320, "file_size_human": "320.0 MB", "status": "released"}
+]
 ```
 
 ### Step 3: Integrate datasets
@@ -458,9 +459,11 @@ encode_track_experiment(accession="ENCSR700SCR", notes="Brain scRNA-seq for cros
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR700SCR",
-  "notes": "Brain scRNA-seq for cross-study meta-analysis - 10x Chromium v3"
+  "tracking": {"accession": "ENCSR700SCR", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
 
@@ -481,9 +484,13 @@ encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 22, "blood": 15, "lung": 8, "heart": 6, "liver": 4}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 22},
+    {"term": "blood", "count": 15},
+    {"term": "lung", "count": 8},
+    {"term": "heart", "count": 6},
+    {"term": "liver", "count": 4}
+  ]
 }
 ```
 
@@ -495,13 +502,19 @@ encode_compare_experiments(accession1="ENCSR700SCR", accession2="ENCSR701FRC")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"assay": "scRNA-seq", "organism": "Homo sapiens"},
-    "differences": {
-      "biosample": ["brain", "frontal cortex"],
-      "lab": ["/labs/bing-ren/", "/labs/joe-ecker/"]
-    }
-  }
+  "experiment_1": {"accession": "ENCSR700SCR", "assay": "scRNA-seq", "biosample": "brain tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR701FRC", "assay": "scRNA-seq", "biosample": "frontal cortex tissue female adult (53 years)"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: scRNA-seq"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different labs: Bing Ren, UCSD vs Joseph Ecker, Salk. Batch effects possible."
+  ]
 }
 ```
 
@@ -513,7 +526,10 @@ encode_summarize_collection()
 Expected output:
 ```json
 {
-  "total_tracked": 8,
+  "total_experiments": 8,
+  "total_publications": 3,
+  "total_derived_files": 4,
+  "total_external_references": 6,
   "by_assay": {"scRNA-seq": 5, "scATAC-seq": 3},
   "by_organ": {"brain": 8}
 }

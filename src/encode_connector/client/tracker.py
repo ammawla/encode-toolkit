@@ -23,6 +23,21 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH = Path.home() / ".encode_connector" / "tracker.db"
 
+ASSEMBLY_SEPARATOR = ", "
+
+
+def _assembly_text(assembly: str | list[str] | None) -> str:
+    """Return the assembly value as the text the assembly column stores.
+
+    Experiment models carry ``assembly`` as a list (an experiment can have files on several
+    assemblies), and SQLite cannot bind a list, so the names are joined into one string.
+    """
+    if not assembly:
+        return ""
+    if isinstance(assembly, str):
+        return assembly
+    return ASSEMBLY_SEPARATOR.join(assembly)
+
 
 class ExperimentTracker:
     """SQLite-backed experiment tracker for ENCODE data."""
@@ -204,7 +219,7 @@ class ExperimentTracker:
                     experiment_data.get("description", ""),
                     experiment_data.get("lab", ""),
                     experiment_data.get("award", ""),
-                    experiment_data.get("assembly", ""),
+                    _assembly_text(experiment_data.get("assembly")),
                     experiment_data.get("replication_type", ""),
                     experiment_data.get("life_stage", ""),
                     experiment_data.get("url", ""),
@@ -237,7 +252,7 @@ class ExperimentTracker:
                     experiment_data.get("description", ""),
                     experiment_data.get("lab", ""),
                     experiment_data.get("award", ""),
-                    experiment_data.get("assembly", ""),
+                    _assembly_text(experiment_data.get("assembly")),
                     experiment_data.get("replication_type", ""),
                     experiment_data.get("life_stage", ""),
                     experiment_data.get("url", ""),
@@ -332,6 +347,17 @@ class ExperimentTracker:
         conn = self._get_conn()
         count = 0
         for pub in publications:
+            # The table is unique on (experiment, pmid). ENCODE lists some papers without a
+            # PMID; stored as "" they would all replace each other, so they are stored as NULL
+            # (which SQLite never treats as equal) and matched on DOI and title instead.
+            pmid = pub.get("pmid") or None
+            if pmid is None:
+                conn.execute(
+                    # older versions stored a missing PMID as "": replace such a row too
+                    "DELETE FROM publications WHERE experiment_accession = ? "
+                    "AND (pmid IS NULL OR pmid = '') AND doi = ? AND title = ?",
+                    (accession, pub.get("doi", ""), pub.get("title", "")),
+                )
             try:
                 conn.execute(
                     """
@@ -341,7 +367,7 @@ class ExperimentTracker:
                 """,
                     (
                         accession,
-                        pub.get("pmid", ""),
+                        pmid,
                         pub.get("doi", ""),
                         pub.get("title", ""),
                         pub.get("authors", ""),
@@ -363,7 +389,8 @@ class ExperimentTracker:
             "SELECT * FROM publications WHERE experiment_accession = ?",
             (accession,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        # a missing PMID is stored as NULL; callers keep getting the empty string they always got
+        return [{**dict(r), "pmid": r["pmid"] or ""} for r in rows]
 
     # ------------------------------------------------------------------
     # Pipeline info
@@ -584,15 +611,19 @@ class ExperimentTracker:
             else:
                 compatible_aspects.append(f"Same organism: {exp1['organism']}")
 
-        # Check assembly
+        # Check assembly. An experiment can have files on several assemblies, stored as one
+        # joined string, so two experiments are comparable when they share at least one.
         if exp1.get("assembly") and exp2.get("assembly"):
-            if exp1["assembly"] != exp2["assembly"]:
+            shared = sorted(
+                set(exp1["assembly"].split(ASSEMBLY_SEPARATOR)) & set(exp2["assembly"].split(ASSEMBLY_SEPARATOR))
+            )
+            if not shared:
                 issues.append(
                     f"Different genome assemblies: {exp1['assembly']} vs {exp2['assembly']}. "
                     "Coordinate liftover needed before comparison."
                 )
             else:
-                compatible_aspects.append(f"Same assembly: {exp1['assembly']}")
+                compatible_aspects.append(f"Same assembly: {ASSEMBLY_SEPARATOR.join(shared)}")
 
         # Check assay type
         if exp1.get("assay_title") and exp2.get("assay_title"):

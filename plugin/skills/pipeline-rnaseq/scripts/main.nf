@@ -92,6 +92,7 @@ process STAR_ALIGN {
     path("${sample_id}.SJ.out.tab"),                                                  emit: junctions
     path("${sample_id}.ReadsPerGene.out.tab"),                                        emit: gene_counts
     tuple val(sample_id), path("${sample_id}.Signal.UniqueMultiple.str*.out.bg"),    emit: bedgraph
+    path("${sample_id}.Signal.Unique.str*.out.bg"),                                   emit: bedgraph_unique
 
     script:
     def input_reads = params.single_end ? "${reads}" : "${reads[0]} ${reads[1]}"
@@ -162,6 +163,7 @@ process KALLISTO_QUANT {
 
     output:
     path("${sample_id}/abundance.tsv"), emit: abundance
+    path("${sample_id}/abundance.h5"),  emit: abundance_h5, optional: true   // only from kallisto builds with HDF5
     path("${sample_id}/run_info.json"), emit: run_info
 
     when:

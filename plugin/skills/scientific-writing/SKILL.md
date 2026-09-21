@@ -660,7 +660,7 @@ The provenance chain logged by the `data-provenance` skill contains all informat
 encode_get_provenance(file_path="/path/to/derived/final_peaks.bed")
 ```
 
-This returns the full chain: derived_file -> processing_steps -> source ENCODE files.
+This returns the full chain: `file_path` -> `tool_used` / `parameters` -> `source_experiments`.
 
 ### Step 2: Extract Tool Names, Versions, Parameters
 
@@ -683,7 +683,7 @@ Match each tool to the appropriate methods template section:
 encode_get_experiment(accession="ENCSR...")
 ```
 
-Populate template fields: biosample, target, lab, replicates, sequencer, read length, read count, library preparation.
+Populate template fields from the response: `biosample_summary`, `target`, `lab`, `bio_replicate_count`. Sequencer, read length, read count and library preparation are not in this response — read them from the experiment's page on encodeproject.org.
 
 ### Step 5: Generate Citations for All Tools
 
@@ -728,7 +728,7 @@ yielding 34,198 peaks (99.1% of filtered set) for downstream analysis.
 
 ### Critical Omissions That Reviewers Will Flag
 
-1. **Not reporting software versions**: "Reads were aligned with STAR" is unacceptable. Reviewers require "STAR v2.7.11a (Dobin et al. 2013)." Every tool needs name, version, and citation.
+1. **Not reporting software versions**: "Reads were aligned with STAR" is unacceptable. Reviewers require "STAR v2.7.11b (Dobin et al. 2013)." Every tool needs name, version, and citation.
 
 2. **Missing biological replicate counts**: "ChIP-seq was performed" does not tell readers whether results are from 1 replicate or 5. Always state: "n=[N] biological replicates per condition."
 
@@ -789,13 +789,23 @@ yielding 34,198 peaks (99.1% of filtered set) for downstream analysis.
 encode_list_tracked()
 ```
 
-Expected output:
+Expected output (experiment fields abridged; each row also carries `tracked_at` / `updated_at` as float epoch timestamps):
 ```json
 {
   "experiments": [
-    {"accession": "ENCSR000AKA", "assay": "Histone ChIP-seq", "notes": "GM12878 H3K27ac"},
-    {"accession": "ENCSR637ENO", "assay": "ATAC-seq", "notes": "GM12878 accessibility"}
-  ]
+    {"accession": "ENCSR000AKA", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "notes": "GM12878 H3K27ac", "publication_count": 1, "derived_file_count": 1},
+    {"accession": "ENCSR637ENO", "assay_title": "ATAC-seq", "target": "", "notes": "GM12878 accessibility", "publication_count": 0, "derived_file_count": 0}
+  ],
+  "count": 2,
+  "stats": {
+    "tracked_experiments": 2,
+    "publications": 1,
+    "pipeline_records": 2,
+    "quality_metrics": 0,
+    "derived_files": 1,
+    "external_references": 2,
+    "db_path": "/Users/you/.encode_connector/tracker.db"
+  }
 }
 ```
 
@@ -808,10 +818,17 @@ encode_get_provenance(file_path="/data/analysis/enhancers_filtered.bed")
 Expected output:
 ```json
 {
-  "file": "/data/analysis/enhancers_filtered.bed",
-  "tool": "bedtools v2.31.0",
-  "sources": [{"accession": "ENCFF001ABC"}],
-  "description": "Blacklist-filtered H3K27ac peaks"
+  "id": 4,
+  "file_path": "/data/analysis/enhancers_filtered.bed",
+  "source_accessions": ["ENCFF001ABC"],
+  "description": "Blacklist-filtered H3K27ac peaks",
+  "file_type": "filtered_peaks",
+  "tool_used": "bedtools v2.31.0",
+  "parameters": "intersect -a peaks.bed -b hg38-blacklist.v2.bed -v",
+  "notes": "",
+  "source_experiments": [
+    {"accession": "ENCFF001ABC", "tracked": false}
+  ]
 }
 ```
 
@@ -843,8 +860,18 @@ Expected output:
 ```json
 {
   "experiments": [
-    {"accession": "ENCSR000AKA", "assay": "Histone ChIP-seq"}
-  ]
+    {"accession": "ENCSR000AKA", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "assembly": "GRCh38", "publication_count": 1, "derived_file_count": 1}
+  ],
+  "count": 1,
+  "stats": {
+    "tracked_experiments": 1,
+    "publications": 1,
+    "pipeline_records": 1,
+    "quality_metrics": 0,
+    "derived_files": 1,
+    "external_references": 2,
+    "db_path": "/Users/you/.encode_connector/tracker.db"
+  }
 }
 ```
 
@@ -856,9 +883,15 @@ encode_get_provenance(file_path="/data/peaks_filtered.bed")
 Expected output:
 ```json
 {
-  "file": "/data/peaks_filtered.bed",
-  "tool": "bedtools v2.31.0",
-  "sources": [{"accession": "ENCFF001ABC"}]
+  "id": 5,
+  "file_path": "/data/peaks_filtered.bed",
+  "source_accessions": ["ENCFF001ABC"],
+  "description": "Blacklist-filtered peaks",
+  "file_type": "filtered_peaks",
+  "tool_used": "bedtools v2.31.0",
+  "parameters": "intersect -v",
+  "notes": "",
+  "source_experiments": [{"accession": "ENCFF001ABC", "tracked": false}]
 }
 ```
 
@@ -870,7 +903,20 @@ encode_get_citations(accession="ENCSR000AKA")
 Expected output:
 ```json
 {
-  "citations": [{"pmid": "29126249", "title": "ENCODE encyclopedia", "year": 2012}]
+  "publications": [
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR000AKA",
+      "pmid": "22955616",
+      "doi": "10.1038/nature11247",
+      "title": "An integrated encyclopedia of DNA elements in the human genome",
+      "authors": "ENCODE Project Consortium",
+      "journal": "Nature",
+      "year": "2012",
+      "abstract": ""
+    }
+  ],
+  "count": 1
 }
 ```
 

@@ -12,7 +12,7 @@ yourself.
 | `bismark/alignments/*_PE_report.txt` | Mapping efficiency, and the percentage of C methylated in CpG/CHG/CHH context |
 | `bismark/dedup_reports/*.deduplication_report.txt` | Duplicate count and rate |
 | `bismark/mbias/<sample>_mbias_*.svg`, `<sample>_mbias_report.txt` | M-bias plots and MethylDackel's suggested inclusion bounds |
-| `coverage/<sample>.coverage_stats.txt` | Covered CpGs, their mean coverage, and the fraction reaching >=5x and >=10x |
+| `coverage/<sample>.coverage_stats.txt` | Covered CpGs, their mean coverage, and the fraction reaching >=5x, >=10x and `--min_coverage`x |
 | `multiqc/multiqc_report.html` | Aggregated report |
 
 ## Coverage Statistics
@@ -21,22 +21,37 @@ yourself.
 site rather than only the ones that pass `--min_coverage`:
 
 ```bash
-awk '!/^track/ {
+awk -v min_cov=5 '!/^track/ {
     cov = $5 + $6; sum += cov; n++;
-    if (cov >= 5)  c5++;
-    if (cov >= 10) c10++
+    if (cov >= 5)       c5++;
+    if (cov >= 10)      c10++;
+    if (cov >= min_cov) cmin++
 } END {
     if (n == 0) { print "Covered CpGs: 0"; exit }
     printf "Covered CpGs (>=1x): %d\n", n;
     printf "Mean coverage of covered CpGs: %.1f\n", sum/n;
     printf "Covered CpGs >=5x: %d (%.1f%%)\n", c5, c5/n*100;
-    printf "Covered CpGs >=10x: %d (%.1f%%)\n", c10, c10/n*100
+    printf "Covered CpGs >=10x: %d (%.1f%%)\n", c10, c10/n*100;
+    printf "Covered CpGs >=%dx (--min_coverage, kept in bedMethyl): %d (%.1f%%)\n", min_cov, cmin, cmin/n*100
 }' sample_CpG.bedGraph > sample.coverage_stats.txt
 ```
 
-Two things to keep straight when reporting these numbers:
+`min_cov` is `--min_coverage`, so the five-line file looks like this at the default of 5:
+
+```
+Covered CpGs (>=1x): 27184023
+Mean coverage of covered CpGs: 12.4
+Covered CpGs >=5x: 22903511 (84.3%)
+Covered CpGs >=10x: 16992841 (62.5%)
+Covered CpGs >=5x (--min_coverage, kept in bedMethyl): 22903511 (84.3%)
+```
+
+Three things to keep straight when reporting these numbers:
 
 - The 5x and 10x thresholds are fixed in the workflow. They do not follow `--min_coverage`.
+- The last line is the one that does, and it is the count that reached the bedMethyl
+  files. At the default it duplicates the >=5x line; at any other `--min_coverage` it does
+  not.
 - The percentages are of *covered* CpGs. A CpG that received zero reads is not in the
   bedGraph and is not counted, so this is not the genome-wide CpG completeness.
 
@@ -149,10 +164,10 @@ and writes `ENCODE-WGBS-Pipeline_multiqc_report.html`, which would not match the
 output.
 
 The inputs collected are the raw-read FastQC reports, the Trim Galore trimming reports,
-the FastQC reports for the trimmed reads, and the Bismark `*_PE_report.txt` files. The
-deduplication reports are published but are not passed to MultiQC, so read the duplication
-rate from `bismark/dedup_reports/` directly. Picard metrics do not exist for this
-pipeline.
+the FastQC reports for the trimmed reads, the Bismark `*_PE_report.txt` files and the
+`*.deduplication_report.txt` files, so the duplication rate appears in the report as well
+as in `bismark/dedup_reports/`. With `--skip_dedup` there are no deduplication reports to
+collect. Picard metrics do not exist for this pipeline.
 
 ## Summary QC Table Format
 

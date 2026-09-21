@@ -1,8 +1,8 @@
 # Stage 5: QC Metrics
 
 ## Tools
-- **RSeQC v4.0.0**: RNA-seq quality control suite (Wang et al. 2012, ~3,500 citations)
-- **MultiQC v1.14**: Aggregated QC report generation
+- **RSeQC 5.0.3**: RNA-seq quality control suite (Wang et al. 2012, ~3,500 citations)
+- **MultiQC 1.21**: Aggregated QC report generation
 
 The workflow runs four RSeQC modules — `infer_experiment.py`, `read_distribution.py`,
 `geneBody_coverage.py` and, for paired-end runs, `inner_distance.py` — all against the

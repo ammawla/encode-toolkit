@@ -42,7 +42,7 @@ These are the versions in `scripts/Dockerfile`, which is what the workflow runs.
 |------|---------|---------|----------|
 | Trim Galore | 0.6.10 | Adapter + quality trimming (bisulfite-aware) | Krueger (Babraham) |
 | Bismark | 0.24.2 | Bisulfite-aware alignment + deduplication | Krueger & Andrews 2011 |
-| Bowtie2 | 2.5.3 | Backend aligner used by Bismark | Langmead & Salzberg 2012 |
+| Bowtie2 | 2.5.4 | Backend aligner used by Bismark | Langmead & Salzberg 2012 |
 | MethylDackel | 0.6.1 | Methylation extraction from BAM | Ryan (GitHub) |
 | samtools | 1.19 | BAM sorting and indexing | Li et al. 2009 |
 | htslib | 1.19 | `bgzip` and `tabix` for the bedMethyl files | Bonfield et al. 2021 |
@@ -50,8 +50,8 @@ These are the versions in `scripts/Dockerfile`, which is what the workflow runs.
 | MultiQC | 1.21 | Aggregated QC reporting | Ewels et al. 2016 |
 
 The conda environment in `bioinformatics-installer` (`environments/wgbs-env.yml`) is a
-separate manual route and may ship different point releases of the same tools; it also
-carries bedtools, which is not in the image.
+separate manual route pinned to the same versions of these tools; it also carries
+bedtools, which is not in the image.
 
 ## Key Literature
 
@@ -141,10 +141,12 @@ project/queue is missing.
 | MethylDackel (mbias, extract) | 2, 4 | 8 GB | 1-2 hours |
 | **Total** | **8** | **48 GB** | **12-24 hours** |
 
-`BISMARK_ALIGN`, `DEDUPLICATE` and `METHYLDACKEL_EXTRACT` are configured in
-`nextflow.config` and double their memory and time on each retry, bounded by
-`--max_memory` and `--max_time`. The other processes carry fixed directives in `main.nf`
-and keep the same allocation on retry.
+Every process asks for `memory { N.GB * task.attempt }`, so a task killed for running out
+of memory is retried with more: the second attempt gets twice the figure in the table, the
+third three times it, bounded by `--max_memory`. `nextflow.config` scales the time the
+same way for `BISMARK_ALIGN`, `DEDUPLICATE` and `METHYLDACKEL_EXTRACT`, bounded by
+`--max_time`; the other processes declare no time limit. A task is retried only for exit
+codes 130-145 and 104 (killed for exceeding a limit); any other failure stops the run.
 
 ## Pipeline Parameters
 
@@ -238,16 +240,23 @@ is an integer percentage. Sites below `--min_coverage` are dropped.
 ### Coverage Statistics
 
 `coverage/{sample}.coverage_stats.txt` is computed from the unfiltered
-`{sample}_CpG.bedGraph`, so it describes every covered site, not just the reported ones:
+`{sample}_CpG.bedGraph`, so it describes every covered site, not just the reported ones.
+It has five lines — this is a run at the default `--min_coverage 5`:
 
-- covered CpGs (>=1x)
-- mean coverage of those covered CpGs
-- how many reach >=5x and >=10x, as a percentage of the covered CpGs
+```
+Covered CpGs (>=1x): 27184023
+Mean coverage of covered CpGs: 12.4
+Covered CpGs >=5x: 22903511 (84.3%)
+Covered CpGs >=10x: 16992841 (62.5%)
+Covered CpGs >=5x (--min_coverage, kept in bedMethyl): 22903511 (84.3%)
+```
 
-The 5x and 10x thresholds are fixed in the workflow and do not follow `--min_coverage`.
-These are percentages of *covered* CpGs, not of all CpGs in the genome — the workflow
-never counts genomic CpGs that got zero reads. With `--merge_context false` the records
-are per cytosine rather than per CpG.
+The 5x and 10x lines are fixed thresholds and do not follow `--min_coverage`. The last
+line does, and it is the one that describes what actually reached the bedMethyl files: at
+the default it repeats the >=5x line, with `--min_coverage 10` it would repeat the >=10x
+line, and at any other value it stands on its own. All the percentages are of *covered*
+CpGs, not of all CpGs in the genome — the workflow never counts genomic CpGs that got zero
+reads. With `--merge_context false` the records are per cytosine rather than per CpG.
 
 ## QC Thresholds (ENCODE Standards)
 
@@ -306,8 +315,9 @@ Regions with <5x coverage have unreliable methylation estimates:
 - The bedMethyl files are filtered to `--min_coverage` (default 5); the bedGraphs are not
 - For differential methylation analysis, consider `--min_coverage 10`
 - Report the >=5x and >=10x fractions from `coverage/{sample}.coverage_stats.txt`. Those
-  two thresholds are fixed in the workflow and do not follow `--min_coverage`, so state
-  both numbers rather than implying the file describes the filter you used
+  two thresholds are fixed in the workflow and do not follow `--min_coverage`; the last
+  line of the file is the one that does, so quote it too whenever the run used a value
+  other than 5
 
 ## Provenance Integration
 
@@ -351,8 +361,10 @@ Expected output:
 {
   "accession": "ENCSR765JPC",
   "assay_title": "WGBS",
-  "biosample_summary": "liver",
-  "replicates": 2,
+  "biosample_summary": "liver tissue male adult (54 years)",
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
+  "tech_replicate_count": 2,
   "status": "released"
 }
 ```
@@ -363,25 +375,39 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR765JPC", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF300BS1", "output_type": "reads", "paired_end": "1", "file_size_mb": 45000},
-    {"accession": "ENCFF301BS2", "output_type": "reads", "paired_end": "2", "file_size_mb": 46000}
-  ]
-}
+[
+  {"accession": "ENCFF300BS1", "file_format": "fastq", "output_type": "reads", "file_size_human": "45.0 GB", "biological_replicates": [1], "status": "released"},
+  {"accession": "ENCFF301BS2", "file_format": "fastq", "output_type": "reads", "file_size_human": "46.0 GB", "biological_replicates": [1], "status": "released"}
+]
 ```
 
 **Interpretation**: WGBS files are very large (~45GB per read file). Ensure adequate storage (>500GB for processing).
 
-### Step 3: Run the WGBS pipeline
+### Step 3: Download and name the FASTQs so a read-pair glob can find them
 
-Name the downloaded FASTQs so one glob matches both mates of each sample, then:
+```
+encode_download_files(file_accessions=["ENCFF300BS1", "ENCFF301BS2"], download_dir="/data/wgbs/fastq")
+```
+
+ENCODE names every FASTQ after its accession (`ENCFF300BS1.fastq.gz`), with no `_R1`/`_R2`
+in the name, so the two files of a pair share no prefix and the `--reads` glob cannot pair
+them. Link them into the shape the glob expects. Which mate an accession is comes from the
+ENCODE file record on encodeproject.org, which carries `paired_end` (1 or 2) and
+`paired_with`; the MCP file tools do not return those two fields:
+
+```bash
+cd /data/wgbs/fastq
+ln -s ENCFF300BS1.fastq.gz liver_rep1_R1.fastq.gz
+ln -s ENCFF301BS2.fastq.gz liver_rep1_R2.fastq.gz
+```
+
+### Step 4: Run the WGBS pipeline
 
 ```bash
 nextflow run scripts/main.nf -profile local \
-    --reads '/data/fastq/*_R{1,2}.fastq.gz' \
+    --reads '/data/wgbs/fastq/liver_*_R{1,2}.fastq.gz' \
     --genome_dir /ref/bismark_index \
     --min_coverage 5 \
     --outdir results/ \
@@ -396,7 +422,7 @@ Key pipeline steps:
 5. CpG coverage statistics
 6. MultiQC aggregation
 
-### Step 4: Validate output quality
+### Step 5: Validate output quality
 
 | Metric | Threshold | Purpose |
 |---|---|---|
@@ -405,7 +431,7 @@ Key pipeline steps:
 | Covered CpGs at >= 10x | Enough for DMR calling | Statistical power (coverage stats) |
 | Bisulfite conversion | >= 98% | Library quality; measured outside this workflow |
 
-### Step 5: Identify differentially methylated regions
+### Step 6: Identify differentially methylated regions
 
 Feed per-CpG methylation into -> **methylation-aggregation** for cross-tissue comparison and HMR/UMR/PMD identification.
 
@@ -430,15 +456,20 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 6,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR321BRN",
       "assay_title": "WGBS",
       "biosample_summary": "brain tissue female adult (53 years)",
+      "organ": "brain",
       "status": "released"
     }
-  ]
+  ],
+  "total": 6,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -454,18 +485,25 @@ encode_search_files(
 )
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
-  "total": 3,
-  "files": [
+  "results": [
     {
       "accession": "ENCFF567MET",
+      "file_format": "bed",
       "output_type": "methylation state at CpG",
       "assembly": "GRCh38",
-      "file_size_mb": 845.2
+      "file_size": 886144860,
+      "file_size_human": "845.1 MB",
+      "experiment_accession": "ENCSR321BRN"
     }
-  ]
+  ],
+  "total": 3,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -496,7 +534,7 @@ Expected output:
 When reporting WGBS pipeline results:
 
 - **Mapping and duplication**: Report the mapping rate from `bismark/alignments/*_PE_report.txt` (>70% expected) and the duplication rate from `bismark/dedup_reports/` (<30% expected)
-- **CpG coverage depth**: Report the mean coverage of covered CpGs and the percentage reaching >=5x and >=10x from `coverage/{sample}.coverage_stats.txt`, and state that these are percentages of covered CpGs rather than of all genomic CpGs
+- **CpG coverage depth**: Report the mean coverage of covered CpGs, the percentage reaching >=5x and >=10x, and the last line's `--min_coverage` count from `coverage/{sample}.coverage_stats.txt`, and state that these are percentages of covered CpGs rather than of all genomic CpGs
 - **Global methylation level**: Report the genome-wide average CpG methylation percentage and note any non-CpG (CHG/CHH) methylation if relevant to the tissue. Both come from the Bismark report or from the bedGraphs
 - **bedMethyl output paths**: Provide paths to the CpG bedMethyl file and the CHG/CHH context files, and state the `--min_coverage` value they were filtered at
 - **M-bias assessment**: No read positions are excluded at extraction. Report MethylDackel's suggested bounds from `bismark/mbias/{sample}_mbias_report.txt`, and say whether a manual re-extraction with `--OT`/`--OB` was done

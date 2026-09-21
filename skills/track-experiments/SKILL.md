@@ -79,7 +79,7 @@ The tracker uses a local SQLite database with WAL journal mode and foreign keys 
 
 **`derived_files`** -- User-created files derived from ENCODE data. Stores file path, source accessions (as JSON array), tool used, parameters, and description. This is the backbone of provenance tracking.
 
-**`external_references`** -- Cross-database links. Stores reference type (pmid, doi, geo_accession, nct_id, biorxiv_doi, dbgap), reference ID, and description. Unique constraint on `(experiment_accession, reference_type, reference_id)`.
+**`external_references`** -- Cross-database links. Stores reference type (one of `pmid`, `doi`, `nct_id`, `preprint_doi`, `geo_accession`, `other`), reference ID, and description. Unique constraint on `(experiment_accession, reference_type, reference_id)`.
 
 The database location is `~/.encode_connector/tracker.db` (macOS/Linux) or `%USERPROFILE%\.encode_connector\tracker.db` (Windows). The directory is created automatically on first use.
 
@@ -109,14 +109,18 @@ Before tracking anything, survey the landscape. Use facets to understand the bre
 encode_get_facets(organ="pancreas", organism="Homo sapiens")
 ```
 
-Expected output (example):
-```
-Histone ChIP-seq: 15 experiments
-ATAC-seq: 3 experiments
-RNA-seq: 8 experiments
-TF ChIP-seq: 4 experiments
-WGBS: 2 experiments
-DNase-seq: 1 experiment
+Expected output (top-level keys are ENCODE facet field names; each value is an array of term/count pairs):
+```json
+{
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 15},
+    {"term": "total RNA-seq", "count": 8},
+    {"term": "TF ChIP-seq", "count": 4},
+    {"term": "ATAC-seq", "count": 3},
+    {"term": "WGBS", "count": 2},
+    {"term": "DNase-seq", "count": 1}
+  ]
+}
 ```
 
 This tells you that pancreatic tissue has strong histone ChIP-seq coverage (15 experiments across multiple marks), adequate ATAC-seq (3), and solid RNA-seq (8). The 2 WGBS experiments are a bonus for methylation analysis.
@@ -185,18 +189,20 @@ After tracking all experiments, get the bird's-eye view.
 encode_summarize_collection()
 ```
 
-Expected output:
-```
-Total experiments: 8
-By assay: Histone ChIP-seq (5), ATAC-seq (1), RNA-seq (2)
-By organ: pancreas (8)
-By organism: Homo sapiens (8)
-By target: H3K27ac (1), H3K4me1 (1), H3K4me3 (1), H3K27me3 (1), H3K36me3 (1), none (2)
-By biosample_type: tissue (5), primary cell (3)
-By lab: /labs/bradley-bernstein/ (3), /labs/john-stamatoyannopoulos/ (2), /labs/michael-snyder/ (3)
-Total publications: 4
-Total derived files: 0
-Total external references: 0
+Expected output (the keys inside each `by_*` object are the values found in your own tracked rows; experiments with no target are bucketed as `"none"`):
+```json
+{
+  "total_experiments": 8,
+  "total_publications": 4,
+  "total_derived_files": 0,
+  "total_external_references": 0,
+  "by_assay": {"Histone ChIP-seq": 5, "total RNA-seq": 2, "ATAC-seq": 1},
+  "by_target": {"H3K27ac": 1, "H3K4me1": 1, "H3K4me3": 1, "H3K27me3": 1, "H3K36me3": 1, "none": 3},
+  "by_organism": {"Homo sapiens": 8},
+  "by_organ": {"pancreas": 8},
+  "by_biosample_type": {"tissue": 5, "primary cell": 3},
+  "by_lab": {"Bradley Bernstein, Broad": 3, "Michael Snyder, Stanford": 3, "John Stamatoyannopoulos, UW": 2}
+}
 ```
 
 Check the summary for consistency:
@@ -238,7 +244,7 @@ encode_track_experiment(accession="ENCSR789GHI", notes="Used in Table S1 - expre
 encode_list_tracked()
 ```
 
-Check the "publications" column. A count of 0 means publications were not fetched at tracking time. This can happen if `fetch_publications=False` was passed or if the ENCODE Portal had a temporary issue.
+Check each experiment's `publication_count`. A count of 0 means publications were not fetched at tracking time. This can happen if `fetch_publications=False` was passed or if the ENCODE Portal had a temporary issue.
 
 ### Step 3: Re-track with publication fetch if needed
 
@@ -329,7 +335,7 @@ encode_log_derived_file(
   file_path="/analysis/h3k27ac_peaks.narrowPeak",
   source_accessions=["ENCSR123ABC"],
   description="MACS2 narrow peaks from H3K27ac ChIP-seq, 2 biological replicates pooled",
-  tool_used="MACS2 v2.2.7.1",
+  tool_used="MACS2 v2.2.9.1",
   parameters="--gsize hs --qvalue 0.05 --keep-dup all --call-summits --bdg --SPMR"
 )
 ```
@@ -382,18 +388,24 @@ encode_log_derived_file(
 encode_get_provenance(file_path="/figures/figure_3A_enhancer_heatmap.pdf")
 ```
 
-This returns the full chain:
+This returns that one file's record plus its ENCODE sources (fields abridged):
+```json
+{
+  "id": 4,
+  "file_path": "/figures/figure_3A_enhancer_heatmap.pdf",
+  "source_accessions": ["ENCSR123ABC"],
+  "description": "Heatmap of H3K27ac signal at pancreatic islet enhancers, sorted by signal intensity. 18,432 enhancers, +/- 3kb window, 50bp bins.",
+  "file_type": "",
+  "tool_used": "deepTools computeMatrix + plotHeatmap v3.5.2",
+  "parameters": "computeMatrix reference-point -S h3k27ac.bw -R enhancer_peaks.bed -a 3000 -b 3000 --binSize 50 -o matrix.gz && plotHeatmap -m matrix.gz --colorMap RdYlBu_r --refPointLabel 'Enhancer center' -o figure_3A.pdf",
+  "notes": "",
+  "source_experiments": [
+    {"accession": "ENCSR123ABC", "assay_title": "Histone ChIP-seq", "biosample_summary": "pancreatic islet", "organism": "Homo sapiens"}
+  ]
+}
 ```
-figure_3A_enhancer_heatmap.pdf
-  <- deepTools computeMatrix + plotHeatmap v3.5.2
-  <- enhancer_peaks.bed
-    <- bedtools intersect v2.31.0
-    <- h3k27ac_peaks_filtered.bed
-      <- bedtools subtract v2.31.0 + grep
-      <- h3k27ac_peaks.narrowPeak
-        <- MACS2 v2.2.7.1
-        <- ENCSR123ABC (ENCODE Portal)
-```
+
+The record also carries a `created_at` timestamp in epoch seconds, and an untracked source appears as `{"accession": "...", "tracked": false}`. There is one record per logged file: call the tool again for each step, or omit `file_path` to get every record under a `derived_files` / `count` wrapper. Reading the four records back in order reconstructs the chain: ENCSR123ABC -> MACS2 peaks -> filtered peaks -> enhancer peaks -> figure.
 
 Every step from raw ENCODE data to final figure is documented with tool versions and parameters. This chain can be used to:
 - Write the Data Processing section of your manuscript (see `scientific-writing` skill)
@@ -420,28 +432,29 @@ encode_track_experiment(accession="ENCSR222BBB", notes="H3K27ac diabetic pancrea
 encode_compare_experiments(accession1="ENCSR111AAA", accession2="ENCSR222BBB")
 ```
 
-The comparison checks eight fields and returns a structured report:
+The comparison checks eight fields (organism, assembly, assay, biosample type, organ, target, replication type, lab) and returns a structured report:
 
+```json
+{
+  "experiment_1": {"accession": "ENCSR111AAA", "assay": "Histone ChIP-seq", "biosample": "pancreas tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR222BBB", "assay": "Histone ChIP-seq", "biosample": "pancreatic islet primary cell female adult (48 years)"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Histone ChIP-seq",
+    "Same target: H3K27ac"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different biosample types: tissue vs primary cell. Results may reflect sample type differences.",
+    "Different labs: Bradley Bernstein, Broad vs Michael Snyder, Stanford. Batch effects possible."
+  ]
+}
 ```
-Verdict: COMPATIBLE_WITH_CAVEATS
 
-Compatible aspects:
-  - Same organism: Homo sapiens
-  - Same assembly: GRCh38
-  - Same assay: Histone ChIP-seq
-  - Same target: H3K27ac-human
-
-Warnings:
-  - Different biosample types: tissue vs primary cell
-    (Results may reflect sample type differences)
-  - Different labs: /labs/bradley-bernstein/ vs /labs/michael-snyder/
-    (Batch effects possible)
-
-Issues: (none)
-
-Recommendation: These experiments can be compared, but the warnings
-should be addressed in your analysis.
-```
+`verdict` is one of `FULLY_COMPATIBLE`, `COMPATIBLE_WITH_CAVEATS` or `NOT_COMPATIBLE`; the three lists hold prose strings, not field maps. If either accession is untracked the whole response is `{"error": "Experiment ENCSR... not tracked. Track it first."}`.
 
 ### Step 3: Interpret results
 
@@ -452,23 +465,23 @@ The comparison produces three categories:
 **Warnings** (yellow): Fields that differ but do not necessarily prevent combined analysis. Each warning needs a decision:
 - **Biosample type mismatch** (tissue vs primary cell): The primary cell isolation process can alter chromatin state. If the tissue and isolated cells are from the same organ, this is often acceptable with a caveat in your methods. If comparing whole pancreas tissue to isolated islets, your results may reflect cell type composition rather than disease state.
 - **Lab mismatch**: Different labs use different protocols, antibody lots, and sequencing platforms. Consider batch correction (ComBat, limma::removeBatchEffect) and report the lab difference in your methods.
-- **Life stage mismatch** (adult vs fetal): Chromatin states differ dramatically between developmental stages. Only combine if the research question specifically involves developmental comparison.
+- **Organ/tissue mismatch** (pancreas vs liver): Regulatory landscapes are largely tissue-specific, so a cross-tissue comparison answers a different question than a within-tissue one. Note: life stage is *not* one of the eight compared fields — compare `life_stage` yourself, because chromatin states differ dramatically between developmental stages.
 - **Replication type mismatch** (isogenic vs anisogenic): Different replicate strategies affect statistical power differently. Anisogenic replicates capture biological variation; isogenic replicates do not.
+- **Assay mismatch**: reported as a warning, but treat it as blocking. Different assays measure different things. ChIP-seq and ATAC-seq cannot be directly compared -- they require multi-omic integration approaches.
 
-**Issues** (red): Fields that are fundamentally incompatible:
+**Issues** (red): the only two mismatches that land in `issues`:
 - **Organism mismatch**: Do not combine human and mouse data directly. Requires ortholog mapping and synteny analysis.
 - **Assembly mismatch**: Do not combine GRCh38 and hg19 coordinates. Use `liftover-coordinates` skill to convert first.
-- **Assay mismatch**: Different assays measure different things. ChIP-seq and ATAC-seq cannot be directly compared -- they require multi-omic integration approaches.
 
 ### Step 4: Decision framework
 
 | Comparison result | Action |
 |---|---|
-| All MATCH, no warnings | Proceed with combined analysis |
-| Warnings on biosample or lab | Proceed with batch correction and caveats in methods |
-| Warning on life stage | Only proceed if developmental comparison is the research question |
+| `FULLY_COMPATIBLE` (empty `issues` and `warnings`) | Proceed with combined analysis |
+| Warnings on biosample type or lab | Proceed with batch correction and caveats in methods |
+| Warning on organ, target or replication type | Only proceed if that difference is the research question |
 | Issue on organism or assembly | DO NOT combine without liftover/ortholog mapping |
-| Issue on assay type | DO NOT combine -- use multi-omic integration instead |
+| Warning on assay type | DO NOT combine directly -- use multi-omic integration instead |
 
 ---
 
@@ -526,7 +539,7 @@ For preprints that have not yet been published in a peer-reviewed journal:
 ```
 encode_link_reference(
   experiment_accession="ENCSR123ABC",
-  reference_type="biorxiv_doi",
+  reference_type="preprint_doi",
   reference_id="10.1101/2024.01.15.123456",
   description="Preprint with novel analysis of pancreatic islet enhancer grammar"
 )
@@ -608,7 +621,8 @@ Step 1: Track both experiments
 
 Step 2: Compare compatibility
   encode_compare_experiments(accession1="ENCSR111AAA", accession2="ENCSR222BBB")
-  -> Returns compatibility report: organism, assembly, assay match; warns about life_stage difference
+  -> compatible_aspects list organism, assembly and assay as matching; life stage is not
+     one of the eight compared fields, so check life_stage yourself before combining
 ```
 
 ### 3. Track, Link, Provenance: "Track experiment, link to GEO, log derived analysis file"
@@ -653,10 +667,10 @@ Step 4: Track methylation
 
 Step 5: Summarize the collection
   encode_summarize_collection()
-  -> Total experiments: 6
-  -> By assay: Histone ChIP-seq (3), ATAC-seq (1), RNA-seq (1), WGBS (1)
-  -> By organ: liver (6)
-  -> Completeness check: all major data types represented
+  -> total_experiments: 6
+  -> by_assay: {"Histone ChIP-seq": 3, "ATAC-seq": 1, "total RNA-seq": 1, "WGBS": 1}
+  -> by_organ: {"liver": 6}
+  -> Read the by_* tallies to confirm all major data types are represented
 
 Step 6: Export the full collection
   encode_export_data(format="csv")
@@ -674,8 +688,8 @@ Step 1: Check current metadata
 
 Step 2: Re-track to refresh
   encode_track_experiment(accession="ENCSR123ABC")
-  -> Returns: {"accession": "ENCSR123ABC", "action": "updated"}
-  -> Status now shows "released" with updated date_released and assembly
+  -> Returns: {"tracking": {"accession": "ENCSR123ABC", "action": "updated"}, ...}
+  -> The stored row now shows status "released" with updated date_released and assembly
 
 Step 3: Verify publications were updated
   encode_list_tracked()
@@ -702,13 +716,13 @@ Re-tracking is safe and idempotent. It updates all metadata fields, re-fetches p
 ## Presenting Results
 
 When presenting tracking results to the user:
-- Show tracked experiment summary as a table: **accession** | **assay** | **biosample** | **publications** | **notes**
+- Show tracked experiment summary as a table: **accession** | **assay_title** | **biosample_summary** | **publication_count** | **notes**
 - For citations, always offer the format choice: JSON (structured), BibTeX (LaTeX), or RIS (Endnote/Zotero/Mendeley)
 - After tracking multiple experiments, show the collection summary using `encode_summarize_collection` to give a bird's-eye view grouped by assay, organ, and target
-- When comparing experiments, present the compatibility verdict clearly:
-  - **COMPATIBLE**: All key fields match. Safe to combine.
-  - **WARNINGS**: Minor differences (e.g., different labs, dates). Proceed with caution.
-  - **INCOMPATIBLE**: Critical mismatches (e.g., different organisms, assemblies). Do not combine without justification.
+- When comparing experiments, present the `verdict` clearly:
+  - **FULLY_COMPATIBLE**: All eight compared fields match. Safe to combine.
+  - **COMPATIBLE_WITH_CAVEATS**: Non-blocking differences (e.g., different labs or biosample types). Proceed with caution and read the `warnings` strings.
+  - **NOT_COMPATIBLE**: Critical mismatches (different organisms or assemblies). Do not combine without justification.
 - For provenance results, show the full chain: derived file -> tool/parameters -> source ENCODE accessions
 - When exporting, confirm the format and offer to save to a specific path
 - For large collections (10+ experiments), present a summary table first and offer to show details on request

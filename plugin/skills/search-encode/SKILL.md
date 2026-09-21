@@ -203,11 +203,13 @@ This returns only GRCh38-aligned BED files, filtering out legacy hg19 files and 
 encode_get_experiment(accession="ENCSR...")
 ```
 
-The full experiment record includes audit fields. Review them in priority order:
-- **audit.ERROR**: Serious problems. Do not use this experiment without investigating.
-- **audit.NOT_COMPLIANT**: Failed an ENCODE standard. Check what standard was missed.
-- **audit.WARNING**: Minor issues. Usually acceptable but worth noting.
-- **audit.INTERNAL_ACTION**: Portal bookkeeping. Safe to ignore.
+The full experiment record includes one count per audit severity (there is no nested `audit` object). Review them in priority order:
+- **audit_error_count**: Serious problems. Do not use this experiment without investigating.
+- **audit_not_compliant_count**: Failed an ENCODE standard. Check what standard was missed.
+- **audit_warning_count**: Minor issues. Usually acceptable but worth noting.
+- **audit_internal_action_count**: Portal bookkeeping. Safe to ignore.
+
+The counts do not carry the audit messages themselves — open the experiment on encodeproject.org to read those.
 
 For ChIP-seq, also check: FRiP (fraction of reads in peaks) should be at least 1%, NSC (normalized strand coefficient) should exceed 1.05, and the experiment should have 2+ biological replicates.
 
@@ -261,7 +263,7 @@ encode_search_experiments(assay_title="total RNA-seq", organ="liver", biosample_
 
 ### Step 3: Match by Biosample
 
-From each result set, extract the `biosample_term_name` values. Look for overlap: which specific biosample terms appear in all three result sets? For example, "liver" tissue may appear in all three, but "hepatocyte" primary cells may only have ChIP-seq and RNA-seq.
+From each result set, extract the `biosample_summary` and `biosample_type` values (`biosample_term_name` is a search filter, not a field of the results). Look for overlap: which specific biosamples appear in all three result sets? For example, "liver" tissue may appear in all three, but "hepatocyte" primary cells may only have ChIP-seq and RNA-seq.
 
 Present the coverage as a matrix:
 
@@ -406,11 +408,11 @@ Step 2: Search with date filter
 
 Step 3: Explore details for a specific experiment
   encode_get_experiment(accession="ENCSR...")
-  -> Full metadata including genetic modifications, biosamples, audit status
+  -> Full metadata: assay, biosample, replicate counts, file list, audit counts
 
 Step 4: Check audit status for quality
-  -> Look at audit.ERROR, audit.NOT_COMPLIANT, audit.WARNING fields
-  -> Experiments with ERROR audits should be flagged to the user
+  -> Look at audit_error_count, audit_not_compliant_count, audit_warning_count
+  -> Experiments with audit_error_count > 0 should be flagged to the user
 ```
 
 ### 4. File-level search: "Find all IDR thresholded peak BED files for human brain ChIP-seq"

@@ -99,6 +99,34 @@ class TestTrackExperiment:
         result = tracker.track_experiment(sample_experiment)
         assert result["action"] == "updated"
 
+    def test_track_accepts_the_assembly_list_the_server_passes(self, tracker):
+        # encode_track_experiment hands over ExperimentDetail.model_dump(), where assembly is a
+        # list. SQLite cannot bind a list, so tracking used to fail for every real experiment.
+        from encode_connector.client.models import ExperimentDetail
+
+        detail = ExperimentDetail(accession="ENCSR133RZO", assay_title="ATAC-seq", assembly=["GRCh38", "hg19"])
+
+        result = tracker.track_experiment(detail.model_dump())
+
+        assert result["action"] == "tracked"
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38, hg19"
+
+    def test_track_update_accepts_an_assembly_list(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        sample_experiment["assembly"] = ["GRCh38"]
+
+        result = tracker.track_experiment(sample_experiment)
+
+        assert result["action"] == "updated"
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38"
+
+    def test_track_stores_an_empty_assembly_list_as_empty_text(self, tracker, sample_experiment):
+        sample_experiment["assembly"] = []
+
+        tracker.track_experiment(sample_experiment)
+
+        assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == ""
+
     def test_get_tracked_experiment(self, tracker, sample_experiment):
         tracker.track_experiment(sample_experiment)
         exp = tracker.get_tracked_experiment("ENCSR133RZO")
@@ -230,6 +258,45 @@ class TestPublications:
         ]
         count = tracker.store_publications("ENCSR133RZO", pubs)
         assert count == 2
+
+    def test_publications_without_a_pmid_do_not_overwrite_each_other(self, tracker, sample_experiment):
+        # ENCODE lists some papers by PMCID only. With pmid "" they all collided on the
+        # (experiment, pmid) key and only the last one survived, while the count said 3.
+        tracker.track_experiment(sample_experiment)
+        pubs = [
+            {"pmid": "", "doi": "10.1/a", "title": "Paper A"},
+            {"pmid": "", "doi": "10.1/b", "title": "Paper B"},
+            {"pmid": "", "doi": "10.1/c", "title": "Paper C"},
+        ]
+
+        count = tracker.store_publications("ENCSR133RZO", pubs)
+
+        stored = tracker.get_publications("ENCSR133RZO")
+        assert count == 3
+        assert sorted(p["title"] for p in stored) == ["Paper A", "Paper B", "Paper C"]
+        assert {p["pmid"] for p in stored} == {""}
+
+    def test_storing_the_same_pmid_less_publications_twice_does_not_duplicate_them(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        pubs = [{"pmid": "", "doi": "10.1/a", "title": "Paper A"}, {"pmid": "", "doi": "10.1/b", "title": "Paper B"}]
+
+        tracker.store_publications("ENCSR133RZO", pubs)
+        tracker.store_publications("ENCSR133RZO", pubs)
+
+        assert len(tracker.get_publications("ENCSR133RZO")) == 2
+
+    def test_a_row_stored_with_an_empty_pmid_by_an_older_version_is_replaced(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        conn = tracker._get_conn()
+        conn.execute(
+            "INSERT INTO publications (experiment_accession, pmid, doi, title) VALUES (?, '', ?, ?)",
+            ("ENCSR133RZO", "10.1/a", "Paper A"),
+        )
+        conn.commit()
+
+        tracker.store_publications("ENCSR133RZO", [{"pmid": "", "doi": "10.1/a", "title": "Paper A"}])
+
+        assert len(tracker.get_publications("ENCSR133RZO")) == 1
 
     def test_store_duplicate_pmid_replaces(self, tracker, sample_experiment):
         """Cover line 354-355: IntegrityError on INSERT OR REPLACE handles duplicates."""
@@ -486,6 +553,27 @@ class TestCompatibility:
         # Assembly mismatch creates a NOT_COMPATIBLE verdict
         assert result["verdict"] == "NOT_COMPATIBLE"
         assert any("assembl" in i.lower() for i in result["issues"]), f"Expected assembly issue, got: {result}"
+
+    def test_experiments_that_share_one_assembly_are_not_flagged(self, tracker, sample_experiment, sample_experiment2):
+        sample_experiment["assembly"] = ["GRCh38", "hg19"]
+        sample_experiment2["assembly"] = ["GRCh38"]
+        tracker.track_experiment(sample_experiment)
+        tracker.track_experiment(sample_experiment2)
+
+        result = tracker.analyze_compatibility("ENCSR133RZO", "ENCSR000AKS")
+
+        assert not any("assembl" in i.lower() for i in result["issues"]), result
+
+    def test_experiments_with_no_common_assembly_are_flagged(self, tracker, sample_experiment, sample_experiment2):
+        sample_experiment["assembly"] = ["GRCh38", "hg19"]
+        sample_experiment2["assembly"] = ["mm10"]
+        tracker.track_experiment(sample_experiment)
+        tracker.track_experiment(sample_experiment2)
+
+        result = tracker.analyze_compatibility("ENCSR133RZO", "ENCSR000AKS")
+
+        assert result["verdict"] == "NOT_COMPATIBLE"
+        assert any("assembl" in i.lower() for i in result["issues"]), result
 
     def test_caveats_different_organ(self, tracker, sample_experiment, sample_experiment2):
         tracker.track_experiment(sample_experiment)

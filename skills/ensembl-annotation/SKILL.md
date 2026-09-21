@@ -221,11 +221,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="brain", organism="Homo 
 Expected output:
 ```json
 {
-  "total": 32,
   "results": [
-    {"accession": "ENCSR800BRN", "assay_title": "ATAC-seq", "biosample_summary": "brain", "status": "released"},
-    {"accession": "ENCSR801CTX", "assay_title": "ATAC-seq", "biosample_summary": "cerebral cortex", "status": "released"}
-  ]
+    {"accession": "ENCSR800BRN", "assay_title": "ATAC-seq", "biosample_summary": "brain tissue male adult (54 years)", "assembly": ["GRCh38"], "status": "released"}
+  ],
+  "total": 32,
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 25
 }
 ```
 
@@ -303,15 +306,19 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 8,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR123ABC",
       "assay_title": "Histone ChIP-seq",
       "target": "H3K27ac-human",
       "biosample_summary": "liver tissue male adult (54 years)"
     }
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -327,10 +334,23 @@ encode_track_experiment(
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR123ABC",
-  "publications": 1,
-  "files": 12
+  "tracking": {"accession": "ENCSR123ABC", "action": "tracked"},
+  "publications_found": 1,
+  "publications": [
+    {
+      "pmid": "32728249",
+      "doi": "10.1038/s41586-020-2493-4",
+      "title": "An atlas of gene regulatory elements in adult human liver",
+      "authors": "Li YE, Preissl S, Hou X",
+      "journal": "Nature",
+      "year": "2020",
+      "abstract": ""
+    }
+  ],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "Histone ChIP-seq 2 (unreplicated)", "version": "1.7.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
 }
 ```
 

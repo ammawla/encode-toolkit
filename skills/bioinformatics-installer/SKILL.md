@@ -40,6 +40,12 @@ All environments use the same channel priority (conda-forge > bioconda). Every f
 solved for Linux x86_64 in CI, so the pinned versions exist and install together. Several tools
 have no macOS arm64 build on bioconda; on Apple Silicon use the pipeline Docker images instead.
 
+For every tool that an environment and the matching `pipeline-*` Docker image both install, the
+two pin the same version, and CI fails if they drift. Some tools exist on only one side — for
+example `phantompeakqualtools`, `salmon`, `subread` and the Hi-C `bedtools` are conda-only,
+while juicer_tools, SEACR, Hotspot2 and `modwt` are image-only because they are not conda
+packages. Those are noted in the sections below.
+
 ## Quick Start
 
 Install a complete environment for any assay type with a single command:
@@ -651,15 +657,20 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 8,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR799GHJ",
       "assay_title": "ATAC-seq",
       "biosample_summary": "pancreatic islet tissue male adult (44 years)",
+      "organ": "pancreas",
       "status": "released"
     }
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -676,14 +687,16 @@ Expected output:
 {
   "accession": "ENCFF001ABC",
   "file_format": "fastq",
-  "file_size_mb": 4521.3,
-  "read_length": 100,
-  "paired_end": true,
-  "platform": "Illumina NovaSeq 6000"
+  "file_type": "fastq",
+  "output_type": "reads",
+  "file_size_human": "4.4 GB",
+  "experiment_assay": "ATAC-seq",
+  "biological_replicates": [1],
+  "status": "released"
 }
 ```
 
-**Install decision**: Paired-end FASTQ needs Bowtie2 (not BWA for ATAC-seq), Picard for duplicate marking, and samtools for BAM processing.
+**Install decision**: raw ATAC-seq reads need Bowtie2 (not BWA), Picard for duplicate marking, and samtools for BAM processing — the `atacseq-env.yml` environment. Whether the FASTQ is one mate of a pair is on the file's page on encodeproject.org (`paired_end`, `paired_with`), not in this response.
 
 ## Pitfalls & Edge Cases
 

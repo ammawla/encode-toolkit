@@ -125,8 +125,8 @@ Most ENCODE data is public and needs no authentication. For restricted/unrelease
    → Calls encode_manage_credentials(action="store", access_key="...", secret_key="...")
    ```
 3. Credentials are encrypted via the OS keyring (macOS Keychain, Windows Credential Manager, or Linux Secret Service)
-4. To verify: `encode_manage_credentials(action="status")`
-5. To remove: `encode_manage_credentials(action="remove")`
+4. To verify: `encode_manage_credentials(action="check")`
+5. To remove: `encode_manage_credentials(action="clear")`
 
 ---
 
@@ -250,10 +250,12 @@ Beyond the 20 tools, the ENCODE Toolkit includes 47 skills providing domain expe
 encode_get_metadata(metadata_type="assays")
 ```
 
-Expected output:
+Expected output (`values` abridged — the full list has 79 assay titles):
 ```json
 {
-  "assays": ["ATAC-seq", "ChIP-seq", "CUT&RUN", "CUT&Tag", "DNase-seq", "Hi-C", "MPRA", "RNA-seq", "STARR-seq", "WGBS", "eCLIP", "scATAC-seq", "scRNA-seq"]
+  "metadata_type": "assays",
+  "values": ["Histone ChIP-seq", "TF ChIP-seq", "ATAC-seq", "DNase-seq", "total RNA-seq", "polyA plus RNA-seq", "WGBS", "intact Hi-C", "CUT&RUN", "CUT&Tag", "eCLIP", "STARR-seq", "MPRA", "snATAC-seq", "scRNA-seq"],
+  "count": 79
 }
 ```
 
@@ -265,10 +267,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="brain", organism="Homo 
 Expected output:
 ```json
 {
-  "total": 32,
   "results": [
-    {"accession": "ENCSR000AAA", "assay_title": "ATAC-seq", "biosample_summary": "brain", "status": "released"}
-  ]
+    {"accession": "ENCSR000AAA", "assay_title": "ATAC-seq", "biosample_summary": "brain tissue female adult (53 years)", "organ": "brain", "status": "released"}
+  ],
+  "total": 32,
+  "limit": 3,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 3
 }
 ```
 
@@ -280,9 +286,13 @@ encode_get_facets(organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 450, "blood": 380, "liver": 220, "heart": 180, "lung": 150}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 450},
+    {"term": "blood", "count": 380},
+    {"term": "liver", "count": 220},
+    {"term": "heart", "count": 180},
+    {"term": "lung", "count": 150}
+  ]
 }
 ```
 

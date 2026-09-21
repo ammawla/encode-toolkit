@@ -369,7 +369,13 @@ encode_get_facets(organ="liver", assay_title="Histone ChIP-seq", organism="Homo 
 Expected output:
 ```json
 {
-  "facets": {"target.label": {"H3K27ac": 6, "H3K4me3": 5, "H3K4me1": 4, "H3K27me3": 3, "CTCF": 4}}
+  "target.label": [
+    {"term": "H3K27ac", "count": 6},
+    {"term": "H3K4me3", "count": 5},
+    {"term": "H3K4me1", "count": 4},
+    {"term": "CTCF", "count": 4},
+    {"term": "H3K27me3", "count": 3}
+  ]
 }
 ```
 
@@ -412,8 +418,12 @@ encode_search_experiments(assay_title="TF ChIP-seq", organ="liver", target="CTCF
 Expected output:
 ```json
 {
+  "results": [{"accession": "ENCSR500CTF", "target": "CTCF", "biosample_summary": "liver tissue male adult (54 years)"}],
   "total": 4,
-  "results": [{"accession": "ENCSR500CTF", "target": "CTCF", "biosample_summary": "liver"}]
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -422,11 +432,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR500CTF", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [{"accession": "ENCFF600CTF", "output_type": "IDR thresholded peaks", "file_size_mb": 0.5}]
-}
+[
+  {"accession": "ENCFF600CTF", "output_type": "IDR thresholded peaks", "assembly": "GRCh38", "file_size": 524288, "file_size_human": "512.0 KB", "preferred_default": true}
+]
 ```
 
 ### 3. Track regulatory classification experiments
@@ -436,7 +446,15 @@ encode_track_experiment(accession="ENCSR500CTF", notes="Liver CTCF for insulator
 
 Expected output:
 ```json
-{"status": "tracked", "accession": "ENCSR500CTF"}
+{
+  "tracking": {"accession": "ENCSR500CTF", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "Transcription factor ChIP-seq 2", "version": "1.5.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
+}
 ```
 
 ## Related Skills

@@ -1,8 +1,8 @@
 # Stage 3: Filtering and Deduplication
 
 ## Tools
-- **Samtools 1.17** (image version): Flag and MAPQ filtering
-- **Picard MarkDuplicates 2.27.5** (image version): Remove PCR duplicates
+- **Samtools 1.19** (image version): Flag and MAPQ filtering
+- **Picard MarkDuplicates 3.1.1** (image version, Java 17): Remove PCR duplicates
 - **bedtools 2.31.0** (image version): Blacklist region filtering
 
 ## Order of operations in the workflow

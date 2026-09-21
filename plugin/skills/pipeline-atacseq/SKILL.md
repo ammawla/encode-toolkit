@@ -25,8 +25,8 @@ ATAC-seq (Assay for Transposase-Accessible Chromatin using sequencing) uses the 
 transposase to probe open chromatin regions. This pipeline processes ATAC-seq data
 through quality control, alignment with Bowtie2, mitochondrial read removal, duplicate
 removal, Tn5 insertion site correction (+4/-5 bp offset), blacklist filtering,
-nucleosome-free fragment selection, MACS2 peak calling, and one IDR comparison between
-two replicates.
+nucleosome-free fragment selection, MACS2 peak calling, FRiP calculation, and an IDR
+comparison for every pair of replicates.
 
 Key differences from ChIP-seq: Bowtie2 aligner (optimized for short fragments), Tn5
 transposase shift correction, mitochondrial read filtering (chrM can be 30-80% of reads),
@@ -62,7 +62,10 @@ FASTQ ──> FastQC / Trim Galore ──> Bowtie2 ──> Mito Removal ──> 
   │                                               Signal Track   NFR (<150 bp)   Mono-nucleosome
   │                                                (all frags)      │              (150-300 bp)
   │                                                                 v
-  │                                                   MACS2 Peak Calling ──> IDR
+  │                                                   MACS2 Peak Calling ──> IDR (every pair)
+  │                                                                 │
+  │                                                                 v
+  │                                                   FRiP (NFR peaks vs final BAM)
   v
  QC reports ────────────────────────────────────────────────────────────────> MultiQC
 ```
@@ -78,8 +81,8 @@ blacklist-filtered BAM, not from the NFR BAM.
 | 1. QC & Trimming | FastQC, Trim Galore | Raw FASTQ | Trimmed FASTQ, FastQC reports | references/01-qc-trimming.md |
 | 2. Alignment | Bowtie2, samtools | Trimmed FASTQ | Sorted BAM, flagstat, bowtie2 log | references/02-alignment.md |
 | 3. Filtering & Tn5 shift | samtools, Picard, deeptools `alignmentSieve`, bedtools | Sorted BAM | Shifted, filtered, size-selected BAMs | references/03-tn5-filtering.md |
-| 4. Peak Calling & IDR | MACS2, IDR | NFR BAM | narrowPeak, idr_peaks.txt | references/04-peak-calling.md |
-| 5. Signal & QC report | deeptools `bamCoverage`, MultiQC | Filtered BAM, QC logs | bigWig, multiqc_report.html | references/05-qc-metrics.md |
+| 4. Peak Calling & IDR | MACS2, IDR | NFR BAM | narrowPeak, one `<sampleA>_vs_<sampleB>.idr_peaks.txt` per replicate pair | references/04-peak-calling.md |
+| 5. Signal, FRiP & QC report | deeptools `bamCoverage`, bedtools, samtools, MultiQC | Filtered BAM, NFR peaks, QC logs | bigWig, `<sample>.frip_mqc.tsv`, multiqc_report.html | references/05-qc-metrics.md |
 
 ## Input Requirements
 
@@ -165,22 +168,27 @@ Profiles are `local`, `slurm`, `gcp` and `aws`.
 
 ## QC Thresholds
 
-**The workflow computes only the metrics marked "workflow" below.** TSS enrichment, FRiP,
-NRF/PBC and fragment-size plots are manual post-processing steps documented in
+**The workflow computes only the metrics marked "workflow" below.** TSS enrichment,
+NRF/PBC, fragment-size plots and ataqv are manual post-processing steps documented in
 `references/05-qc-metrics.md`.
 
 | Metric | Threshold | Computed by | Source |
 |--------|-----------|-------------|--------|
 | Total sequenced reads | >=50M (recommended) | workflow (FastQC, flagstat) | ENCODE |
 | Mapping rate | >80% | workflow (bowtie2 log, `samtools flagstat`) | ENCODE |
-| Mitochondrial fraction | <20% (ideal <5%) | workflow (`qc/<sample>.mito_stats.txt`) | ENCODE |
+| Mitochondrial fraction | <20% (ideal <5%) | workflow (`qc/<sample>.idxstats.txt`) | ENCODE |
 | Duplication rate | <30% | workflow (Picard `dup_metrics.txt`) | ENCODE |
-| IDR peaks at 0.05 | >50,000 | workflow (`peaks/idr/idr_peaks.txt`) | ENCODE |
+| IDR peaks at 0.05 | >50,000 | workflow (`peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt`) | ENCODE |
 | NRF (non-redundant fraction) | >=0.8 | manual | ENCODE |
 | PBC1 | >=0.8 | manual | ENCODE |
 | TSS enrichment score | >=5 (GRCh38), >=6 (hg19), >=10 (mm10) | manual (deeptools + a TSS BED) | ENCODE standard |
-| FRiP | >=0.3 | manual (bedtools + samtools) | ENCODE |
+| FRiP | >=0.3 | workflow (`qc/<sample>.frip_mqc.tsv`) | ENCODE |
 | NFR fraction | >0.4 of fragments <150bp | manual | Buenrostro 2013 |
+
+`qc/<sample>.idxstats.txt` is `samtools idxstats` of the BAM before mitochondrial reads are
+removed (contig, length, mapped, unmapped): the mitochondrial fraction is the mapped count
+on the `--mito_name` row divided by the sum of the mapped column. MultiQC's samtools module
+reads the same file and reports that fraction.
 
 ### TSS Enrichment Score (manual)
 
@@ -284,10 +292,13 @@ results/
   peaks/
     narrow/                 # <sample>_peaks.narrowPeak, _summits.bed, _peaks.xls,
                             #   _treat_pileup.bdg, _control_lambda.bdg
-    idr/                    # idr_peaks.txt (+ idr_peaks.txt.png)
+    idr/                    # <sampleA>_vs_<sampleB>.idr_peaks.txt (+ .png), one file per
+                            #   replicate pair
   signal/                   # <sample>.signal.bw (all fragments, RPKM)
   qc/
-    <sample>.mito_stats.txt # total_reads / mito_reads / mito_frac
+    <sample>.idxstats.txt   # samtools idxstats before chrM removal:
+                            #   contig / length / mapped / unmapped
+    <sample>.frip_mqc.tsv   # Peak set / FRiP / reads_in_peaks / total_reads
     multiqc/                # multiqc_report.html, multiqc_data/
   pipeline_info/            # timeline.html, report.html, trace.txt
 ```
@@ -300,7 +311,9 @@ no `filtered/mononuc/` directory, and `mononuc.bam` has no index.
 ### 1. High Mitochondrial Read Fraction
 Mitochondrial DNA lacks chromatin and is highly accessible, often capturing 30-80%
 of reads. This is the most common ATAC-seq quality issue. The workflow removes `--mito_name`
-reads and records the fraction in `qc/<sample>.mito_stats.txt`. If >50% mito, consider
+reads and publishes the per-contig counts it used, `qc/<sample>.idxstats.txt`: divide the
+mapped count on the `--mito_name` row by the sum of the mapped column to get the fraction,
+or read it from the samtools section of the MultiQC report. If >50% mito, consider
 optimizing the cell lysis step.
 
 ### 2. Wrong mitochondrial contig name
@@ -313,8 +326,10 @@ Bowtie2 handles the short fragments from ATAC-seq (especially NFR <150bp) better
 than BWA-MEM. The workflow uses Bowtie2 with `--very-sensitive`.
 
 ### 4. Only one replicate in the `--reads` glob
-The IDR step needs at least two per-sample peak files. With one sample, IDR is skipped
-silently and `peaks/idr/` is never created.
+IDR needs a pair of samples. With one sample there is no pair, so IDR is skipped silently
+and `peaks/idr/` is never created. Every sample matched by `--reads` is treated as a
+replicate of the same experiment, so unrelated samples in one glob produce meaningless
+pairwise comparisons.
 
 ### 5. TSS enrichment is not in the output
 TSS enrichment is the most informative single metric for ATAC-seq, but the workflow does
@@ -331,11 +346,11 @@ not compute it. Run the manual `computeMatrix`/`plotProfile` step in
 
 The image is pinned to `linux/amd64`; on an arm64 host it runs under emulation.
 
-Tool versions in the image: Bowtie2 2.5.1, samtools 1.17, bedtools 2.31.0, Picard 2.27.5,
-Trim Galore 0.6.7, FastQC 0.11.9, MACS2 2.2.9.1, IDR 2.0.4.2, deeptools 3.5.5,
-MultiQC 1.14. The conda environment
-`bioinformatics-installer/environments/atacseq-env.yml` is an alternative route for the
-manual steps and may ship different point releases of the same tools.
+Tool versions in the image: Bowtie2 2.5.4, samtools 1.19, bedtools 2.31.0, Picard 3.1.1
+(Java 17), Trim Galore 0.6.10 with cutadapt 4.6, FastQC 0.12.1, MACS2 2.2.9.1,
+IDR 2.0.4.2, deepTools 3.5.5, MultiQC 1.21. The conda environment
+`bioinformatics-installer/environments/atacseq-env.yml` pins the same versions of the
+tools it lists.
 
 ## ENCODE Data Integration
 
@@ -393,13 +408,15 @@ blacklist filtering, NFR selection and MACS2 peak calling.
 encode_get_experiment(accession="ENCSR637ENO")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
   "accession": "ENCSR637ENO",
   "assay_title": "ATAC-seq",
   "biosample_summary": "GM12878",
-  "replicates": 2,
+  "assembly": ["GRCh38"],
+  "bio_replicate_count": 2,
+  "tech_replicate_count": 2,
   "status": "released"
 }
 ```
@@ -410,19 +427,20 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR637ENO", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF100ATQ", "output_type": "reads", "paired_end": "1", "biological_replicates": [1], "file_size_mb": 1800},
-    {"accession": "ENCFF101ATQ", "output_type": "reads", "paired_end": "2", "biological_replicates": [1], "file_size_mb": 1900},
-    {"accession": "ENCFF102ATQ", "output_type": "reads", "paired_end": "1", "biological_replicates": [2], "file_size_mb": 1750},
-    {"accession": "ENCFF103ATQ", "output_type": "reads", "paired_end": "2", "biological_replicates": [2], "file_size_mb": 1820}
-  ]
-}
+[
+  {"accession": "ENCFF100ATQ", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "1.8 GB"},
+  {"accession": "ENCFF101ATQ", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size_human": "1.9 GB"},
+  {"accession": "ENCFF102ATQ", "file_format": "fastq", "output_type": "reads", "biological_replicates": [2], "file_size_human": "1.7 GB"},
+  {"accession": "ENCFF103ATQ", "file_format": "fastq", "output_type": "reads", "biological_replicates": [2], "file_size_human": "1.8 GB"}
+]
 ```
 
-Both replicates are needed for the IDR step.
+The listing does not say which file of a pair is read 1 and which is read 2 -- no
+`encode_*` tool reports that. Open each file's page on encodeproject.org, where
+`paired_end` is 1 or 2 and `paired_with` names the other accession. Both replicates are
+needed for the IDR step.
 
 ### Step 3: Download and name the FASTQs so a read-pair glob can find them
 
@@ -430,8 +448,10 @@ Both replicates are needed for the IDR step.
 encode_download_files(file_accessions=["ENCFF100ATQ", "ENCFF101ATQ", "ENCFF102ATQ", "ENCFF103ATQ"], download_dir="/data/atacseq/fastq")
 ```
 
-ENCODE accessions do not share a prefix within a pair, and the workflow matches file pairs
-with a `{1,2}` glob:
+ENCODE FASTQs are named by accession (`ENCFF123ABC.fastq.gz`) with no `_R1`/`_R2` in the
+name, so the `--reads` glob (`*_R{1,2}.fq.gz`) cannot pair them. Take the mate assignment
+from each file's page on encodeproject.org (`paired_end` is 1 or 2, `paired_with` names the
+other accession), then link them into the shape the glob expects:
 
 ```bash
 cd /data/atacseq/fastq
@@ -458,26 +478,30 @@ Pipeline steps, in the order the workflow runs them:
 1. FastQC on raw reads
 2. Adapter trimming with Trim Galore (`--nextera`), plus FastQC on the trimmed reads
 3. Alignment (Bowtie2 `--very-sensitive`, MAPQ 30, properly paired only)
-4. Mitochondrial read removal, with the fraction recorded in `qc/<sample>.mito_stats.txt`
+4. Mitochondrial read removal, with `samtools idxstats` of the pre-removal BAM published as `qc/<sample>.idxstats.txt`
 5. Duplicate removal (Picard `REMOVE_DUPLICATES=true`)
 6. Tn5 shift correction (+4/-5, `alignmentSieve --ATACshift`)
 7. Blacklist filtering of the BAM
 8. Nucleosome-free (<150 bp) and mono-nucleosome (150-300 bp) selection
 9. Peak calling on the NFR BAM (MACS2 `-f BAMPE --nomodel --keep-dup all --call-summits --qvalue 0.05 -B`)
-10. IDR on two replicates, signal track from all fragments, MultiQC
+10. IDR on every pair of replicates, signal track from all fragments, FRiP, MultiQC
 
 ### Step 5: Validate output quality
 
 From the workflow:
 | Output | What to check |
 |---|---|
-| `qc/multiqc/multiqc_report.html` | Mapping rate (>80%), adapter content, duplication rate |
-| `qc/<sample>.mito_stats.txt` | Mitochondrial fraction (<20%, ideal <5%) |
+| `qc/multiqc/multiqc_report.html` | Mapping rate (>80%), adapter content, duplication rate, mitochondrial fraction, FRiP |
+| `qc/<sample>.idxstats.txt` | Mitochondrial fraction (<20%, ideal <5%): mapped reads on the `chrM` row over the sum of the mapped column |
+| `qc/<sample>.frip_mqc.tsv` | FRiP (>=0.3 for ATAC-seq) |
 | `peaks/narrow/<sample>_peaks.narrowPeak` | Peak count per replicate |
-| `peaks/idr/idr_peaks.txt` | IDR peaks at 0.05 (>50,000) |
+| `peaks/idr/gm12878_rep1_vs_gm12878_rep2.idr_peaks.txt` | IDR peaks at 0.05 (>50,000) |
+
+With the two replicates above there is one IDR file; a third replicate would add
+`gm12878_rep1_vs_gm12878_rep3` and `gm12878_rep2_vs_gm12878_rep3`.
 
 Manual follow-ups (not run by this workflow): TSS enrichment, fragment-size distribution
-plots, FRiP, NRF/PBC and ataqv. Commands are in `references/05-qc-metrics.md`.
+plots, NRF/PBC and ataqv. Commands are in `references/05-qc-metrics.md`.
 
 ### Step 6: Track and log provenance
 
@@ -506,15 +530,19 @@ encode_search_experiments(
 Expected output:
 ```json
 {
-  "total": 8,
-  "experiments": [
+  "results": [
     {
       "accession": "ENCSR789PAN",
       "assay_title": "ATAC-seq",
       "biosample_summary": "pancreas tissue male adult (44 years)",
       "status": "released"
     }
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -529,18 +557,16 @@ encode_list_files(
 
 Expected output:
 ```json
-{
-  "total": 4,
-  "files": [
-    {
-      "accession": "ENCFF100ATQ",
-      "file_format": "fastq",
-      "read_length": 50,
-      "paired_end": "1",
-      "file_size_mb": 3200.1
-    }
-  ]
-}
+[
+  {
+    "accession": "ENCFF100ATQ",
+    "file_format": "fastq",
+    "output_type": "reads",
+    "biological_replicates": [1],
+    "file_size_human": "3.1 GB",
+    "status": "released"
+  }
+]
 ```
 
 ## Integration
@@ -552,7 +578,7 @@ Expected output:
 | Signal tracks (bigWig) | **visualization-workflow** | Genome browser accessibility display |
 | Nucleosome-free peaks | **regulatory-elements** | Classify accessible regions as enhancers/promoters |
 | Peak coordinates | **variant-annotation** | Identify variants in accessible chromatin |
-| QC outputs (`mito_stats.txt`, MultiQC) | **quality-assessment** | Validate against ENCODE ATAC-seq standards |
+| QC outputs (`idxstats.txt`, `frip_mqc.tsv`, MultiQC) | **quality-assessment** | Validate against ENCODE ATAC-seq standards |
 | `pipeline_info/` reports | **data-provenance** | Record Tn5 shift, fragment filters, tool versions |
 | Peak files | **jaspar-motifs** | Scan accessible regions for known TF motifs |
 
@@ -570,17 +596,22 @@ Expected output:
 
 When reporting ATAC-seq pipeline results:
 
-- **Mitochondrial fraction**: Report the value from `qc/<sample>.mito_stats.txt`
-  (ideal <5%, acceptable <20%)
+- **Mitochondrial fraction**: Report it from `qc/<sample>.idxstats.txt` -- mapped reads on
+  the `--mito_name` row over the sum of the mapped column -- or from the samtools section
+  of the MultiQC report (ideal <5%, acceptable <20%)
 - **Key QC metrics from the run**: mapping rate (bowtie2 log, `samtools flagstat`),
   duplication rate (Picard `dup_metrics.txt`), and read counts, all aggregated in
   `qc/multiqc/multiqc_report.html`
-- **Peak counts**: Report the per-replicate MACS2 peak count and the IDR peak count at the
-  0.05 threshold. IDR is skipped when fewer than two samples were processed
+- **Peak counts**: Report the per-replicate MACS2 peak count and, for every replicate pair,
+  the IDR peak count at the 0.05 threshold. IDR is skipped when only one sample was
+  processed
 - **TSS enrichment**: State plainly that the workflow does not compute it. Report it only
   if the user ran the manual step, with the quality tier (Excellent >=7, Good 5-7,
   Marginal 3-5, Poor <3)
-- **Fragment size distribution / NFR fraction / FRiP**: also manual; do not report values
+- **FRiP**: Report the value from `qc/<sample>.frip_mqc.tsv` (>=0.3 for ATAC-seq). It is
+  computed from the blacklist-filtered BAM (all fragments) against the peaks called on the
+  nucleosome-free fragments
+- **Fragment size distribution / NFR fraction / ataqv**: also manual; do not report values
   the run did not produce
 - **Output paths**: List key outputs (`peaks/narrow/`, `peaks/idr/`, `signal/`,
   `filtered/nfr/`, `qc/`, `pipeline_info/`)

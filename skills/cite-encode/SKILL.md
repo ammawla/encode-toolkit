@@ -89,7 +89,7 @@ For the Data Availability section of a publication:
 Template:
 > "[Assay type] data for [biosample] were obtained from the ENCODE Project (https://www.encodeproject.org). Experiment accessions: [list ENCSR accessions]. All ENCODE data are freely available under unrestricted use policy."
 
-Use `encode_export_data(format="csv")` to generate a supplementary table listing all experiments used, with columns for accession, assay, biosample, target, lab, and date released.
+Use `encode_export_data(format="csv")` to generate a supplementary table listing all experiments used, with columns for `accession`, `assay_title`, `biosample_summary`, `target`, `lab` and `date_released`.
 
 ## Step 4: Write Acknowledgments
 
@@ -127,7 +127,7 @@ This walkthrough covers generating ALL citation content needed for a manuscript 
 encode_list_tracked()
 ```
 
-Review the output. A typical multi-omic study might track 12 experiments: 5 Histone ChIP-seq, 3 ATAC-seq, 2 RNA-seq, 2 WGBS. Verify every experiment has publications fetched (the publications column should show a count greater than zero). If any show zero publications, run `encode_get_citations(accession="ENCSR...")` for those experiments individually to trigger a fresh lookup.
+Review the output. A typical multi-omic study might track 12 experiments: 5 Histone ChIP-seq, 3 ATAC-seq, 2 RNA-seq, 2 WGBS. Verify every experiment has publications fetched (its `publication_count` should be greater than zero). If any show zero publications, run `encode_get_citations(accession="ENCSR...")` for those experiments individually to trigger a fresh lookup.
 
 Check that every experiment you actually used in the analysis is tracked. A common oversight is forgetting to track experiments that were used only for quality comparison or as controls. If you generated a figure or statistic from an experiment, it must be tracked and cited.
 
@@ -137,13 +137,13 @@ Every bioinformatics tool used in your analysis pipeline must be cited. Reviewer
 
 | Tool | Citation | DOI |
 |------|----------|-----|
-| MACS2 v2.2.7.1 | Zhang et al. Genome Biol 2008 | 10.1186/gb-2008-9-9-r137 |
-| STAR v2.7.10b | Dobin et al. Bioinformatics 2013 | 10.1093/bioinformatics/bts635 |
+| MACS2 v2.2.9.1 | Zhang et al. Genome Biol 2008 | 10.1186/gb-2008-9-9-r137 |
+| STAR v2.7.11b | Dobin et al. Bioinformatics 2013 | 10.1093/bioinformatics/bts635 |
 | DESeq2 v1.38 | Love et al. Genome Biol 2014 | 10.1186/s13059-014-0550-8 |
-| deepTools v3.5.4 | Ramirez et al. Nucleic Acids Res 2016 | 10.1093/nar/gkw257 |
+| deepTools v3.5.5 | Ramirez et al. Nucleic Acids Res 2016 | 10.1093/nar/gkw257 |
 | bedtools v2.31.0 | Quinlan & Hall. Bioinformatics 2010 | 10.1093/bioinformatics/btq033 |
-| samtools v1.17 | Danecek et al. GigaScience 2021 | 10.1093/gigascience/giab008 |
-| Bowtie2 v2.5.1 | Langmead & Salzberg. Nat Methods 2012 | 10.1038/nmeth.1923 |
+| samtools v1.19 | Danecek et al. GigaScience 2021 | 10.1093/gigascience/giab008 |
+| Bowtie2 v2.5.4 | Langmead & Salzberg. Nat Methods 2012 | 10.1038/nmeth.1923 |
 | featureCounts (Subread) | Liao et al. Bioinformatics 2014 | 10.1093/bioinformatics/btt656 |
 | Bismark | Krueger & Andrews. Bioinformatics 2011 | 10.1093/bioinformatics/btr167 |
 | HOMER | Heinz et al. Mol Cell 2010 | 10.1016/j.molcel.2010.05.004 |
@@ -153,7 +153,7 @@ Every bioinformatics tool used in your analysis pipeline must be cited. Reviewer
 
 See the `bioinformatics-installer` and `scientific-writing` skills for the complete citation list covering 134+ tools.
 
-Always include tool versions. "We called peaks using MACS2" is insufficient. Write: "We called peaks using MACS2 v2.2.7.1 (Zhang et al. 2008) with parameters --nomodel --shift -100 --extsize 200 --broad."
+Always include tool versions. "We called peaks using MACS2" is insufficient. Write: "We called peaks using MACS2 v2.2.9.1 (Zhang et al. 2008) with parameters --nomodel --shift -100 --extsize 200 --broad."
 
 ### Phase 3: Generate ENCODE Consortium Citations
 
@@ -205,12 +205,12 @@ To fill in the PI names, check the `lab` field from `encode_list_tracked()`. For
 encode_export_data(format="tsv")
 ```
 
-This creates a table with the columns needed for reproducibility:
+This creates a 17-column table with everything needed for reproducibility, in this fixed order: `accession`, `assay_title`, `target`, `organism`, `organ`, `biosample_type`, `biosample_summary`, `lab`, `assembly`, `status`, `date_released`, `replication_type`, `life_stage`, `publication_count`, `pmids`, `derived_file_count`, `external_reference_count`. Some of those columns:
 
-| Accession | Assay | Target | Biosample | Assembly | Lab | Date Released | Publication PMID |
-|-----------|-------|--------|-----------|----------|-----|---------------|-----------------|
-| ENCSR123ABC | Histone ChIP-seq | H3K27ac | pancreatic islet | GRCh38 | Bernstein | 2020-03-15 | 32728249 |
-| ENCSR456DEF | ATAC-seq | -- | pancreatic islet | GRCh38 | Stamatoyannopoulos | 2020-06-01 | 32728249 |
+| accession | assay_title | target | biosample_summary | assembly | lab | date_released | pmids |
+|-----------|-------------|--------|-------------------|----------|-----|---------------|-------|
+| ENCSR123ABC | Histone ChIP-seq | H3K27ac | pancreatic islet | GRCh38 | Bradley Bernstein, Broad | 2020-03-15 | 32728249 |
+| ENCSR456DEF | ATAC-seq |  | pancreatic islet | GRCh38 | John Stamatoyannopoulos, UW | 2020-06-01 | 32728249 |
 
 This table goes in Supplementary Materials. Some journals (Nature, Cell) require it. All journals benefit from having it.
 
@@ -447,12 +447,12 @@ For manuscripts submitted to Cell, Cell Reports, Cell Systems, Molecular Cell, o
 | GENCODE v41 gene annotation | GENCODE | https://www.gencodegenes.org/human/release_41.html |
 | ENCODE Blacklist v2 | Amemiya et al., 2019 | https://github.com/Boyle-Lab/Blacklist/ |
 | **Software and Algorithms** | | |
-| MACS2 v2.2.7.1 | Zhang et al., 2008 | https://github.com/macs3-project/MACS |
-| STAR v2.7.10b | Dobin et al., 2013 | https://github.com/alexdobin/STAR |
+| MACS2 v2.2.9.1 | Zhang et al., 2008 | https://github.com/macs3-project/MACS |
+| STAR v2.7.11b | Dobin et al., 2013 | https://github.com/alexdobin/STAR |
 | DESeq2 v1.38 | Love et al., 2014 | https://bioconductor.org/packages/DESeq2 |
 | bedtools v2.31.0 | Quinlan & Hall, 2010 | https://github.com/arq5x/bedtools2 |
-| deepTools v3.5.4 | Ramirez et al., 2016 | https://github.com/deeptools/deepTools |
-| samtools v1.17 | Danecek et al., 2021 | https://github.com/samtools/samtools |
+| deepTools v3.5.5 | Ramirez et al., 2016 | https://github.com/deeptools/deepTools |
+| samtools v1.19 | Danecek et al., 2021 | https://github.com/samtools/samtools |
 | Custom analysis scripts | This study | https://github.com/[your-repo] |
 ```
 
@@ -574,23 +574,34 @@ The Joint Declaration of Data Citation Principles (Starr et al. 2015) establishe
 encode_get_citations(accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (`export_format="json"`, the default; `"bibtex"` and `"ris"` return plain text instead):
 ```json
 {
-  "citations": [
-    {"pmid": "29126249", "title": "ENCODE encyclopedia", "year": 2012}
-  ]
+  "publications": [
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR000AKA",
+      "pmid": "29126249",
+      "doi": "10.1038/s41586-020-2493-4",
+      "title": "An integrated encyclopedia of DNA elements in the human genome",
+      "authors": "Dunham I, Kundaje A, Aldred SF",
+      "journal": "Nature",
+      "year": "2012",
+      "abstract": ""
+    }
+  ],
+  "count": 1
 }
 ```
 
 ### 2. Link a reference to an experiment
 ```
-encode_link_reference(experiment_accession="ENCSR000AKA", reference_type="pubmed", reference_id="29126249", description="ENCODE consortium paper")
+encode_link_reference(experiment_accession="ENCSR000AKA", reference_type="pmid", reference_id="29126249", description="ENCODE consortium paper")
 ```
 
-Expected output:
+Expected output (`action` is `"already_linked"` if the same reference was linked before):
 ```json
-{"status": "linked", "accession": "ENCSR000AKA", "reference_type": "pubmed", "reference_id": "29126249"}
+{"action": "linked", "experiment_accession": "ENCSR000AKA", "reference_type": "pmid", "reference_id": "29126249"}
 ```
 
 ### 3. List all tracked experiments for citation
@@ -598,13 +609,31 @@ Expected output:
 encode_list_tracked()
 ```
 
-Expected output:
+Expected output (one of the two experiments shown, fields abridged; the `tracked_at` / `updated_at` timestamps are epoch seconds):
 ```json
 {
   "experiments": [
-    {"accession": "ENCSR000AKA", "assay": "Histone ChIP-seq", "notes": "GM12878 H3K27ac"},
-    {"accession": "ENCSR637ENO", "assay": "ATAC-seq", "notes": "GM12878 accessibility"}
-  ]
+    {
+      "accession": "ENCSR000AKA",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K27ac",
+      "biosample_summary": "GM12878",
+      "updated_at": 1739452800.123456,
+      "notes": "GM12878 H3K27ac",
+      "publication_count": 1,
+      "derived_file_count": 0
+    }
+  ],
+  "count": 2,
+  "stats": {
+    "tracked_experiments": 2,
+    "publications": 1,
+    "pipeline_records": 2,
+    "quality_metrics": 0,
+    "derived_files": 0,
+    "external_references": 1,
+    "db_path": "/Users/you/.encode_connector/tracker.db"
+  }
 }
 ```
 

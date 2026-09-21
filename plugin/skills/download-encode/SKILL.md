@@ -294,7 +294,7 @@ encode_batch_download(
 ### Step 4: Handle failed downloads
 
 If some files fail:
-- Check the `errors` array in the response for specific failure reasons
+- `encode_batch_download` has no `errors` array: look in `downloaded[]` for entries with `"success": false` and read their `error` string (`encode_download_files` does add a separate `errors` array, for accessions whose metadata could not be fetched at all)
 - Network timeouts: retry the failed accessions with `encode_download_files`
 - MD5 mismatches: re-download the specific files
 - 403/404 errors: the file may be restricted or withdrawn from ENCODE

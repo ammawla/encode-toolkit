@@ -28,14 +28,12 @@ FASTQ
             (removed) -> blacklist filter -> {sample}.filtered.bam       |
                  |-> fragment BED -> fragment bedGraph -> SEACR peaks    |
                  |-> MACS2 peaks (with --peak_caller macs2|both)         |
+                 |-> FRiP vs every peak set -> {sample}.frip_mqc.tsv     |
                  +-> bamCoverage -> {sample}.normalized.bw <-- factor ---+
 ```
 
 ### Not run by this workflow
 
-- **FRiP** is not computed by any process. Compute it manually from
-  `alignment/{sample}.filtered.bam` and a peak BED -- see
-  `references/05-qc-metrics.md`.
 - **Peak-level filtering**: `--blacklist` is applied to the BAM only. Peak
   files are never filtered afterwards, and there is no separate suspect-list
   input. Pass a pre-merged blacklist + suspect-list BED as `--blacklist`, or
@@ -59,7 +57,7 @@ workflow runs.
 
 | Tool | Version | Purpose | Citation |
 |------|---------|---------|----------|
-| Bowtie2 | 2.5.3 | Alignment (genome + spike-in) | Langmead & Salzberg 2012 |
+| Bowtie2 | 2.5.4 | Alignment (genome + spike-in) | Langmead & Salzberg 2012 |
 | SEACR | 1.3 | Peak calling (CUT&RUN-specific) | Meers et al. 2019 |
 | MACS2 | 2.2.9.1 | Alternative peak caller | Zhang et al. 2008 |
 | Picard | 3.1.1 | Duplicate marking and removal | Broad Institute |
@@ -70,9 +68,10 @@ workflow runs.
 | FastQC | 0.12.1 | Read quality | Andrews (Babraham) |
 | MultiQC | 1.21 | Aggregated QC | Ewels et al. 2016 |
 
-The conda alternative (`cutandrun-env.yml`) pins Bowtie2 2.5.4 rather than
-2.5.3 and installs no SEACR (only `r-base`), so on that route `SEACR_1.3.sh`
-must be fetched separately from the SEACR repository.
+The conda alternative (`cutandrun-env.yml`) pins the same version of every tool
+in the table above, but installs no SEACR (only `r-base`): SEACR is not a conda
+package, so on that route `SEACR_1.3.sh` and `SEACR_1.3.R` must be fetched
+separately from the SEACR repository.
 
 ## Key Literature
 
@@ -169,6 +168,11 @@ error if it or the project/queue is missing.
 | Signal tracks | 4 | 8 GB | 15-30 min |
 | **Total** | **8** | **8 GB** | **1.5-3 hours** |
 
+The RAM column is each step's first-attempt request. These processes ask for
+that much memory per attempt, so a task killed for exceeding it is retried with
+more (at most two retries, capped by `--max_memory`). Failures with any other
+exit status stop the run.
+
 ## Pipeline Parameters
 
 | Parameter | Default | Description |
@@ -223,6 +227,7 @@ results/
     {sample}.fragments.bed            # Fragment BED (same chromosome, <1 kb)
   qc/
     {sample}.fragment_sizes.txt
+    {sample}.frip_mqc.tsv             # FRiP, one row per peak set called for the sample
   multiqc/
     multiqc_report.html
   pipeline_info/
@@ -245,7 +250,7 @@ back to it.
 | Mapping rate (genome) | >80% | 60-80% | <60% | Bowtie2 log (in `multiqc_report.html`) |
 | Spike-in reads | 1-10% of total | 0.1-1% or 10-30% | <0.1% or >30% | `spikein/{sample}.spikein_counts.txt` |
 | Duplication rate | <20% | 20-40% | >40% | `alignment/{sample}.dup_metrics.txt` |
-| FRiP (peaks) | >10% | 5-10% | <5% | Not computed -- see `references/05-qc-metrics.md` |
+| FRiP (peaks) | >10% | 5-10% | <5% | `qc/{sample}.frip_mqc.tsv` (also a MultiQC table) |
 | Peak count | >5,000 | 1,000-5,000 | <1,000 | `peaks/{sample}.seacr.*.bed` |
 | Fragment size | Nucleosomal pattern | Irregular | No pattern | `qc/{sample}.fragment_sizes.txt` |
 
@@ -364,7 +369,7 @@ encode_log_derived_file(
     source_accessions=["ENCSR...", "ENCFF..."],
     description="CUT&RUN peaks from ENCODE CUT&RUN pipeline",
     file_type="CUT&RUN_peaks",
-    tool_used="Bowtie2 2.5.3 + SEACR 1.3",
+    tool_used="Bowtie2 2.5.4 + SEACR 1.3",
     parameters="stringent mode, threshold 0.01 non, BAM blacklist-filtered (peaks unfiltered)"
 )
 ```
@@ -377,7 +382,7 @@ Detailed step-by-step documentation is provided in the `references/` directory:
 2. `02-bowtie2-alignment.md` -- Bowtie2 alignment to genome and spike-in
 3. `03-filtering-spikein.md` -- Filtering, dedup, and spike-in normalization
 4. `04-seacr-peaks.md` -- SEACR peak calling and MACS2 alternative
-5. `05-qc-metrics.md` -- Fragment sizes, manual FRiP, spike-in QC
+5. `05-qc-metrics.md` -- Fragment sizes, FRiP, spike-in QC
 
 ## Walkthrough: Processing ENCODE CUT&RUN from FASTQ to Peaks
 
@@ -393,10 +398,14 @@ encode_search_experiments(assay_title="CUT&RUN", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "total": 35,
   "results": [
-    {"accession": "ENCSR900CUR", "assay_title": "CUT&RUN", "target": "H3K27me3", "biosample_summary": "K562", "status": "released"}
-  ]
+    {"accession": "ENCSR900CUR", "assay_title": "CUT&RUN", "target": "H3K27me3", "biosample_summary": "K562", "assembly": ["GRCh38"], "status": "released"}
+  ],
+  "total": 35,
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 25
 }
 ```
 
@@ -406,19 +415,31 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR900CUR", file_format="fastq")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF900CR1", "output_type": "reads", "paired_end": "1", "file_size_mb": 800},
-    {"accession": "ENCFF901CR2", "output_type": "reads", "paired_end": "2", "file_size_mb": 850}
-  ]
-}
+[
+  {"accession": "ENCFF900CR1", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size": 839252000, "file_size_human": "800.4 MB", "status": "released"},
+  {"accession": "ENCFF901CR2", "file_format": "fastq", "output_type": "reads", "biological_replicates": [1], "file_size": 891394000, "file_size_human": "850.1 MB", "status": "released"}
+]
 ```
 
 **Interpretation**: CUT&RUN yields smaller files than ChIP-seq (~800MB vs ~2.5GB) due to lower background.
 
-### Step 3: Run the CUT&RUN pipeline
+### Step 3: Name the files so a read-pair glob can find them
+
+ENCODE FASTQs are named by accession, so the two mates of a pair share no
+prefix, and the workflow matches file pairs with a `{1,2}` glob. Which mate a
+file is comes from its page on encodeproject.org (`paired_end` 1 or 2, and
+`paired_with` naming the other accession), not from any tool here. Link the
+files into the shape the glob expects:
+
+```bash
+mkdir -p fastq
+ln -s "$PWD/ENCFF900CR1.fastq.gz" fastq/ENCSR900CUR_R1.fastq.gz
+ln -s "$PWD/ENCFF901CR2.fastq.gz" fastq/ENCSR900CUR_R2.fastq.gz
+```
+
+### Step 4: Run the CUT&RUN pipeline
 
 ```bash
 nextflow run scripts/main.nf \
@@ -441,16 +462,18 @@ Key pipeline steps:
 5. Filter (MAPQ 10, proper pairs), remove duplicates with Picard, remove blacklist regions
 6. SEACR peak calling from the fragment bedGraph (stringent by default)
 7. Signal bigWig with `bamCoverage`, scaled by the spike-in factor
+8. FRiP of the filtered BAM against every peak set called for the sample,
+   written to `qc/{sample}.frip_mqc.tsv`
 
-### Step 4: Validate output quality
+### Step 5: Validate output quality
 
 Use the QC threshold table above with `alignment/{sample}.dup_metrics.txt`,
-`spikein/{sample}.spikein_counts.txt` and `qc/{sample}.fragment_sizes.txt`.
-FRiP has to be computed manually (`references/05-qc-metrics.md`).
+`spikein/{sample}.spikein_counts.txt`, `qc/{sample}.fragment_sizes.txt` and
+`qc/{sample}.frip_mqc.tsv`.
 
 **Key difference from ChIP-seq**: CUT&RUN has inherently lower background, so peak callers like MACS2 overfit. Use SEACR (Meers et al. 2019) instead.
 
-### Step 5: Compare with ChIP-seq for the same target
+### Step 6: Compare with ChIP-seq for the same target
 
 ```
 encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="K562", target="H3K27me3", organism="Homo sapiens")
@@ -476,9 +499,12 @@ encode_get_facets(assay_title="CUT&RUN", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "target.label": {"H3K27me3": 15, "H3K4me3": 12, "H3K27ac": 8, "CTCF": 5}
-  }
+  "target.label": [
+    {"term": "H3K27me3", "count": 15},
+    {"term": "H3K4me3", "count": 12},
+    {"term": "H3K27ac", "count": 8},
+    {"term": "CTCF", "count": 5}
+  ]
 }
 ```
 
@@ -491,10 +517,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="K
 Expected output:
 ```json
 {
-  "total": 5,
   "results": [
-    {"accession": "ENCSR000CHI", "assay_title": "Histone ChIP-seq", "target": "H3K27me3", "biosample_summary": "K562"}
-  ]
+    {"accession": "ENCSR000CHI", "assay_title": "Histone ChIP-seq", "target": "H3K27me3", "biosample_summary": "K562", "assembly": ["GRCh38"]}
+  ],
+  "total": 5,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -507,9 +537,14 @@ encode_track_experiment(accession="ENCSR900CUR", notes="K562 H3K27me3 CUT&RUN - 
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR900CUR",
-  "notes": "K562 H3K27me3 CUT&RUN - SEACR peaks for comparison with ChIP-seq"
+  "tracking": {
+    "accession": "ENCSR900CUR",
+    "action": "tracked"
+  },
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
 
@@ -541,7 +576,7 @@ When reporting CUT&RUN pipeline results:
 
 - **SEACR peak counts**: Report peak counts for each SEACR mode that was run (default: stringent only; both with `--seacr_mode both`). If MACS2 was also run, include those counts for comparison
 - **Spike-in normalization factor**: Report the scale factor and spike-in count per sample from `spikein/scale_factors.txt` and the spike-in read fraction (ideal 1-10% of total reads). Explain that higher spike-in counts indicate less target enrichment
-- **FRiP**: Not computed by the pipeline. If you compute it manually from `alignment/{sample}.filtered.bam` and a peak BED (`references/05-qc-metrics.md`), judge it against the QC table (>10% pass, 5-10% warning, <5% fail) and say it was computed outside the workflow
+- **FRiP**: Report it from `qc/{sample}.frip_mqc.tsv`, which has one row per peak set called for the sample (SEACR stringent and/or relaxed, and/or MACS2), and judge each against the QC table (>10% pass, 5-10% warning, <5% fail). The value is the fraction of the filtered BAM's alignments that overlap a peak, so mates of a pair count separately; the `Peak set` column names the peak file each row refers to
 - **Signal track paths**: Provide paths to the `signal/{sample}.normalized.bw` files (spike-in scaled, or RPKM if spike-in was skipped) for genome browser visualization
 - **Fragment size distribution**: From `qc/{sample}.fragment_sizes.txt`, confirm the expected nucleosomal ladder pattern and note the dominant fragment class (sub-nucleosomal for TFs, mononucleosomal for histone marks)
 - **Key QC metrics**: Present mapping rate (>80%), duplication rate (<20%), and spike-in calibration status in a summary table

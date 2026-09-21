@@ -273,6 +273,7 @@ async def encode_search_experiments(
     """
     client = await _get_client()
     limit = clamp_limit(limit)
+    offset = max(0, offset)
 
     filter_warnings = _validate_filters(assay_title, organ, biosample_type)
 
@@ -471,6 +472,7 @@ async def encode_search_files(
     """
     client = await _get_client()
     limit = clamp_limit(limit)
+    offset = max(0, offset)
     filter_warnings = _validate_filters(assay_title, organ, biosample_type)
     result = await client.search_files(
         file_format=file_format,

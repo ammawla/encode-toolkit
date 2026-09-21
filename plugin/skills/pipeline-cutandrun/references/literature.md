@@ -114,7 +114,7 @@ See pipeline-chipseq/references/literature.md for detailed descriptions of share
 ### Quinlan & Hall 2010 — BEDTools
 
 - **DOI:** [10.1093/bioinformatics/btq033](https://doi.org/10.1093/bioinformatics/btq033) | **PMID:** 20110278 | **Citations:** ~12,000
-- **CUT&RUN role:** Used by the workflow to filter the BAM against `--blacklist` and to build the fragment BED and bedGraph; used manually for peak filtering and FRiP calculation, which the workflow does not run.
+- **CUT&RUN role:** Used by the workflow to filter the BAM against `--blacklist`, to build the fragment BED and bedGraph, and to count reads in peaks for FRiP (`bedtools intersect -u`); used manually for peak filtering, which the workflow does not run.
 
 ---
 

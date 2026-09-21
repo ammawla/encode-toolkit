@@ -1,8 +1,8 @@
 # Stage 2: Alignment
 
 ## Tools
-- **Bowtie2 2.5.1** (image version): Primary aligner for ATAC-seq (Langmead & Salzberg 2012, ~30,000 citations)
-- **Samtools 1.17** (image version): BAM conversion, sorting, indexing, and statistics
+- **Bowtie2 2.5.4** (image version): Primary aligner for ATAC-seq (Langmead & Salzberg 2012, ~30,000 citations)
+- **Samtools 1.19** (image version): BAM conversion, sorting, indexing, and statistics
 
 ## Why Bowtie2 Instead of BWA
 Bowtie2 is preferred for ATAC-seq because:
@@ -67,8 +67,8 @@ samtools index aligned.bam
 samtools flagstat aligned.bam > flagstat.txt
 ```
 
-`samtools idxstats` is a useful manual follow-up but is not published by the workflow; the
-mitochondrial fraction is reported separately in Stage 3.
+`samtools idxstats` is run on this BAM in Stage 3 and published as
+`qc/<sample>.idxstats.txt`, which is where the mitochondrial fraction comes from.
 
 ## Expected Output
 - `aligned/<sample>.bam` + `.bam.bai` -- coordinate-sorted, indexed BAM

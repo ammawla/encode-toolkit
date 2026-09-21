@@ -80,7 +80,16 @@ preview dnaseseq "skip footprinting needs no RGT data" pass "${DNASE[@]}" --hots
     --skip_footprint
 preview dnaseseq "footprinting without --rgt_data is rejected" fail "${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch"
 preview dnaseseq "missing center sites is rejected" fail "${DNASE[@]}" --skip_footprint
-preview hic "defaults" pass --reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes"
+HIC=(--reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes")
+preview hic "defaults" pass "${HIC[@]}"
+preview hic "custom resolutions, loops at 10 kb only" pass "${HIC[@]}" --resolutions 10000,50000,100000 \
+    --hiccups_resolutions 10000
+preview hic "resolution that is not a multiple of the base bin is rejected" "must all be multiples" "${HIC[@]}" \
+    --resolutions 5000,12000
+preview hic "loop resolution missing from --resolutions is rejected" "must also be listed in --resolutions" "${HIC[@]}" \
+    --resolutions 10000,50000 --hiccups_resolutions 5000,10000
+preview hic "unsupported loop resolution is rejected" "accepts 5000, 10000 and 25000 only" "${HIC[@]}" \
+    --hiccups_resolutions 50000
 RNASEQ=(--reads "$READS" --star_index "$REF/star_index" --rsem_index "$REF/rsem/GRCh38")
 preview rnaseq "RSEM reference given as a prefix" pass "${RNASEQ[@]}"
 preview rnaseq "explicit kallisto index and RSeQC gene model, unstranded" pass "${RNASEQ[@]}" --strandedness none \
@@ -97,7 +106,7 @@ for pipeline in atacseq chipseq cutandrun dnaseseq hic rnaseq wgbs; do
         chipseq)   ARGS=(--reads "$READS" --chrom_sizes "$REF/chrom.sizes" --blacklist "$REF/blacklist.bed") ;;
         cutandrun) ARGS=("${CUTANDRUN[@]}") ;;
         dnaseseq)  ARGS=("${DNASE[@]}" --hotspot_center_sites "$REF/center_sites.starch" --skip_footprint) ;;
-        hic)       ARGS=(--reads "$READS" --bwa_index "$REF/genome.fa" --chrom_sizes "$REF/chrom.sizes") ;;
+        hic)       ARGS=("${HIC[@]}") ;;
         rnaseq)    ARGS=("${RNASEQ[@]}") ;;
         wgbs)      ARGS=(--reads "$READS" --genome_dir "$REF/bismark_genome") ;;
     esac

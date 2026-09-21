@@ -213,10 +213,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="kidney", organism="Homo
 Expected output:
 ```json
 {
-  "total": 8,
   "results": [
     {"accession": "ENCSR900KID", "assay_title": "ATAC-seq", "biosample_summary": "kidney", "status": "released"}
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -226,13 +230,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR900KID", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF950KID", "output_type": "IDR thresholded peaks", "file_format": "bed narrowPeak", "file_size_mb": 0.7}
-  ]
-}
+[
+  {"accession": "ENCFF950KID", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "file_size_human": "0.7 MB"}
+]
 ```
 
 ### Step 3: Query gnomAD for variants in regulatory peaks
@@ -311,12 +313,13 @@ Apply gnomAD frequency filters:
 encode_get_facets(assay_title="ATAC-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {
-    "organ": {"brain": 32, "heart": 18, "liver": 14, "kidney": 8, "lung": 10}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 32},
+    {"term": "kidney", "count": 8}
+  ]
 }
 ```
 
@@ -325,15 +328,18 @@ Expected output:
 encode_get_experiment(accession="ENCSR900KID")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
   "accession": "ENCSR900KID",
   "assay_title": "ATAC-seq",
   "biosample_summary": "kidney",
-  "replicates": 2,
+  "bio_replicate_count": 2,
   "status": "released",
-  "audit": {"WARNING": 0, "ERROR": 0}
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 0,
+  "audit_internal_action_count": 1
 }
 ```
 
@@ -342,12 +348,16 @@ Expected output:
 encode_track_experiment(accession="ENCSR900KID", notes="Kidney ATAC-seq for gnomAD regulatory variant filtering")
 ```
 
-Expected output:
+Expected output (the `notes` you pass are stored, not echoed back; read them with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR900KID",
-  "notes": "Kidney ATAC-seq for gnomAD regulatory variant filtering"
+  "tracking": {"accession": "ENCSR900KID", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "ATAC-seq (replicated)", "version": "2.2.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
 }
 ```
 

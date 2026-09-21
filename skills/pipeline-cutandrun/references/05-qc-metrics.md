@@ -5,7 +5,7 @@ CUT&RUN-specific fragment analysis, spike-in validation, and peak quality.
 
 Pass/warn/fail thresholds live in one place: the QC table in `SKILL.md`. The
 commands below show how to derive each value, including the ones the workflow
-does not compute (FRiP, spike-in fraction, peak statistics).
+does not compute (spike-in fraction, peak statistics).
 
 ## Fragment Size Distribution
 
@@ -81,19 +81,29 @@ samtools flagstat results/alignment/sample.filtered.bam > flagstat.txt
 Mapping rate, properly paired fraction and duplication rate are judged against
 the QC table in `SKILL.md`.
 
-## FRiP (Fraction of Reads in Peaks) -- not computed by the workflow
+## FRiP (Fraction of Reads in Peaks)
 
-No process computes FRiP; run it yourself on the published files:
+The FRIP process computes this and publishes `qc/{sample}.frip_mqc.tsv`, one
+row per peak set called for the sample (SEACR stringent and/or relaxed, and/or
+MACS2). Columns: `Peak set` (the peak file), `FRiP`, `reads_in_peaks`,
+`total_reads`. MultiQC shows the same table as "Fraction of reads in peaks".
+
+This is what it runs for each peak set:
 
 ```bash
-total=$(samtools view -c -F 1804 -f 2 results/alignment/sample.filtered.bam)
+total=$(samtools view -c results/alignment/sample.filtered.bam)
 in_peaks=$(bedtools intersect \
+    -u \
     -a results/alignment/sample.filtered.bam \
     -b results/peaks/sample.seacr.stringent.bed \
-    -u -bed | wc -l)
-frip=$(echo "scale=4; $in_peaks / $total" | bc)
-echo "FRiP: $frip"
+    | samtools view -c -)
+awk -v a="$in_peaks" -v b="$total" 'BEGIN { printf "FRiP: %.4f\n", a / b }'
 ```
+
+Both counts are alignments of the filtered BAM with no further flag filter, so
+the two mates of a fragment count separately. Counting differently (for
+example with `-F 1804 -f 2`) gives a number that does not match the published
+one.
 
 CUT&RUN typically has higher FRiP than ChIP-seq because of lower background.
 Use the FRiP row of the QC table in `SKILL.md` for the thresholds.

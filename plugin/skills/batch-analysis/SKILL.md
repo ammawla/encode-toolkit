@@ -332,7 +332,7 @@ encode_export_data(
 )
 ```
 
-This produces a CSV with columns: accession, assay, target, biosample, organ, organism, lab, replicates, audit, pipeline, publication count, derived file count, and PMIDs.
+This produces a CSV with 17 columns: accession, assay_title, target, organism, organ, biosample_type, biosample_summary, lab, assembly, status, date_released, replication_type, life_stage, publication_count, pmids, derived_file_count, and external_reference_count.
 
 For R or pandas import:
 ```
@@ -378,7 +378,7 @@ encode_log_derived_file(
     source_accessions=["ENCSR001", "ENCSR002", "ENCSR003", ...],
     description="Pearson correlation heatmap of H3K27ac signal across 15 tissue types",
     file_type="visualization",
-    tool_used="deepTools v3.5.4 multiBigwigSummary + plotCorrelation",
+    tool_used="deepTools v3.5.5 multiBigwigSummary + plotCorrelation",
     parameters="--binSize 10000 --corMethod pearson"
 )
 
@@ -510,11 +510,15 @@ encode_search_experiments(
 Expected output:
 ```json
 {
+  "results": [
+    {"accession": "ENCSR001ABC", "biosample_summary": "liver tissue male adult (54 years)", "audit_error_count": 0, "audit_warning_count": 1},
+    {"accession": "ENCSR002DEF", "biosample_summary": "brain tissue female adult (53 years)", "audit_error_count": 1, "audit_warning_count": 0}
+  ],
   "total": 156,
-  "experiments": [
-    {"accession": "ENCSR001ABC", "biosample_summary": "liver tissue", "audit": {"ERROR": 0, "WARNING": 1}},
-    {"accession": "ENCSR002DEF", "biosample_summary": "brain tissue", "audit": {"ERROR": 1, "WARNING": 0}}
-  ]
+  "limit": 10,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 10
 }
 ```
 
@@ -537,8 +541,9 @@ Expected output:
 ```json
 {
   "total_experiments": 8,
-  "assays": {"Histone ChIP-seq": 8},
-  "organs": {"liver": 2, "brain": 2, "heart": 2, "kidney": 2}
+  "total_publications": 5,
+  "by_assay": {"Histone ChIP-seq": 8},
+  "by_organ": {"liver": 2, "brain": 2, "heart": 2, "kidney": 2}
 }
 ```
 
@@ -559,8 +564,10 @@ Expected output:
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac-human",
   "status": "released",
-  "audit": {"ERROR": 0, "WARNING": 1, "NOT_COMPLIANT": 0},
-  "replicates": 2
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 1,
+  "bio_replicate_count": 2
 }
 ```
 

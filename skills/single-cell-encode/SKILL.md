@@ -389,9 +389,14 @@ encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 22, "blood": 15, "lung": 8, "heart": 6, "liver": 4, "kidney": 3}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 22},
+    {"term": "blood", "count": 15},
+    {"term": "lung", "count": 8},
+    {"term": "heart", "count": 6},
+    {"term": "liver", "count": 4},
+    {"term": "kidney", "count": 3}
+  ]
 }
 ```
 
@@ -406,11 +411,15 @@ encode_search_experiments(assay_title="snATAC-seq", organ="brain", organism="Hom
 Expected output:
 ```json
 {
-  "total": 12,
   "results": [
-    {"accession": "ENCSR700SCA", "assay_title": "scATAC-seq", "biosample_summary": "brain", "status": "released"},
-    {"accession": "ENCSR701CTX", "assay_title": "scATAC-seq", "biosample_summary": "cerebral cortex", "status": "released"}
-  ]
+    {"accession": "ENCSR700SCA", "assay_title": "snATAC-seq", "organ": "brain", "biosample_summary": "brain tissue male adult (54 years)", "status": "released"},
+    {"accession": "ENCSR701CTX", "assay_title": "snATAC-seq", "organ": "brain", "biosample_summary": "cerebral cortex tissue female adult (53 years)", "status": "released"}
+  ],
+  "total": 12,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -420,13 +429,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR700SCA", file_format="h5ad", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF800H5A", "output_type": "gene quantifications", "file_format": "h5ad", "file_size_mb": 320}
-  ]
-}
+[
+  {"accession": "ENCFF800H5A", "output_type": "gene quantifications", "file_format": "h5ad", "assembly": "GRCh38", "file_size": 335544320, "file_size_human": "320.0 MB", "status": "released"}
+]
 ```
 
 ### Step 4: Compare with bulk ENCODE experiments
@@ -438,10 +445,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="brain", organism="Homo 
 Expected output:
 ```json
 {
-  "total": 32,
   "results": [
-    {"accession": "ENCSR800BLK", "assay_title": "ATAC-seq", "biosample_summary": "brain", "status": "released"}
-  ]
+    {"accession": "ENCSR800BLK", "assay_title": "ATAC-seq", "organ": "brain", "biosample_summary": "brain tissue male adult (54 years)", "status": "released"}
+  ],
+  "total": 32,
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 25
 }
 ```
 
@@ -468,9 +479,12 @@ encode_get_facets(assay_title="snATAC-seq", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 12, "blood": 8, "lung": 5, "heart": 3}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 12},
+    {"term": "blood", "count": 8},
+    {"term": "lung", "count": 5},
+    {"term": "heart", "count": 3}
+  ]
 }
 ```
 
@@ -482,13 +496,19 @@ encode_compare_experiments(accession1="ENCSR700SCA", accession2="ENCSR800BLK")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"organ": "brain", "organism": "Homo sapiens"},
-    "differences": {
-      "assay": ["scATAC-seq", "ATAC-seq"],
-      "resolution": ["single-cell", "bulk"]
-    }
-  }
+  "experiment_1": {"accession": "ENCSR700SCA", "assay": "snATAC-seq", "biosample": "brain tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR800BLK", "assay": "ATAC-seq", "biosample": "brain tissue male adult (54 years)"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same organ: brain"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different assay types: snATAC-seq vs ATAC-seq. Multi-omic integration may be needed."
+  ]
 }
 ```
 
@@ -500,9 +520,11 @@ encode_track_experiment(accession="ENCSR700SCA", notes="Brain scATAC-seq for cel
 Expected output:
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR700SCA",
-  "notes": "Brain scATAC-seq for cell-type-specific regulatory analysis"
+  "tracking": {"accession": "ENCSR700SCA", "action": "tracked"},
+  "publications_found": 0,
+  "publications": [],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
 

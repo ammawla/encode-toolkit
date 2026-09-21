@@ -3,6 +3,7 @@
 ## Tools
 - **MACS2 2.2.9.1** (image version): Peak caller (Zhang et al. 2008)
 - **IDR 2.0.4.2** (image version): Irreproducible Discovery Rate (Li et al. 2011)
+- **bedtools 2.31.0 + samtools 1.19** (image versions): FRiP counting after peak calling
 
 ## MACS2 Parameters for ATAC-seq
 
@@ -38,11 +39,11 @@ macs2 callpeak -t sample.nfr.bam \
   --nomodel --keep-dup all --call-summits \
   --qvalue 0.05 -B
 
-# IDR on the first two replicate peak files, sorted by name
+# IDR, once per pair of replicates, the two names sorted alphabetically
 idr --samples rep1_peaks.narrowPeak rep2_peaks.narrowPeak \
   --input-file-type narrowPeak \
   --rank p.value \
-  --output-file idr_peaks.txt \
+  --output-file rep1_vs_rep2.idr_peaks.txt \
   --plot \
   --idr-threshold 0.05
 ```
@@ -55,19 +56,22 @@ instead of the NFR BAM is a reasonable manual variant, but the workflow always u
 - `peaks/narrow/<sample>_peaks.narrowPeak`
 - `peaks/narrow/<sample>_peaks.xls`
 - `peaks/narrow/<sample>_treat_pileup.bdg` and `<sample>_control_lambda.bdg`
-- `peaks/idr/idr_peaks.txt` and, when IDR emits it, `idr_peaks.txt.png`
+- `peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt` and, when IDR emits it,
+  `<sampleA>_vs_<sampleB>.idr_peaks.txt.png`, one pair of files per replicate pair
+- `qc/<sample>.frip_mqc.tsv` (see `references/05-qc-metrics.md`)
 
-`<sample>_summits.bed` is produced by `--call-summits` but is not declared as an output, so
-it stays in the Nextflow work directory. Only narrow peaks are called; there is no broad
-mode.
+`<sample>_summits.bed` is produced by `--call-summits` and published to `peaks/narrow/`
+alongside the peak files. Only narrow peaks are called; there is no broad mode.
 
 ## What the IDR step does and does not do
 
-The workflow collects the per-sample peak files, sorts them by file name, and runs `idr`
-once on the first two. Consequently:
+All samples matched by `--reads` are treated as replicates of one experiment. The workflow
+sorts them by sample name and runs `idr` once for every pair. Consequently:
 
-- With fewer than two peak files, IDR is skipped silently and `peaks/idr/` is not created.
-- With more than two, the extra files are dropped and a warning is logged.
+- Two samples give one comparison, three give three, four give six. No replicate is
+  dropped.
+- With a single peak file there is no pair, so IDR is skipped silently and `peaks/idr/` is
+  not created.
 - There are **no** pooled-replicate calls, **no** pseudoreplicates, and **no** optimal /
   conservative peak sets.
 - Rescue ratio and self-consistency ratio are **not computed**; they require pooled and
@@ -87,7 +91,7 @@ once on the first two. Consequently:
 
 | Check | Threshold | Action if Failed |
 |-------|-----------|------------------|
-| FRiP (manual) | >=0.3 (ATAC-seq standard) | Poor accessibility signal |
+| FRiP (`qc/<sample>.frip_mqc.tsv`) | >=0.3 (ATAC-seq standard) | Poor accessibility signal |
 | Peak count | >50,000 (IDR filtered) | Low enrichment |
 | Peak width distribution | Median 200-500 bp | Check if calling mode correct |
 | Peaks at TSS (manual) | Enrichment visible | Fundamental ATAC-seq signal |
@@ -95,8 +99,9 @@ once on the first two. Consequently:
 ## Notes
 
 - ATAC-seq FRiP is typically much higher than ChIP-seq (0.3-0.6 vs 0.01-0.1)
-  because open chromatin is a large fraction of the genome. FRiP is a manual calculation;
-  see `references/05-qc-metrics.md`.
+  because open chromatin is a large fraction of the genome. The workflow computes it after
+  peak calling, counting the peaks called here against the blacklist-filtered all-fragment
+  BAM; see `references/05-qc-metrics.md`.
 - The workflow always calls peaks on NFR fragments for accessibility analysis.
 - For nucleosome positioning, use `filtered/nfr/<sample>.mononuc.bam` separately.
 - IDR is standard for ATAC-seq with biological replicates.

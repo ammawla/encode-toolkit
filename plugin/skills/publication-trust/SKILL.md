@@ -296,12 +296,17 @@ Key findings:
 encode_track_experiment(accession="ENCSR000AKA", notes="H3K27ac ChIP-seq - QC thresholds verified per Landt 2012 (PMID:22955991)")
 ```
 
-Expected output:
+Expected output (the `notes` you pass are stored, not echoed back; read them with `encode_list_tracked`):
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR000AKA",
-  "notes": "H3K27ac ChIP-seq - QC thresholds verified per Landt 2012 (PMID:22955991)"
+  "tracking": {"accession": "ENCSR000AKA", "action": "tracked"},
+  "auto_linked_references": [{"type": "geo_accession", "id": "GSE123456"}],
+  "publications_found": 1,
+  "publications": [
+    {"pmid": "22955991", "doi": "10.1101/gr.136184.111", "title": "ChIP-seq guidelines and practices of the ENCODE and modENCODE consortia", "authors": "Landt SG, Marinov GK, Kundaje A", "journal": "Genome Research", "year": "2012", "abstract": ""}
+  ],
+  "pipelines_found": 0,
+  "pipelines": []
 }
 ```
 
@@ -326,21 +331,24 @@ Record which claims were verified, sources found, and any caveats:
 encode_get_experiment(accession="ENCSR123ABC")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
   "accession": "ENCSR123ABC",
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac-human",
   "status": "released",
-  "audit": {"WARNING": 1, "NOT_COMPLIANT": 0, "ERROR": 0},
-  "replicates": 2,
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 1,
+  "audit_internal_action_count": 0,
+  "bio_replicate_count": 2,
   "lab": "Bernstein, Broad",
   "date_released": "2020-03-15"
 }
 ```
 
-**Trust check**: 0 errors, 2 replicates, released status — meets ENCODE standards.
+**Trust check**: `audit_error_count` 0, `bio_replicate_count` 2, released status — meets ENCODE standards.
 
 ### 2. Check citations for a tracked experiment
 
@@ -348,20 +356,29 @@ Expected output:
 encode_get_citations(accession="ENCSR123ABC")
 ```
 
-Expected output:
+Expected output (`export_format="bibtex"` / `"ris"` return plain text instead of JSON):
 ```json
 {
-  "accession": "ENCSR123ABC",
-  "citations": {
-    "consortium": "ENCODE Project Consortium. Nature 2020;583:699-710",
-    "lab_publication": "Roadmap Epigenomics. Nature 2015;518:317-330",
-    "data_citation": "ENCODE Project. https://www.encodeproject.org/experiments/ENCSR123ABC/"
-  }
+  "publications": [
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR123ABC",
+      "pmid": "32728249",
+      "doi": "10.1038/s41586-020-2493-4",
+      "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes",
+      "authors": "ENCODE Project Consortium",
+      "journal": "Nature",
+      "year": "2020",
+      "abstract": ""
+    }
+  ],
+  "count": 1
 }
 ```
 
 ### 3. Compare two experiments for consistency
 
+Both experiments must already be tracked; otherwise the tool returns `{"error": "Experiment ... not tracked. Track it first."}`.
 ```
 encode_compare_experiments(
   accession1="ENCSR123ABC",
@@ -372,10 +389,20 @@ encode_compare_experiments(
 Expected output:
 ```json
 {
-  "compatible": true,
-  "shared": {"organism": "Homo sapiens", "assembly": "GRCh38"},
-  "differences": {"lab": ["Bernstein, Broad", "Snyder, Stanford"]},
-  "warnings": ["Different labs — check for batch effects"]
+  "experiment_1": {"accession": "ENCSR123ABC", "assay": "Histone ChIP-seq", "biosample": "GM12878"},
+  "experiment_2": {"accession": "ENCSR456DEF", "assay": "Histone ChIP-seq", "biosample": "K562"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Histone ChIP-seq",
+    "Same target: H3K27ac-human"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different labs: Bernstein, Broad vs Snyder, Stanford. Batch effects possible."
+  ]
 }
 ```
 

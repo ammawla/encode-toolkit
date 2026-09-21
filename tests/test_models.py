@@ -353,3 +353,43 @@ class TestDownloadResult:
         )
         assert r.success is True
         assert r.file_size == 1024
+
+
+class TestExperimentSummaryFromSearchProjection:
+    """Search results as the ENCODE API returns them for the fields the client asks for."""
+
+    SEARCH_HIT = {
+        "@id": "/experiments/ENCSR000AKS/",
+        "accession": "ENCSR000AKS",
+        "assay_title": "Histone ChIP-seq",
+        "assembly": ["hg19", "GRCh38"],
+        "biosample_ontology": {"organ_slims": ["bodily fluid", "blood"], "classification": "cell line"},
+        "biosample_summary": "Homo sapiens K562",
+        "files": [{"@id": "/files/ENCFF000BXK/"}, {"@id": "/files/ENCFF000BXL/"}],
+        "lab": {"title": "Bradley Bernstein, Broad"},
+        "replicates": [
+            {"library": {"biosample": {"organism": {"scientific_name": "Homo sapiens"}}}},
+            {"library": {"biosample": {"organism": {"scientific_name": "Homo sapiens"}}}},
+        ],
+        "status": "released",
+        "target": {"label": "H3K4me1"},
+    }
+
+    def test_assembly_comes_from_the_experiment_itself(self):
+        summary = ExperimentSummary.from_api(self.SEARCH_HIT)
+
+        assert summary.assembly == ["GRCh38", "hg19"]
+
+    def test_organism_comes_from_the_replicates(self):
+        summary = ExperimentSummary.from_api(self.SEARCH_HIT)
+
+        assert summary.organism == "Homo sapiens"
+
+    def test_labels_are_the_ones_the_search_filters_accept(self):
+        summary = ExperimentSummary.from_api(self.SEARCH_HIT)
+
+        assert summary.target == "H3K4me1"
+        assert summary.lab == "Bradley Bernstein, Broad"
+        assert summary.biosample_type == "cell line"
+        assert summary.organ == "bodily fluid, blood"
+        assert summary.file_count == 2

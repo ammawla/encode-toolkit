@@ -416,6 +416,28 @@ METADATA_MAP = {
 }
 
 # ENCODE API parameter name mapping (user-friendly -> API param)
+# Fields requested from /search/?type=Experiment. They are what ExperimentSummary.from_api
+# reads; naming them makes the API embed labels instead of returning object paths.
+EXPERIMENT_SEARCH_FIELDS = (
+    "accession",
+    "assay_title",
+    "target.label",
+    "biosample_summary",
+    "biosample_ontology.classification",
+    "biosample_ontology.organ_slims",
+    "replicates.library.biosample.organism.scientific_name",
+    "status",
+    "date_released",
+    "description",
+    "lab.title",
+    "files.@id",
+    "replication_type",
+    "life_stage_age",
+    "assembly",
+    "audit",
+    "dbxrefs",
+)
+
 EXPERIMENT_FILTER_MAP = {
     "assay_title": "assay_title",
     "organism": "replicates.library.biosample.donor.organism.scientific_name",

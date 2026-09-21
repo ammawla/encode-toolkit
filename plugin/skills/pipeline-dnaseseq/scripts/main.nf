@@ -24,7 +24,7 @@ process FASTQC_RAW {
     tag "${sample_id}"
     publishDir "${params.outdir}/fastqc", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -42,7 +42,7 @@ process TRIM_GALORE {
     tag "${sample_id}"
     publishDir "${params.outdir}/trim_galore", mode: 'copy'
     cpus 4
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -68,7 +68,7 @@ process TRIM_GALORE {
 process BWA_ALIGN {
     tag "${sample_id}"
     cpus 8
-    memory '16 GB'
+    memory { 16.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -95,7 +95,7 @@ process FILTER_DEDUP {
     tag "${sample_id}"
     publishDir "${params.outdir}/alignment", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -143,7 +143,7 @@ process HOTSPOT2 {
     tag "${sample_id}"
     publishDir "${params.outdir}/hotspots", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -190,7 +190,7 @@ process SIGNAL_TRACK {
     tag "${sample_id}"
     publishDir "${params.outdir}/hotspots", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -222,7 +222,7 @@ process FOOTPRINTING {
     tag "${sample_id}"
     publishDir "${params.outdir}/footprints", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai), path(peaks)
@@ -254,7 +254,7 @@ process INSERT_SIZES {
     tag "${sample_id}"
     publishDir "${params.outdir}/qc", mode: 'copy'
     cpus 1
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -273,7 +273,7 @@ process INSERT_SIZES {
 process MULTIQC {
     publishDir "${params.outdir}/multiqc", mode: 'copy'
     cpus 1
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     path('*')

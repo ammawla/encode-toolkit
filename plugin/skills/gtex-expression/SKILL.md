@@ -305,10 +305,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", target=
 Expected output:
 ```json
 {
-  "total": 8,
   "results": [
     {"accession": "ENCSR123LIV", "assay_title": "Histone ChIP-seq", "biosample_summary": "liver", "target": "H3K27ac"}
-  ]
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -360,10 +364,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="brain", target=
 Expected output:
 ```json
 {
-  "total": 24,
   "results": [
     {"accession": "ENCSR456BRN", "assay_title": "Histone ChIP-seq", "biosample_summary": "brain", "target": "H3K27ac"}
-  ]
+  ],
+  "total": 24,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -372,12 +380,13 @@ Expected output:
 encode_get_facets(assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (facet field names are the top-level keys):
 ```json
 {
-  "facets": {
-    "organ": {"brain": 45, "liver": 18, "heart": 15, "lung": 12, "kidney": 8}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 45},
+    {"term": "liver", "count": 18}
+  ]
 }
 ```
 
@@ -386,13 +395,11 @@ Expected output:
 encode_list_files(experiment_accession="ENCSR456BRN", file_format="bed", output_type="IDR thresholded peaks", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of file records; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF789IDR", "output_type": "IDR thresholded peaks", "file_format": "bed narrowPeak", "file_size_mb": 1.2}
-  ]
-}
+[
+  {"accession": "ENCFF789IDR", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "file_size_human": "1.2 MB"}
+]
 ```
 
 ## Integration

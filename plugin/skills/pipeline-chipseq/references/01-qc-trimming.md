@@ -5,8 +5,8 @@
 - Adapter sequences (auto-detected by Trim Galore or specify: Illumina TruSeq)
 
 ## Tools
-- **FastQC 0.11.9** (image version): Per-base quality, adapter content, duplication rates, GC content
-- **Trim Galore 0.6.7** (image version, wraps Cutadapt 4.4): Adapter trimming + quality filtering
+- **FastQC 0.12.1** (image version): Per-base quality, adapter content, duplication rates, GC content
+- **Trim Galore 0.6.10** (image version, wraps Cutadapt 4.6): Adapter trimming + quality filtering
 
 ## Parameters
 

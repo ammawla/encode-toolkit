@@ -37,10 +37,11 @@ Help the user evaluate whether ENCODE experiments meet quality standards for the
 ## Step 1: Retrieve Experiment Details and Audit Status
 
 Use `encode_get_experiment` with the accession to get full metadata including:
-- **Audit status** (ERROR, NOT_COMPLIANT, WARNING, INTERNAL_ACTION)
-- **Replicate information** (biological and technical replicates)
-- **Pipeline and analysis details** (which ENCODE uniform pipeline was used)
-- **Quality metrics** embedded in file objects
+- **Audit counts** — `audit_error_count`, `audit_not_compliant_count`, `audit_warning_count`, `audit_internal_action_count` (four ints, one per ENCODE severity level)
+- **Replicate information** — `bio_replicate_count`, `tech_replicate_count`, `replication_type`
+- **The file list** (`files`) with format, output type, assembly, size and md5sum per file
+
+Two things this tool does not return: the ENCODE pipeline record (use `encode_track_experiment`, which returns `pipelines[]`) and per-file quality metrics such as FRiP or NSC (read those from the file's page on encodeproject.org).
 
 ```
 encode_get_experiment(accession="ENCSR...")
@@ -119,7 +120,7 @@ The Irreproducible Discovery Rate provides principled assessment of replicate co
 ENCODE requires characterization for every antibody:
 - **Primary**: IP followed by mass spectrometry or immunoprecipitation-western
 - **Secondary**: At least one of: knockdown/knockout, motif enrichment, genomic annotation enrichment
-- Check the `antibody_lot_reviews` field in experiment metadata
+- No `encode_*` tool returns antibody data: read `antibody_lot_reviews` on the experiment's page on encodeproject.org
 
 ## Step 4: Evaluate ATAC-seq Quality (Buenrostro et al. 2013; Ou et al. 2018)
 
@@ -182,7 +183,7 @@ A clean ATAC-seq library shows a clear nucleosomal ladder. Monotonic decay (no p
 
 ENCODE RNA-seq data may be stranded or unstranded:
 - **Stranded**: Can distinguish sense vs antisense transcription. Required for accurate quantification of overlapping genes.
-- **Unstranded**: Cannot resolve strand of origin. Check `run_type` and `library_strand_specificity` in metadata.
+- **Unstranded**: Cannot resolve strand of origin. No `encode_*` tool reports this — check `run_type` and the library's strand specificity on the experiment's page on encodeproject.org.
 
 ## Step 6: Evaluate WGBS Quality (ENCODE data standards)
 
@@ -308,7 +309,7 @@ Single-cell experiments in ENCODE include cell-level quality summaries in their 
 ```
 encode_get_experiment(accession="ENCSR...")
 ```
-Look for `audit` flags — ENCODE applies automated QC checks including minimum cell counts, minimum genes per cell, and maximum doublet rates. Also check the `replicates` section for library preparation details.
+Look at the four `audit_*_count` fields — ENCODE applies automated QC checks including minimum cell counts, minimum genes per cell, and maximum doublet rates. Also check `bio_replicate_count` and `replication_type`; library preparation details are on the experiment's ENCODE page, not in the tool output.
 
 ## Step 10: Assess Replication
 
@@ -413,7 +414,7 @@ For each experiment assessed, provide:
 
 4. **Assembly mismatch**: Quality metrics computed on different assemblies (hg19 vs GRCh38) may differ slightly. Always verify the assembly of quality metrics matches your analysis assembly.
 
-5. **Antibody lot variation**: The same antibody target can show different enrichment across lots. Check `antibody_lot_reviews` in ENCODE metadata.
+5. **Antibody lot variation**: The same antibody target can show different enrichment across lots. Check `antibody_lot_reviews` on the experiment's page on encodeproject.org (it is not part of any tool response).
 
 6. **Read depth ≠ quality**: A deeply sequenced bad library is still a bad library. Check NRF/PBC first — if complexity is exhausted, more sequencing wastes resources.
 
@@ -432,20 +433,25 @@ For each experiment assessed, provide:
 encode_get_experiment(accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (fields abridged; the full response also carries `files` and the rest of the experiment metadata):
 ```json
 {
   "accession": "ENCSR000AKA",
   "assay_title": "Histone ChIP-seq",
   "target": "H3K27ac",
   "biosample_summary": "GM12878",
-  "replicates": 2,
+  "bio_replicate_count": 2,
+  "tech_replicate_count": 2,
+  "replication_type": "isogenic",
   "status": "released",
-  "audit": {"ERROR": 0, "NOT_COMPLIANT": 0, "WARNING": 1}
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 1,
+  "audit_internal_action_count": 0
 }
 ```
 
-**Interpretation**: 0 ERRORs and 0 NOT_COMPLIANT = experiment meets ENCODE standards. 1 WARNING is acceptable.
+**Interpretation**: `audit_error_count` 0 and `audit_not_compliant_count` 0 = experiment meets ENCODE standards. One warning is acceptable. The counts say how many flags there are, not which ones — open the experiment on encodeproject.org for the individual audit messages.
 
 ### Step 2: Check file-level quality
 
@@ -483,41 +489,50 @@ encode_track_experiment(accession="ENCSR000AKA", notes="QC PASSED: FRiP=3.2%, NS
 encode_get_experiment(accession="ENCSR000AKA")
 ```
 
-Expected output:
+Expected output (audit fields only; the response carries the full experiment record):
 ```json
 {
   "accession": "ENCSR000AKA",
-  "audit": {"ERROR": 0, "NOT_COMPLIANT": 0, "WARNING": 1}
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 1,
+  "audit_internal_action_count": 0
 }
 ```
 
-### 2. List files to check quality metrics
+### 2. List the analysis files for an experiment
 ```
 encode_list_files(experiment_accession="ENCSR000AKA", file_format="bed", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (a JSON array of files; fields abridged):
 ```json
-{
-  "files": [
-    {"accession": "ENCFF001ABC", "output_type": "IDR thresholded peaks", "file_size_mb": 1.1}
-  ]
-}
+[
+  {"accession": "ENCFF001ABC", "output_type": "IDR thresholded peaks", "file_format": "bed", "file_type": "bed narrowPeak", "assembly": "GRCh38", "file_size": 1153434, "file_size_human": "1.1 MB", "preferred_default": true}
+]
 ```
 
-### 3. Get detailed file info for QC
+### 3. Get detailed file info
 ```
 encode_get_file_info(accession="ENCFF001ABC")
 ```
 
-Expected output:
+Expected output (no QC metrics here — `FileSummary` has no FRiP/NSC/RSC fields; get those from the file's page on encodeproject.org):
 ```json
 {
   "accession": "ENCFF001ABC",
-  "file_format": "bed narrowPeak",
+  "file_format": "bed",
+  "file_type": "bed narrowPeak",
   "output_type": "IDR thresholded peaks",
+  "output_category": "annotation",
   "assembly": "GRCh38",
-  "quality_metrics": {"frip": 0.032, "nsc": 1.12, "rsc": 0.95}
+  "file_size": 1153434,
+  "file_size_human": "1.1 MB",
+  "biological_replicates": [1, 2],
+  "status": "released",
+  "md5sum": "5d41402abc4b2a76b9719d911017c592",
+  "experiment_accession": "ENCSR000AKA",
+  "preferred_default": true
 }
 ```
 

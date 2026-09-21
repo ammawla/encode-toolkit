@@ -7,7 +7,7 @@ Juicer tools.
 ## HiCCUPS Loop Calling
 
 ```bash
-java -Xmx16g -jar juicer_tools.jar hiccups \
+java -Xmx13g -jar juicer_tools.jar hiccups \
     --cpu \
     --threads 4 \
     -k KR \
@@ -20,22 +20,31 @@ java -Xmx16g -jar juicer_tools.jar hiccups \
     loops_output/
 ```
 
-This is the command `main.nf` runs. `--cpu` is required with the container
-image, which has no CUDA runtime; drop it only with `--hiccups_gpu` on a host
-with an NVIDIA GPU. CPU mode restricts the search to a band along the
-diagonal (8 Mb by default), so very long-range loops are not reported.
+This is the command `main.nf` runs with the default `--hiccups_resolutions`
+(`5000,10000,25000`). The heap is 85% of the task's memory allocation, so it is
+13 GB on the first attempt of the 16 GB request in `nextflow.config` and grows
+with each retry, rather than being a fixed number. `--cpu` is
+required with the container image, which has no CUDA runtime; drop it only with
+`--hiccups_gpu` on a host with an NVIDIA GPU. CPU mode restricts the search to a
+band along the diagonal (8 Mb by default), so very long-range loops are not
+reported.
 
 ### Key Parameters
+
+`-r`, `-f`, `-p`, `-i` and `-d` take one value per resolution, in the order given to
+`--hiccups_resolutions`; the peak widths, window widths and merge radii are Juicer's
+published defaults for 5 kb, 10 kb and 25 kb. With `--hiccups_resolutions 10000` the
+workflow runs `-r 10000 -f 0.1 -p 2 -i 5 -d 20000`.
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
 | `--cpu` | flag | CPU mode; needed without a CUDA runtime, searches 8 Mb from the diagonal |
 | `-k` | KR | Normalization vector to read from the .hic file |
-| `-r` | 5000,10000,25000 | Resolutions to search for loops |
+| `-r` | 5000,10000,25000 | Resolutions to search for loops (`--hiccups_resolutions`) |
 | `-f` | 0.1,0.1,0.1 | FDR threshold per resolution |
 | `-p` | 4,2,1 | Peak width (pixels) per resolution |
-| `-i` | 7,5,3 | Window width for local background per resolution |
-| `-d` | 20000,20000,50000 | Distance within which nearby enriched pixels are merged into one loop centroid |
+| `-i` | 7,5,3 | Window width (pixels) of the local background region per resolution |
+| `-d` | 20000,20000,50000 | Merge radius (bp) around a loop centroid per resolution: 20 kb at 5 kb and 10 kb, 50 kb at 25 kb. juicer_tools 2.20.00 reads one value per `-r` resolution (`HiCCUPSConfiguration.extractIntegerValues(..., resolutions.length)`); its usage text still says "three values", but a list of any other length (except a single value, which is applied to every resolution) stops HiCCUPS with "Must pass N parameters" and exit code 30 |
 
 `juicer_tools pre` must have written the `-k` vector into the .hic file:
 `main.nf` builds KR, VC and VC_SQRT.
@@ -50,18 +59,26 @@ diagonal (8 Mb by default), so very long-range loops are not reported.
 
 ## HiCCUPS Output Format
 
-HiCCUPS produces a BEDPE-like file with loop anchors:
+HiCCUPS produces a BEDPE-like file with loop anchors. juicer_tools 2.20.00
+writes the BEDPE core columns first, then the loop attributes in alphabetical
+order, on a header line that starts with `#`:
 
 ```
-chr1  start1  end1  chr2  start2  end2  color  observed  expected_BL  expected_donut  expected_H  expected_V  FDR_BL  FDR_donut  FDR_H  FDR_V
+#chr1  x1  x2  chr2  y1  y2  name  score  strand1  strand2  color  centroid1  centroid2  expectedBL  expectedDonut  expectedH  expectedV  fdrBL  fdrDonut  fdrH  fdrV  numCollapsed  observed  radius
 ```
 
-Key columns:
-- `chr1:start1-end1` -- Upstream anchor
-- `chr2:start2-end2` -- Downstream anchor
-- `observed` -- Observed contact count
-- `expected_donut` -- Expected count from donut background model
-- `FDR_donut` -- FDR from donut model (primary significance)
+Key columns (1-based, in that order):
+- `chr1 x1 x2` (1-3) -- Upstream anchor
+- `chr2 y1 y2` (4-6) -- Downstream anchor
+- `centroid1`, `centroid2` (12-13) -- Centroid of the merged pixel cluster on each side
+- `expectedDonut` (15) -- Expected count from the donut background model
+- `fdrDonut` (19) -- FDR from the donut model (primary significance)
+- `numCollapsed` (22) -- Enriched pixels merged into this call
+- `observed` (23) -- Observed contact count
+- `radius` (24) -- Radius of the merged cluster
+
+The header line is the only `#` line; skip it before any arithmetic on the
+file.
 
 ## Merge Loops Across Resolutions
 
@@ -110,17 +127,19 @@ HiCCUPS writes two files per resolution: `enriched_pixels_<res>.bedpe`
 calls that go into `merged_loops.bedpe`). Count the post-filter file:
 
 ```bash
+# One file per resolution in --hiccups_resolutions (default: 5000 10000 25000)
 for res in 5000 10000 25000; do
-    count=$(wc -l < loops_output/postprocessed_pixels_${res}.bedpe)
+    count=$(grep -vc '^#' loops_output/postprocessed_pixels_${res}.bedpe)
     echo "Resolution ${res}: ${count} loops"
 done
 ```
 
 These per-resolution files are not published by the workflow; they remain in
-the task's work directory. From a finished run, count the merged file instead:
+the task's work directory. From a finished run, count the merged file instead,
+excluding its header line:
 
 ```bash
-wc -l < results/loops/sample.hiccups_loops.bedpe
+grep -vc '^#' results/loops/sample.hiccups_loops.bedpe
 ```
 
 Expected loop counts (human cell line, >1B contacts):
@@ -131,7 +150,8 @@ Expected loop counts (human cell line, >1B contacts):
 ### Loop Size Distribution
 
 ```bash
-awk '{print $5 - $2}' results/loops/sample.hiccups_loops.bedpe | \
+# Loop size = y1 - x1, i.e. column 5 minus column 2; skip the header line
+awk '!/^#/ {print $5 - $2}' results/loops/sample.hiccups_loops.bedpe | \
     sort -n | \
     awk '{a[NR]=$1} END {
         print "Median loop size:", a[int(NR/2)];

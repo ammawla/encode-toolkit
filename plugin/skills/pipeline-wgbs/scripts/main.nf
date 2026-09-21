@@ -19,7 +19,7 @@ process FASTQC_RAW {
     tag "${sample_id}"
     publishDir "${params.outdir}/fastqc", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -37,7 +37,7 @@ process TRIM_GALORE {
     tag "${sample_id}"
     publishDir "${params.outdir}/trim_galore", mode: 'copy'
     cpus 4
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -66,7 +66,7 @@ process BISMARK_ALIGN {
     tag "${sample_id}"
     publishDir "${params.outdir}/bismark/alignments", mode: 'copy', pattern: '*_report.txt'
     cpus 8
-    memory '48 GB'
+    memory { 48.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -97,7 +97,7 @@ process DEDUPLICATE {
     tag "${sample_id}"
     publishDir "${params.outdir}/bismark/dedup_reports", mode: 'copy', pattern: '*.txt'
     cpus 2
-    memory '16 GB'
+    memory { 16.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam)
@@ -119,7 +119,7 @@ process SAMTOOLS_SORT_INDEX {
     tag "${sample_id}"
     publishDir "${params.outdir}/bismark/alignments", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam)
@@ -138,7 +138,7 @@ process METHYLDACKEL_MBIAS {
     tag "${sample_id}"
     publishDir "${params.outdir}/bismark/mbias", mode: 'copy'
     cpus 2
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -163,7 +163,7 @@ process METHYLDACKEL_EXTRACT {
     tag "${sample_id}"
     publishDir "${params.outdir}/bismark/methylation", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -212,7 +212,7 @@ process COVERAGE_STATS {
     tag "${sample_id}"
     publishDir "${params.outdir}/coverage", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bedgraph)
@@ -222,16 +222,18 @@ process COVERAGE_STATS {
 
     script:
     """
-    awk '!/^track/ {
+    awk -v min_cov=${params.min_coverage} '!/^track/ {
         cov = \$5 + \$6; sum += cov; n++;
-        if (cov >= 5)  c5++;
-        if (cov >= 10) c10++
+        if (cov >= 5)       c5++;
+        if (cov >= 10)      c10++;
+        if (cov >= min_cov) cmin++
     } END {
         if (n == 0) { print "Covered CpGs: 0"; exit }
         printf "Covered CpGs (>=1x): %d\\n", n;
         printf "Mean coverage of covered CpGs: %.1f\\n", sum/n;
         printf "Covered CpGs >=5x: %d (%.1f%%)\\n", c5, c5/n*100;
-        printf "Covered CpGs >=10x: %d (%.1f%%)\\n", c10, c10/n*100
+        printf "Covered CpGs >=10x: %d (%.1f%%)\\n", c10, c10/n*100;
+        printf "Covered CpGs >=%dx (--min_coverage, kept in bedMethyl): %d (%.1f%%)\\n", min_cov, cmin, cmin/n*100
     }' ${sample_id}_CpG.bedGraph > ${sample_id}.coverage_stats.txt
     """
 }
@@ -239,7 +241,7 @@ process COVERAGE_STATS {
 process MULTIQC {
     publishDir "${params.outdir}/multiqc", mode: 'copy'
     cpus 1
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     path('*')

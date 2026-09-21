@@ -26,7 +26,7 @@ process FASTQC_RAW {
     tag "${sample_id}"
     publishDir "${params.outdir}/fastqc", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -44,7 +44,7 @@ process TRIM_GALORE {
     tag "${sample_id}"
     publishDir "${params.outdir}/trim_galore", mode: 'copy'
     cpus 4
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -71,7 +71,7 @@ process TRIM_GALORE {
 process BOWTIE2_ALIGN {
     tag "${sample_id}"
     cpus 8
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(reads)
@@ -108,7 +108,7 @@ process SPIKEIN_ALIGN {
     tag "${sample_id}"
     publishDir "${params.outdir}/spikein", mode: 'copy'
     cpus 4
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -145,7 +145,7 @@ process FILTER_DEDUP {
     tag "${sample_id}"
     publishDir "${params.outdir}/alignment", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -185,7 +185,7 @@ process FILTER_DEDUP {
 process COMPUTE_SCALE_FACTOR {
     publishDir "${params.outdir}/spikein", mode: 'copy'
     cpus 1
-    memory '1 GB'
+    memory { 1.GB * task.attempt }
 
     input:
     path(counts)
@@ -213,7 +213,7 @@ process FRAGMENT_BEDGRAPH {
     publishDir "${params.outdir}/signal", mode: 'copy', pattern: '*.fragments.bed',
         saveAs: { name -> sample_id == '__control__' ? null : name }
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam)
@@ -245,7 +245,7 @@ process SEACR_PEAKS {
     tag "${sample_id}"
     publishDir "${params.outdir}/peaks", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bedgraph)
@@ -272,7 +272,7 @@ process MACS2_PEAKS {
     tag "${sample_id}"
     publishDir "${params.outdir}/peaks", mode: 'copy'
     cpus 2
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -301,7 +301,7 @@ process SIGNAL_TRACK {
     tag "${sample_id}"
     publishDir "${params.outdir}/signal", mode: 'copy'
     cpus 4
-    memory '8 GB'
+    memory { 8.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai), val(scale_factor)
@@ -329,7 +329,7 @@ process FRAGMENT_SIZES {
     tag "${sample_id}"
     publishDir "${params.outdir}/qc", mode: 'copy'
     cpus 1
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     tuple val(sample_id), path(bam), path(bai)
@@ -346,10 +346,45 @@ process FRAGMENT_SIZES {
     """
 }
 
+process FRIP {
+    tag "$sample_id"
+    publishDir "${params.outdir}/qc", mode: 'copy'
+    cpus 2
+    memory { 4.GB * task.attempt }
+
+    input:
+    tuple val(sample_id), path(bam), path(bai), path(peaks)
+
+    output:
+    path("${sample_id}.frip_mqc.tsv"), emit: frip
+
+    script:
+    // Fraction of reads in peaks: alignments of the final BAM that overlap a called peak,
+    // over all alignments of that BAM. One row per peak file, in a table MultiQC picks up.
+    """
+    total=\$(samtools view -c ${bam})
+    {
+        echo "# id: 'frip'"
+        echo "# section_name: 'Fraction of reads in peaks'"
+        echo "# description: 'Alignments of the final BAM that overlap a called peak, over all alignments of that BAM.'"
+        echo "# plot_type: 'table'"
+        echo "# pconfig:"
+        echo "#     id: 'frip_table'"
+        echo "#     namespace: 'FRiP'"
+        printf 'Peak set\\tFRiP\\treads_in_peaks\\ttotal_reads\\n'
+        for peak_file in ${peaks}; do
+            in_peaks=\$(bedtools intersect -u -a ${bam} -b "\$peak_file" | samtools view -c -)
+            frip=\$(awk -v a="\$in_peaks" -v b="\$total" 'BEGIN { printf "%.4f", (b > 0) ? a / b : 0 }')
+            printf '%s\\t%s\\t%s\\t%s\\n' "\$peak_file" "\$frip" "\$in_peaks" "\$total"
+        done
+    } > ${sample_id}.frip_mqc.tsv
+    """
+}
+
 process MULTIQC {
     publishDir "${params.outdir}/multiqc", mode: 'copy'
     cpus 1
-    memory '4 GB'
+    memory { 4.GB * task.attempt }
 
     input:
     path('*')
@@ -453,12 +488,20 @@ workflow {
     SIGNAL_TRACK(ch_signal_in)
     FRAGMENT_SIZES(FILTER_DEDUP.out.bam)
 
+    // FRiP for every peak set that was called for a sample (SEACR modes and/or MACS2)
+    ch_sample_peaks = (use_seacr ? SEACR_PEAKS.out.peaks : channel.empty())
+        .mix(use_macs2 ? MACS2_PEAKS.out.peaks : channel.empty())
+        .groupTuple()
+        .map { sample_id, peak_sets -> [sample_id, peak_sets.flatten()] }
+    FRIP(FILTER_DEDUP.out.bam.join(ch_sample_peaks))
+
     ch_multiqc = FASTQC_RAW.out.reports
         .mix(TRIM_GALORE.out.reports)
         .mix(TRIM_GALORE.out.fastqc)
         .mix(BOWTIE2_ALIGN.out.log)
         .mix(FILTER_DEDUP.out.flagstat)
         .mix(FILTER_DEDUP.out.dup_metrics)
+        .mix(FRIP.out.frip)
         .collect()
 
     MULTIQC(ch_multiqc)

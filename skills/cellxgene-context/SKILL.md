@@ -294,10 +294,14 @@ encode_search_experiments(assay_title="ATAC-seq", organ="lung", organism="Homo s
 Expected output:
 ```json
 {
-  "total": 14,
   "results": [
-    {"accession": "ENCSR500LNG", "assay_title": "ATAC-seq", "biosample_summary": "lung", "status": "released"}
-  ]
+    {"accession": "ENCSR500LNG", "assay_title": "ATAC-seq", "biosample_summary": "lung", "organ": "lung", "status": "released"}
+  ],
+  "total": 14,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -343,14 +347,18 @@ encode_search_experiments(assay_title="snATAC-seq", organ="lung", organism="Homo
 Expected output:
 ```json
 {
-  "total": 4,
   "results": [
-    {"accession": "ENCSR600SCA", "assay_title": "scATAC-seq", "biosample_summary": "lung", "status": "released"}
-  ]
+    {"accession": "ENCSR600SCA", "assay_title": "snATAC-seq", "biosample_summary": "lung", "organ": "lung", "status": "released"}
+  ],
+  "total": 4,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
-**Interpretation**: 4 scATAC-seq experiments available in lung. Compare cell-type accessibility profiles from scATAC-seq with the bulk ATAC-seq to validate deconvolution estimates.
+**Interpretation**: 4 snATAC-seq experiments available in lung. Compare cell-type accessibility profiles from snATAC-seq with the bulk ATAC-seq to validate deconvolution estimates.
 
 ### Integration with downstream skills
 - Cell-type composition informs **compare-biosamples** interpretation of tissue differences
@@ -368,10 +376,14 @@ encode_search_experiments(assay_title="scRNA-seq", organ="brain", organism="Homo
 Expected output:
 ```json
 {
-  "total": 22,
   "results": [
-    {"accession": "ENCSR700SCR", "assay_title": "scRNA-seq", "biosample_summary": "brain", "status": "released"}
-  ]
+    {"accession": "ENCSR700SCR", "assay_title": "scRNA-seq", "biosample_summary": "brain", "organ": "brain", "status": "released"}
+  ],
+  "total": 22,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -383,9 +395,11 @@ encode_get_facets(assay_title="scRNA-seq", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "organ": {"brain": 22, "blood": 15, "lung": 8, "heart": 6, "liver": 4}
-  }
+  "biosample_ontology.organ_slims": [
+    {"term": "brain", "count": 22},
+    {"term": "blood", "count": 15},
+    {"term": "lung", "count": 8}
+  ]
 }
 ```
 
@@ -397,13 +411,26 @@ encode_compare_experiments(accession1="ENCSR500LNG", accession2="ENCSR600SCA")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"organ": "lung", "organism": "Homo sapiens"},
-    "differences": {
-      "assay": ["ATAC-seq", "scATAC-seq"],
-      "biosample": ["lung", "lung"]
-    }
-  }
+  "experiment_1": {
+    "accession": "ENCSR500LNG",
+    "assay": "ATAC-seq",
+    "biosample": "lung"
+  },
+  "experiment_2": {
+    "accession": "ENCSR600SCA",
+    "assay": "snATAC-seq",
+    "biosample": "lung"
+  },
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same organ: lung"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different assay types: ATAC-seq vs snATAC-seq. Multi-omic integration may be needed."
+  ]
 }
 ```
 

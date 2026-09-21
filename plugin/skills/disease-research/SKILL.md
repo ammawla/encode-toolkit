@@ -315,9 +315,14 @@ encode_get_facets(organ="brain", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "assay_title": {"Histone ChIP-seq": 120, "TF ChIP-seq": 45, "ATAC-seq": 32, "RNA-seq": 28, "DNase-seq": 22, "Hi-C": 8}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 120},
+    {"term": "TF ChIP-seq", "count": 45},
+    {"term": "ATAC-seq", "count": 32},
+    {"term": "RNA-seq", "count": 28},
+    {"term": "DNase-seq", "count": 22},
+    {"term": "Hi-C", "count": 8}
+  ]
 }
 ```
 
@@ -332,11 +337,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", organ="brain", target=
 Expected output:
 ```json
 {
-  "total": 24,
   "results": [
-    {"accession": "ENCSR100BRN", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "brain"},
-    {"accession": "ENCSR101CTX", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "frontal cortex"}
-  ]
+    {"accession": "ENCSR100BRN", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "brain tissue male adult (54 years)"}
+  ],
+  "total": 24,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -392,9 +400,12 @@ encode_get_facets(organ="brain", organism="Homo sapiens")
 Expected output:
 ```json
 {
-  "facets": {
-    "assay_title": {"Histone ChIP-seq": 120, "ATAC-seq": 32, "RNA-seq": 28, "Hi-C": 8}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 120},
+    {"term": "ATAC-seq", "count": 32},
+    {"term": "RNA-seq", "count": 28},
+    {"term": "Hi-C", "count": 8}
+  ]
 }
 ```
 
@@ -406,10 +417,14 @@ encode_search_experiments(assay_title="ATAC-seq", biosample_term_name="microglia
 Expected output:
 ```json
 {
-  "total": 4,
   "results": [
     {"accession": "ENCSR200MIC", "assay_title": "ATAC-seq", "biosample_summary": "microglia", "status": "released"}
-  ]
+  ],
+  "total": 4,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -421,9 +436,20 @@ encode_get_citations(accession="ENCSR100BRN")
 Expected output:
 ```json
 {
-  "citations": [
-    {"pmid": "31234567", "title": "Brain enhancer atlas reveals Alzheimer regulatory mechanisms", "year": 2023}
-  ]
+  "publications": [
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR100BRN",
+      "pmid": "31234567",
+      "doi": "10.1038/s41586-023-06345-2",
+      "title": "Brain enhancer atlas reveals Alzheimer regulatory mechanisms",
+      "authors": "Li YE, Preissl S, Hou X",
+      "journal": "Nature",
+      "year": "2023",
+      "abstract": ""
+    }
+  ],
+  "count": 1
 }
 ```
 

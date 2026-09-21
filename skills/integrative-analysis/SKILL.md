@@ -479,10 +479,17 @@ Different data types require different normalization. Using the wrong normalizat
 encode_get_facets(organ="brain", assay_title="Histone ChIP-seq", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (top-level keys are ENCODE facet field names):
 ```json
 {
-  "facets": {"target.label": {"H3K27ac": 24, "H3K4me3": 20, "H3K27me3": 18, "H3K4me1": 15, "H3K36me3": 12, "H3K9me3": 8}}
+  "target.label": [
+    {"term": "H3K27ac", "count": 24},
+    {"term": "H3K4me3", "count": 20},
+    {"term": "H3K27me3", "count": 18},
+    {"term": "H3K4me1", "count": 15},
+    {"term": "H3K36me3", "count": 12},
+    {"term": "H3K9me3", "count": 8}
+  ]
 }
 ```
 
@@ -523,10 +530,14 @@ encode_search_experiments(assay_title="Histone ChIP-seq", biosample_term_name="G
 Expected output (one entry per experiment; tally the `target` values to see which marks are covered):
 ```json
 {
-  "total": 12,
   "results": [
     {"accession": "ENCSR000AKC", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "GM12878"}
-  ]
+  ],
+  "total": 12,
+  "limit": 100,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -535,13 +546,17 @@ Expected output (one entry per experiment; tally the `target` values to see whic
 encode_search_files(file_format="bigWig", output_type="fold change over control", assay_title="Histone ChIP-seq", search_term="GM12878", assembly="GRCh38")
 ```
 
-Expected output:
+Expected output (files carry no `target`; group them by `experiment_accession` and look the mark up on the experiment):
 ```json
 {
-  "total": 15,
   "results": [
-    {"accession": "ENCFF100BW", "file_format": "bigWig", "target": "H3K27ac", "file_size_mb": 45}
-  ]
+    {"accession": "ENCFF100BW", "file_format": "bigWig", "output_type": "fold change over control", "assembly": "GRCh38", "file_size": 47185920, "file_size_human": "45.0 MB", "experiment_accession": "ENCSR000AKC", "experiment_assay": "Histone ChIP-seq", "biosample_summary": "GM12878"}
+  ],
+  "total": 15,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -550,9 +565,19 @@ Expected output:
 encode_track_experiment(accession="ENCSR000AKA", notes="GM12878 H3K27ac for ChromHMM integrative analysis")
 ```
 
-Expected output:
+Expected output (`notes` is stored, not echoed — read it back with `encode_list_tracked`):
 ```json
-{"status": "tracked", "accession": "ENCSR000AKA", "notes": "GM12878 H3K27ac for ChromHMM integrative analysis"}
+{
+  "tracking": {"accession": "ENCSR000AKA", "action": "tracked"},
+  "publications_found": 1,
+  "publications": [
+    {"pmid": "32728249", "doi": "10.1038/s41586-020-2493-4", "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes", "authors": "Abascal F, Acosta R, Addleman NJ", "journal": "Nature", "year": "2020", "abstract": ""}
+  ],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "Histone ChIP-seq 2 (unreplicated)", "version": "1.7.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
+}
 ```
 
 ## Related Skills

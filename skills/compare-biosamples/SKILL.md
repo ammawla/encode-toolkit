@@ -203,11 +203,11 @@ Batch effects are the most common confounder in cross-biosample comparisons. Whe
 | Source | Impact | Detection Method |
 |--------|--------|-----------------|
 | **Lab of origin** | High -- different protocols, antibodies, cell handling | Check `lab` field; PCA of signal should not cluster by lab |
-| **Sequencing platform** | Moderate -- read quality, GC bias | Check `platform` in file metadata |
-| **Library preparation date** | Moderate -- reagent lots, operator variation | Check experiment date_released |
-| **Antibody lot** | High for ChIP-seq -- different enrichment profiles | Check antibody_lot_reviews in experiment metadata |
-| **Pipeline version** | Low-moderate -- different peak calling parameters | Check analysis pipeline version |
-| **Read length** | Low-moderate -- affects mappability | Check read_length in file metadata |
+| **Sequencing platform** | Moderate -- read quality, GC bias | Not in any `encode_*` output; read `platform` from the file's page on encodeproject.org |
+| **Library preparation date** | Moderate -- reagent lots, operator variation | Check the experiment's `date_released` field |
+| **Antibody lot** | High for ChIP-seq -- different enrichment profiles | Not in any `encode_*` output; read the antibody lot reviews on the experiment's ENCODE page |
+| **Pipeline version** | Low-moderate -- different peak calling parameters | Check `pipelines[].version` returned by `encode_track_experiment` |
+| **Read length** | Low-moderate -- affects mappability | Not in any `encode_*` output; read `read_length` from the file's page on encodeproject.org |
 
 ### How to Detect Batch Effects
 
@@ -376,14 +376,18 @@ encode_link_reference(
 encode_search_experiments(assay_title="Histone ChIP-seq", organ="liver", target="H3K27ac", organism="Homo sapiens")
 ```
 
-Expected output:
+Expected output (fields abridged):
 ```json
 {
-  "total": 8,
   "results": [
-    {"accession": "ENCSR100LIV", "biosample_summary": "liver", "target": "H3K27ac"},
-    {"accession": "ENCSR200HEP", "biosample_summary": "HepG2", "target": "H3K27ac"}
-  ]
+    {"accession": "ENCSR100LIV", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "liver tissue male adult (54 years)", "biosample_type": "tissue", "assembly": ["GRCh38"]},
+    {"accession": "ENCSR200HEP", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "HepG2", "biosample_type": "cell line", "assembly": ["GRCh38"]}
+  ],
+  "total": 8,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -393,18 +397,27 @@ Expected output:
 encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HEP")
 ```
 
-Expected output:
+Expected output (both experiments must be tracked first, or the tool returns `{"error": "..."}`):
 ```json
 {
-  "comparison": {
-    "shared": {"assay": "Histone ChIP-seq", "target": "H3K27ac", "organism": "Homo sapiens"},
-    "differences": {
-      "biosample": ["liver", "HepG2"],
-      "biosample_type": ["tissue", "cell line"]
-    }
-  }
+  "experiment_1": {"accession": "ENCSR100LIV", "assay": "Histone ChIP-seq", "biosample": "liver tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR200HEP", "assay": "Histone ChIP-seq", "biosample": "HepG2"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Histone ChIP-seq",
+    "Same target: H3K27ac"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different biosample types: tissue vs cell line. Results may reflect sample type differences."
+  ]
 }
 ```
+
+Matching metadata lands in `compatible_aspects`; differences are split between `issues` (blocking) and `warnings` (non-blocking), both as prose strings.
 
 ### Step 3: Download peak files for both
 
@@ -438,10 +451,13 @@ encode_compare_experiments(accession1="ENCSR100LIV", accession2="ENCSR200HEP")
 Expected output:
 ```json
 {
-  "comparison": {
-    "shared": {"assay": "Histone ChIP-seq", "target": "H3K27ac"},
-    "differences": {"biosample": ["liver", "HepG2"]}
-  }
+  "experiment_1": {"accession": "ENCSR100LIV", "assay": "Histone ChIP-seq", "biosample": "liver tissue male adult (54 years)"},
+  "experiment_2": {"accession": "ENCSR200HEP", "assay": "Histone ChIP-seq", "biosample": "HepG2"},
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": ["Same assay: Histone ChIP-seq", "Same target: H3K27ac"],
+  "issues": [],
+  "warnings": ["Different biosample types: tissue vs cell line. Results may reflect sample type differences."]
 }
 ```
 
@@ -450,12 +466,17 @@ Expected output:
 encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K27ac", organism="Homo sapiens", limit=100)
 ```
 
-Expected output:
+Expected output (one entry per experiment; tally the `biosample_summary` / `biosample_type` values to see which biosamples are covered, or call `encode_get_facets` for the counts directly):
 ```json
 {
-  "facets": {
-    "biosample_ontology.term_name": {"K562": 8, "GM12878": 7, "HepG2": 5, "liver": 4, "brain": 3}
-  }
+  "results": [
+    {"accession": "ENCSR000AKA", "assay_title": "Histone ChIP-seq", "target": "H3K27ac", "biosample_summary": "K562", "biosample_type": "cell line"}
+  ],
+  "total": 142,
+  "limit": 100,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 100
 }
 ```
 
@@ -464,9 +485,19 @@ Expected output:
 encode_track_experiment(accession="ENCSR100LIV", notes="Liver H3K27ac - normal tissue control for HepG2 comparison")
 ```
 
-Expected output:
+Expected output (`notes` is stored, not echoed — read it back with `encode_list_tracked`):
 ```json
-{"status": "tracked", "accession": "ENCSR100LIV", "notes": "Liver H3K27ac - normal tissue control for HepG2 comparison"}
+{
+  "tracking": {"accession": "ENCSR100LIV", "action": "tracked"},
+  "publications_found": 1,
+  "publications": [
+    {"pmid": "32728249", "doi": "10.1038/s41586-020-2493-4", "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes", "authors": "Abascal F, Acosta R, Addleman NJ", "journal": "Nature", "year": "2020", "abstract": ""}
+  ],
+  "pipelines_found": 1,
+  "pipelines": [
+    {"title": "Histone ChIP-seq 2 (unreplicated)", "version": "1.7.1", "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}
+  ]
+}
 ```
 
 ## Integration
