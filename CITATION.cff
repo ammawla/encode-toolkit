@@ -8,7 +8,7 @@ authors:
     given-names: Alex M.
     orcid: "https://orcid.org/0000-0003-0907-464X"
     affiliation: "Independent Researcher"
-version: 0.3.3
+version: 0.3.4
 date-released: "2026-09-20"
 license: AGPL-3.0-only
 repository-code: "https://github.com/ammawla/encode-toolkit"
