@@ -19,7 +19,7 @@ Help the user find ENCODE experiments and files. Use the appropriate tools based
 ## Search Strategy
 
 1. **Finding experiments**: Use `encode_search_experiments` with filters:
-   - `assay_title`: "Histone ChIP-seq", "ATAC-seq", "RNA-seq", "TF ChIP-seq", "Hi-C", "CUT&RUN", "WGBS", etc.
+   - `assay_title`: "Histone ChIP-seq", "ATAC-seq", "total RNA-seq", "polyA plus RNA-seq", "TF ChIP-seq", "Hi-C", "CUT&RUN", "WGBS", etc.
    - `organ`: "pancreas", "brain", "liver", "heart", "kidney", "lung", etc.
    - `biosample_type`: "tissue", "cell line", "primary cell", "organoid"
    - `biosample_term_name`: specific name like "GM12878", "HepG2", "K562"

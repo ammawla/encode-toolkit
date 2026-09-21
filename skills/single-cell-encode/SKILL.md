@@ -94,7 +94,7 @@ encode_list_files(
 Typical file hierarchy:
 - **FASTQ** (`output_type="reads"`): Raw sequencing reads with cell barcodes and UMIs
 - **Gene quantifications** (`output_type="gene quantifications"`, format TSV): Count matrices (genes x cells) after ENCODE uniform pipeline processing
-- **Filtered counts** (`output_type="filtered feature barcode matrix"`): Post-QC cell-filtered matrices ready for analysis
+- **Filtered counts** (`output_type="sparse gene count matrix of unique reads"`, format tar): Cell-filtered sparse matrices ready for analysis; the `unfiltered sparse gene count matrix of unique reads` keeps every barcode
 - **h5ad**: AnnData format when available (convenient for Scanpy workflows)
 
 ### scATAC-seq Files

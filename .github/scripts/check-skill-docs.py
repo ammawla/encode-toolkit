@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Keep the skill documentation honest about the code it describes.
 
-1. Every ``encode_*`` tool call shown in a skill must name a real MCP tool and use only
-   keyword arguments that the tool accepts (read from the server source with ``ast``).
+1. Every ``encode_*`` tool call shown in a skill must name a real MCP tool, pass every required
+   argument, and use only keyword arguments and values that the tool accepts: ``Literal``
+   choices, and for filters such as ``assay_title`` the server's catalog of ENCODE values
+   (all read from the source with ``ast``).
 2. Every ``nextflow run`` example in a pipeline skill must use only parameters that the
    pipeline declares and only profiles that its nextflow.config defines.
 3. A JSON example that directly follows a tool call is that tool's output, so every field name
@@ -19,6 +21,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / "skills"
 SERVER = ROOT / "src" / "encode_connector" / "server" / "main.py"
+CONSTANTS = ROOT / "src" / "encode_connector" / "client" / "constants.py"
+# tool parameter -> the list in constants.py that holds the values ENCODE uses for it
+CATALOGS = {
+    "assay_title": "ASSAY_TITLES",
+    "organism": "ORGANISMS",
+    "organ": "ORGAN_SLIMS",
+    "biosample_type": "BIOSAMPLE_CLASSIFICATIONS",
+    "file_format": "FILE_FORMATS",
+    "output_type": "OUTPUT_TYPES",
+    "output_category": "OUTPUT_CATEGORIES",
+    "assembly": "ASSEMBLIES",
+    "life_stage": "LIFE_STAGES",
+    "replication_type": "REPLICATION_TYPES",
+}
 
 CALL_RE = re.compile(r"\b(encode_[a-z_]+)\s*\(")
 KEYWORD_RE = re.compile(r"\s*([A-Za-z_]\w*)\s*=(?!=)")
@@ -44,14 +60,44 @@ def literal_values(annotation: ast.expr | None) -> set[str]:
     }
 
 
+def catalog_values() -> dict[str, set[str]]:
+    """Filter parameter -> the values the server lists for it in constants.py."""
+    lists = {
+        node.targets[0].id: {item.value for item in node.value.elts if isinstance(item, ast.Constant)}
+        for node in ast.parse(CONSTANTS.read_text()).body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List) and isinstance(node.targets[0], ast.Name)
+    }
+    return {parameter: lists[name] for parameter, name in CATALOGS.items()}
+
+
+def tool_functions() -> list[ast.AsyncFunctionDef | ast.FunctionDef]:
+    return [
+        node
+        for node in ast.walk(ast.parse(SERVER.read_text()))
+        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and node.name.startswith("encode_")
+    ]
+
+
 def tool_signatures() -> dict[str, dict[str, set[str]]]:
     """Tool name -> parameter name -> allowed string values (empty when the parameter is free-form)."""
-    tree = ast.parse(SERVER.read_text())
+    catalogs = catalog_values()
     return {
-        node.name: {arg.arg: literal_values(arg.annotation) for arg in node.args.args + node.args.kwonlyargs}
-        for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and node.name.startswith("encode_")
+        node.name: {
+            arg.arg: literal_values(arg.annotation) or catalogs.get(arg.arg, set())
+            for arg in node.args.args + node.args.kwonlyargs
+        }
+        for node in tool_functions()
     }
+
+
+def required_parameters() -> dict[str, set[str]]:
+    """Tool name -> parameters that have no default."""
+    required = {}
+    for node in tool_functions():
+        positional = node.args.args[: len(node.args.args) - len(node.args.defaults)]
+        keyword_only = [arg for arg, default in zip(node.args.kwonlyargs, node.args.kw_defaults) if default is None]
+        required[node.name] = {arg.arg for arg in positional + keyword_only}
+    return required
 
 
 def call_arguments(text: str, start: int) -> str | None:
@@ -99,7 +145,7 @@ def top_level_arguments(arguments: str) -> list[str]:
     return [*parts, current]
 
 
-def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
+def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[str, set[str]]) -> list[str]:
     problems = []
     for doc in sorted(SKILLS.rglob("*.md")):
         text = doc.read_text()
@@ -113,7 +159,13 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
             if tool not in signatures:
                 problems.append(f"{where}: unknown tool {tool}")
                 continue
-            for argument in top_level_arguments(arguments):
+            parts = [part for part in top_level_arguments(arguments) if part.strip()]
+            named = {match.group(1) for match in map(KEYWORD_RE.match, parts) if match}
+            # "encode_x(...)" and positional arguments say nothing about which parameters are set
+            if len(named) == len(parts) and required[tool] - named:
+                missing = ", ".join(sorted(required[tool] - named))
+                problems.append(f"{where}: {tool}() is called without its required {missing}")
+            for argument in parts:
                 keyword = KEYWORD_RE.match(argument)
                 if not keyword:
                     continue
@@ -125,9 +177,8 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
                 value = STRING_VALUE_RE.match(argument)
                 choices = signatures[tool][name]
                 if value and choices and value.group(2) not in choices and not PLACEHOLDER_RE.search(value.group(2)):
-                    problems.append(
-                        f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {", ".join(sorted(choices))})'
-                    )
+                    accepted = ", ".join(sorted(choices)) if len(choices) <= 8 else f"the values in {CATALOGS[name]}"
+                    problems.append(f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {accepted})')
     return problems
 
 
@@ -254,6 +305,11 @@ def example_keys(body: str):
 
 def check_output_examples(known: set[str]) -> list[str]:
     problems = []
+    catalogs = catalog_values()
+    catalog_value_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*"([^"]*)"')
+    # facet counts: "assay_title": [{"term": "total RNA-seq", "count": 12}, ...]
+    facet_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*\[(.*?)\]', re.S)
+    term_re = re.compile(r'"term"\s*:\s*"([^"]*)"')
     for doc in sorted(SKILLS.rglob("*.md")):
         text = doc.read_text()
         previous_tool, previous_end = None, 0
@@ -272,13 +328,20 @@ def check_output_examples(known: set[str]) -> list[str]:
                     if FIELD_NAME_RE.fullmatch(key) and key not in known:
                         where = f"{doc.relative_to(ROOT)}:{line}"
                         problems.append(f"{where}: {previous_tool}() output has no field '{key}'")
+                # a value shown for a filter field must be one ENCODE uses, so it can be searched for
+                shown = catalog_value_re.findall(body)
+                shown += [(field, term) for field, terms in facet_re.findall(body) for term in term_re.findall(terms)]
+                for field, value in shown:
+                    if value not in catalogs[field] and not PLACEHOLDER_RE.search(value):
+                        where = f"{doc.relative_to(ROOT)}:{line}"
+                        problems.append(f'{where}: "{field}": "{value}" is not a value in {CATALOGS[field]}')
             calls = CALL_RE.findall(body)
             previous_tool, previous_end = (calls[-1] if calls else None), block.end()
     return problems
 
 
 def main() -> int:
-    problems = check_tool_calls(tool_signatures()) + check_pipeline_examples()
+    problems = check_tool_calls(tool_signatures(), required_parameters()) + check_pipeline_examples()
     problems += check_output_examples(server_field_names())
     for problem in problems:
         print(problem)

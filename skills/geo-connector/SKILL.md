@@ -373,7 +373,7 @@ Expected output (each row also carries `linked_at`, a float epoch timestamp; row
 
 | This skill produces... | Feed into... | Using tool/skill |
 |---|---|---|
-| GEO accession (GSE/GSM) | Cross-reference link | encode_link_reference(reference_type="geo_accession") |
+| GEO accession (GSE/GSM) | Cross-reference link | encode_link_reference(experiment_accession="ENCSR...", reference_type="geo_accession", reference_id="GSE...") |
 | Supplementary expression data | Differential expression | integrative-analysis skill |
 | Complementary replicates from GEO | Expanded sample size | download-encode + batch-analysis |
 | SRA run accessions | Raw data download | bioinformatics-installer (sra-tools) |

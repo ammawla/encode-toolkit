@@ -401,7 +401,7 @@ Expected output:
 ```json
 {
   "accession": "ENCSR000CPR",
-  "assay_title": "RNA-seq",
+  "assay_title": "total RNA-seq",
   "biosample_summary": "K562",
   "assembly": ["GRCh38"],
   "bio_replicate_count": 2,

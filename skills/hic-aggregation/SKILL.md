@@ -109,10 +109,10 @@ encode_list_files(
     assembly="GRCh38"
 )
 
-# Also check for BED-formatted loop files
+# Or ask for loop calls by output type
 encode_list_files(
     experiment_accession="ENCSR...",
-    output_type="chromatin interactions",
+    output_type="loops",
     assembly="GRCh38"
 )
 
@@ -436,11 +436,11 @@ Expected output (a JSON array of file records; fields abridged):
 ```json
 [
   {"accession": "ENCFF001ABC", "output_type": "contact domains", "file_format": "bedpe", "file_size_human": "2.4 MB"},
-  {"accession": "ENCFF002DEF", "output_type": "chromatin interactions", "file_format": "bedpe", "file_size_human": "1.8 MB"}
+  {"accession": "ENCFF002DEF", "output_type": "loops", "file_format": "bedpe", "file_size_human": "1.8 MB"}
 ]
 ```
 
-**Interpretation**: Use "chromatin interactions" files for loop aggregation. Contact domains are TADs, not loops.
+**Interpretation**: Use "loops" files for loop aggregation. Contact domains are TADs, not loops.
 
 ### Step 3: Download loop files
 

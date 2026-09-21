@@ -90,6 +90,12 @@ preview hic "loop resolution missing from --resolutions is rejected" "must also 
     --resolutions 10000,50000 --hiccups_resolutions 5000,10000
 preview hic "unsupported loop resolution is rejected" "accepts 5000, 10000 and 25000 only" "${HIC[@]}" \
     --hiccups_resolutions 50000
+preview hic "a zero resolution is rejected" "must be a comma-separated list of positive integers" "${HIC[@]}" \
+    --resolutions 0
+preview hic "a negative resolution is rejected" "must be a comma-separated list of positive integers" "${HIC[@]}" \
+    --resolutions 1000,-5000
+preview hic "a non-numeric resolution is rejected" "must be a comma-separated list of positive integers" "${HIC[@]}" \
+    --resolutions 5000,10kb
 RNASEQ=(--reads "$READS" --star_index "$REF/star_index" --rsem_index "$REF/rsem/GRCh38")
 preview rnaseq "RSEM reference given as a prefix" pass "${RNASEQ[@]}"
 preview rnaseq "explicit kallisto index and RSeQC gene model, unstranded" pass "${RNASEQ[@]}" --strandedness none \

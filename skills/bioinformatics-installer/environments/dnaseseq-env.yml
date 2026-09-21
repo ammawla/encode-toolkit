@@ -7,11 +7,11 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.11
+  - python=3.10
   # Alignment
   - bwa=0.7.18
   # BAM processing
-  - samtools=1.19
+  - samtools==1.19
   - picard=3.1.1
   # Hotspot detection: Hotspot2 and its modwt dependency are not packaged for conda.
   # Build them from source (see pipeline-dnaseseq/scripts/Dockerfile) or use that image.
@@ -21,6 +21,7 @@ dependencies:
   # QC and trimming
   - fastqc=0.12.1
   - trim-galore=0.6.10
+  - cutadapt=4.6  # run by Trim Galore; pinned to the version in the image
   - multiqc=1.21
   # Signal format conversion
   - ucsc-bedgraphtobigwig

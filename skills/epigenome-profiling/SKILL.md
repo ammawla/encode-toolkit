@@ -478,7 +478,7 @@ Expected output (facet field names are the top-level keys):
 {
   "assay_title": [
     {"term": "Histone ChIP-seq", "count": 25},
-    {"term": "RNA-seq", "count": 12},
+    {"term": "total RNA-seq", "count": 12},
     {"term": "ATAC-seq", "count": 6}
   ]
 }

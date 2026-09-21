@@ -7,7 +7,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python=3.11
+  - python=3.10
   # Splice-aware alignment
   - star=2.7.11b
   # Transcript quantification
@@ -17,12 +17,13 @@ dependencies:
   # Gene-level counting
   - subread=2.0.6
   # BAM processing
-  - samtools=1.19
+  - samtools==1.19
   # RNA-seq QC
   - rseqc=5.0.3
   # QC and trimming
   - fastqc=0.12.1
   - trim-galore=0.6.10
+  - cutadapt=4.6  # run by Trim Galore; pinned to the version in the image
   - multiqc=1.21
   # Utilities
   - pigz
