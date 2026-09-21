@@ -1598,6 +1598,32 @@ class TestSearchFilesByOrganismPaginates:
         assert result["results"] == []
         assert "stopped after" in result["total_note"]
 
+    async def test_reading_every_experiment_is_not_reported_as_stopping_early(self):
+        # exactly as many experiments as the bound: all of them were read, nothing was cut off
+        from encode_connector.client.constants import MAX_EXPERIMENTS_SCANNED
+
+        client = EncodeClient()
+
+        async def mock_search_experiments(**kwargs):
+            remaining = max(0, MAX_EXPERIMENTS_SCANNED - kwargs["offset"])
+            summaries = []
+            for index in range(min(kwargs["limit"], remaining)):
+                summary = MagicMock()
+                summary.accession = f"ENCSR{kwargs['offset'] + index:06d}"
+                summaries.append(summary)
+            return {"results": summaries, "total": MAX_EXPERIMENTS_SCANNED}
+
+        async def mock_list_files(experiment_accession, **kwargs):
+            return []
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+
+        result = await client.search_files(organism="Mus musculus", file_format="hic")
+
+        assert result["results"] == []
+        assert "stopped after" not in result["total_note"]
+
     async def test_a_negative_offset_is_zero_with_an_organism_and_no_experiments(self):
         client = EncodeClient()
 

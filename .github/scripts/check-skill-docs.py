@@ -110,6 +110,11 @@ def required_parameters() -> dict[str, set[str]]:
     return required
 
 
+def positional_parameters() -> dict[str, list[str]]:
+    """Tool name -> its parameters in the order positional arguments fill them."""
+    return {node.name: [arg.arg for arg in node.args.args] for node in tool_functions()}
+
+
 def call_arguments(text: str, start: int) -> str | None:
     """Return the text between the parentheses that open at ``start - 1``, without # comments."""
     depth, quote, comment, arguments = 1, None, False, ""
@@ -157,6 +162,7 @@ def top_level_arguments(arguments: str) -> list[str]:
 
 def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[str, set[str]]) -> list[str]:
     problems = []
+    order = positional_parameters()
     for doc in sorted(SKILLS.rglob("*.md")):
         text = doc.read_text()
         for match in CALL_RE.finditer(text):
@@ -171,9 +177,13 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[
                 continue
             parts = [part for part in top_level_arguments(arguments) if part.strip()]
             named = {match.group(1) for match in map(KEYWORD_RE.match, parts) if match}
-            # "encode_x(...)" and positional arguments say nothing about which parameters are set
-            if len(named) == len(parts) and required[tool] - named:
-                missing = ", ".join(sorted(required[tool] - named))
+            unnamed = [part.strip() for part in parts if not KEYWORD_RE.match(part)]
+            # "encode_x(...)" and "**filters" say nothing about which parameters are set;
+            # a plain positional argument fills the next positional parameter
+            elided = any(part.startswith(("...", "*", "…")) for part in unnamed)
+            given = named | set(order[tool][: len(unnamed)])
+            if not elided and required[tool] - given:
+                missing = ", ".join(sorted(required[tool] - given))
                 problems.append(f"{where}: {tool}() is called without its required {missing}")
             for argument in parts:
                 keyword = KEYWORD_RE.match(argument)

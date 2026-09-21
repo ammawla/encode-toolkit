@@ -6,8 +6,9 @@ with ``skills/pipeline-<pipeline>/scripts/Dockerfile``:
 
 1. A tool the environment pins exactly must have that version in the Dockerfile, whenever the
    Dockerfile names a version of it (Java included: ``openjdk=17`` and ``openjdk-17-jre-headless``).
-2. A package the Dockerfile pins with pip (``cutadapt==4.6``) must be pinned exactly in the
-   environment too.
+2. A tool the Dockerfile pins must be pinned exactly in the environment too: pip pins
+   (``cutadapt==4.6``), and source or binary downloads (``samtools-1.19.tar.bz2``) of any tool
+   that some environment pins.
 3. A tool that both sides install but the environment does not pin exactly must be listed in
    ``NOT_COMPARED`` with the reason. Those are printed on every run, so nothing is skipped silently.
 
@@ -73,8 +74,12 @@ def environment_pins(text: str) -> dict[str, str | None]:
     return pins
 
 
-def compare(pipeline: str, environment: str, dockerfile: str) -> tuple[list[str], list[str], int]:
-    """Problems, tools deliberately not compared, and the number of versions compared."""
+def compare(pipeline: str, environment: str, dockerfile: str, tracked: set[str]) -> tuple[list[str], list[str], int]:
+    """Problems, tools deliberately not compared, and the number of versions compared.
+
+    ``tracked`` holds every tool that some environment pins: when this image names a version of
+    one, this environment has to pin it as well.
+    """
     problems, skipped, compared = [], [], 0
     pins = environment_pins(environment)
     image = instructions(dockerfile)
@@ -108,6 +113,13 @@ def compare(pipeline: str, environment: str, dockerfile: str) -> tuple[list[str]
                     f"pipeline-{pipeline}: {tool} is {', '.join(sorted(image_versions))} in the Dockerfile "
                     f"but {conda_version} in the environment"
                 )
+    for tool in sorted(tracked - set(pins)):
+        image_versions = dockerfile_versions(dockerfile, tool)
+        if image_versions and tool not in NOT_COMPARED:
+            problems.append(
+                f"pipeline-{pipeline}: the image installs {tool} {', '.join(sorted(image_versions))} "
+                "but the environment does not list it"
+            )
     for package, version in sorted(set(PIP_IN_IMAGE.findall(image))):
         if pins.get(package.lower()) is not None:
             continue  # compared above
@@ -120,11 +132,18 @@ def compare(pipeline: str, environment: str, dockerfile: str) -> tuple[list[str]
 
 def main() -> int:
     problems, skipped, compared = [], [], 0
-    for environment in sorted(ENVIRONMENTS.glob("*-env.yml")):
+    environments = sorted(ENVIRONMENTS.glob("*-env.yml"))
+    tracked = {
+        tool
+        for environment in environments
+        for tool, version in environment_pins(environment.read_text()).items()
+        if version is not None and tool not in ("python", "pip")
+    }
+    for environment in environments:
         pipeline = environment.name.removesuffix("-env.yml")
         dockerfile = SKILLS / f"pipeline-{pipeline}" / "scripts" / "Dockerfile"
         if dockerfile.exists():
-            found, not_compared, count = compare(pipeline, environment.read_text(), dockerfile.read_text())
+            found, not_compared, count = compare(pipeline, environment.read_text(), dockerfile.read_text(), tracked)
             problems += found
             skipped += not_compared
             compared += count

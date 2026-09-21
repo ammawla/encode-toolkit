@@ -452,6 +452,7 @@ class EncodeClient:
             wanted = offset + limit + 1
             all_files: list[FileSummary] = []
             experiment_offset = 0
+            experiment_total = 0
             while len(all_files) < wanted and experiment_offset < MAX_EXPERIMENTS_SCANNED:
                 exp_result = await self.search_experiments(
                     assay_title=assay_title,
@@ -465,6 +466,7 @@ class EncodeClient:
                     offset=experiment_offset,
                 )
                 experiments = exp_result["results"]
+                experiment_total = exp_result.get("total", 0)
                 for exp in experiments:
                     # one experiment can hold more files than a request returns
                     file_offset = 0
@@ -488,12 +490,12 @@ class EncodeClient:
                     if len(all_files) >= wanted:
                         break
                 experiment_offset += len(experiments)
-                if not experiments or experiment_offset >= exp_result.get("total", 0):
+                if not experiments or experiment_offset >= experiment_total:
                     break
 
             total_note = "Lower bound: files collected so far from matching experiments, not the full count"
-            if len(all_files) < wanted and experiment_offset >= MAX_EXPERIMENTS_SCANNED:
-                total_note += f"; stopped after reading {experiment_offset} experiments"
+            if len(all_files) < wanted and experiment_total > experiment_offset >= MAX_EXPERIMENTS_SCANNED:
+                total_note += f"; stopped after reading {experiment_offset} of {experiment_total} experiments"
             return {
                 "results": all_files[offset : offset + limit],
                 "total": len(all_files),
