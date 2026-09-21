@@ -22,6 +22,7 @@ from encode_connector.client.constants import (
     EXPERIMENT_PAGE_SIZE,
     EXPERIMENT_SEARCH_FIELDS,
     FILE_FILTER_MAP,
+    FILES_PAGE_SIZE,
     MAX_EXPERIMENTS_SCANNED,
     MAX_REQUESTS_PER_SECOND,
     METADATA_MAP,
@@ -350,6 +351,7 @@ class EncodeClient:
         status: str | None = None,
         preferred_default: bool | None = None,
         limit: int = 200,
+        offset: int = 0,
     ) -> list[FileSummary]:
         """List files for a specific experiment with optional filters."""
         validate_accession(experiment_accession)
@@ -361,6 +363,8 @@ class EncodeClient:
             "frame": "object",
             "limit": limit,
         }
+        if offset > 0:
+            params["from"] = offset
 
         filter_values = {
             "file_format": file_format,
@@ -462,17 +466,25 @@ class EncodeClient:
                 )
                 experiments = exp_result["results"]
                 for exp in experiments:
-                    exp_files = await self.list_files(
-                        experiment_accession=exp.accession,
-                        file_format=file_format,
-                        file_type=file_type,
-                        output_type=output_type,
-                        output_category=output_category,
-                        assembly=assembly,
-                        status=status,
-                        preferred_default=preferred_default,
-                    )
-                    all_files.extend(exp_files)
+                    # one experiment can hold more files than a request returns
+                    file_offset = 0
+                    while len(all_files) < wanted:
+                        exp_files = await self.list_files(
+                            experiment_accession=exp.accession,
+                            file_format=file_format,
+                            file_type=file_type,
+                            output_type=output_type,
+                            output_category=output_category,
+                            assembly=assembly,
+                            status=status,
+                            preferred_default=preferred_default,
+                            limit=FILES_PAGE_SIZE,
+                            offset=file_offset,
+                        )
+                        all_files.extend(exp_files)
+                        file_offset += len(exp_files)
+                        if len(exp_files) < FILES_PAGE_SIZE:
+                            break
                     if len(all_files) >= wanted:
                         break
                 experiment_offset += len(experiments)

@@ -16,6 +16,8 @@ DEFAULT_LIMIT = 25
 EXPERIMENT_PAGE_SIZE = 200
 # ...and how many experiments it reads at most: each one costs a request to ENCODE
 MAX_EXPERIMENTS_SCANNED = 1000
+# files of one experiment read per request during that walk
+FILES_PAGE_SIZE = 200
 try:
     import importlib.metadata
 
@@ -302,6 +304,10 @@ OUTPUT_TYPES = [
     "filtered peaks",
     # Quantifications
     "gene quantifications",
+    "sparse gene count matrix of unique reads",
+    "sparse gene count matrix of all reads",
+    "unfiltered sparse gene count matrix of unique reads",
+    "unfiltered sparse gene count matrix of all reads",
     "transcript quantifications",
     "exon quantifications",
     "microRNA quantifications",

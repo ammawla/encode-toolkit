@@ -130,7 +130,10 @@ jobs:
               if grep -q -- "$pattern" <<<"$out"; then echo "ok      $*"
               else echo "FAILED  $*  (expected: $pattern)"; head -5 <<<"$out"; return 1; fi
             }
+          # every image ships the Java that its conda environment pins
+          COMMON: shows 'version .17[.]' java -version &&
         run: docker run --rm "encode-toolkit/pipeline-${PIPELINE}:ci" bash -eu -c "$HELPER
+          $COMMON
           $SMOKE"
 
   environments:

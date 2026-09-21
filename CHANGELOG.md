@@ -27,15 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it had collected as the total, so every page was the first page and `has_more` was false.
   `encode_batch_download` always took that path. Pages now advance and `total` is a lower bound
   that exceeds the page when more files exist. The search also stopped after the first 200
-  experiments, so files of later experiments were never found; it now reads further pages of
-  experiments until the page is full (at most 1,000 experiments, and it says so when it stops there).
+  experiments, and after the first 200 files of each experiment, so later files were never
+  found; it now reads further pages of both until the requested page is full (at most 1,000
+  experiments, and it says so when it stops there).
 - A negative `offset` in `encode_search_experiments` and `encode_search_files` is treated as 0,
   in the request, in the reported `offset` and in `has_more` / `next_offset`, instead of hiding
   or repeating pages.
 - The value lists behind `encode_get_metadata` named three values ENCODE does not have (file
   format `dat`, output type `stable peaks`, output category `quality metric`) and lacked eleven
   file formats (among them `h5ad`) and eight assemblies. File formats, assemblies and output
-  categories now match ENCODE's file schema.
+  categories now match ENCODE's file schema, and the output types include the single-cell
+  sparse gene count matrices.
 - `encode_connector.__version__` was a hard-coded `0.2.1`; it now reports the installed version.
 - **Four pipelines failed at their last step.** MultiQC names its report after `--title`, so
   CUT&RUN, DNase-seq, Hi-C and WGBS never produced the `multiqc_report.html` they declare. They
@@ -82,12 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt`.
 - **Hi-C honours `--resolutions`**: the cooler base bin is the smallest requested resolution,
   and the new `--hiccups_resolutions` selects the loop-calling resolutions. Both lists are
-  validated before anything runs (positive integers, multiples of the smallest), and HiCCUPS
+  validated before anything runs (positive integers with no empty fields, multiples of the
+  smallest), and HiCCUPS
   gets one peak width, window width and merge radius per resolution (juicer_tools exits when
   the `-d` list has a different length).
-- The conda environments pin cutadapt 4.6, samtools 1.19 and (Hi-C) Java 17 exactly, as the
-  images do; they resolved to cutadapt 5.2, samtools 1.19.2 and Java 22 before. cutadapt 4.6
-  has no Python 3.11 build, so all seven environments use Python 3.10.
+- The conda environments pin cutadapt 4.6, samtools 1.19 and OpenJDK 17 exactly, as the images
+  do; they resolved to cutadapt 5.2, samtools 1.19.2 and Java 22 before. cutadapt 4.6 has no
+  Python 3.11 build, so all seven environments use Python 3.10. The Hi-C and WGBS images
+  install `openjdk-17-jre-headless` like the other five instead of Ubuntu's `default-jre`
+  (Java 11), and the image smoke tests assert Java 17.
 - ATAC-seq publishes `samtools idxstats` (which MultiQC reads) in place of a text line that
   needed `bc` and failed on genomes without the mitochondrial contig.
 - WGBS coverage statistics also report the run's `--min_coverage`; deduplication reports reach
@@ -116,14 +121,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when a config differs from what the generator writes.
 - `check-tool-versions.py` fails the build when a pipeline image and its conda environment pin
   different versions of the same tool, when the image pins a package the environment does not,
-  or when both install a tool the environment leaves unpinned. Dockerfile comments do not count
-  as evidence, and the few deliberate exceptions (packages from the Ubuntu base) are printed.
+  or when both install a tool the environment leaves unpinned. It compares Java too and rejects
+  an unversioned `default-jre`. Dockerfile comments do not count as evidence, and the few
+  deliberate exceptions (packages from the Ubuntu base) are printed.
 - `check-skill-docs.py` fails the build when a skill shows a tool call the server would reject
   or a `nextflow run` example with a parameter or profile the pipeline does not declare, and
   when an example output uses a field the server never emits (model fields, dict keys and
   SQLite columns, read from the source with `ast`). It also rejects a call that omits a required
-  argument, and filter values ENCODE does not use (`assay_title="RNA-seq"`), in calls and in
-  example outputs.
+  argument, and filter values ENCODE does not use (`assay_title="RNA-seq"`), in calls to the
+  tools that query the portal and in example outputs (single values, lists and facet terms).
 - Image smoke tests start FastQC and Trim Galore; the preview suite covers the new parameters
   and the cloud-profile checks.
 

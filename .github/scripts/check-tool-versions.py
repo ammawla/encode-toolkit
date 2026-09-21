@@ -5,7 +5,7 @@ For each pipeline, compare ``skills/bioinformatics-installer/environments/<pipel
 with ``skills/pipeline-<pipeline>/scripts/Dockerfile``:
 
 1. A tool the environment pins exactly must have that version in the Dockerfile, whenever the
-   Dockerfile names a version of it.
+   Dockerfile names a version of it (Java included: ``openjdk=17`` and ``openjdk-17-jre-headless``).
 2. A package the Dockerfile pins with pip (``cutadapt==4.6``) must be pinned exactly in the
    environment too.
 3. A tool that both sides install but the environment does not pin exactly must be listed in
@@ -31,6 +31,10 @@ DOCKERFILE_NAMES = {
     "bismark": r"bismark",
     "methyldackel": r"methyldackel",
 }
+# tools whose version is a single number on both sides: "openjdk=17" and "openjdk-17-jre-headless"
+MAJOR_ONLY = {"openjdk"}
+# apt packages that install whatever version the base image happens to carry
+UNVERSIONED_IN_IMAGE = {"openjdk": r"default-j(?:re|dk)"}
 UBUNTU = "comes from the ubuntu:22.04 archive in the image, which fixes its version"
 NOT_COMPARED = {
     "numpy": "build constraint for MACS2's extension in the image; conda's MACS2 build brings its own",
@@ -56,7 +60,8 @@ def dockerfile_versions(dockerfile: str, tool: str) -> set[str]:
     """Versions that follow the tool's name: samtools-1.19, multiqc==1.21, picard/releases/download/3.1.1."""
     name = DOCKERFILE_NAMES.get(tool, re.escape(tool))
     between = r"(?:[-_=/ v]|linux|releases/download|archive|refs/tags)*"
-    return set(re.findall(rf"(?i)(?<![\w]){name}{between}{VERSION}", instructions(dockerfile)))
+    version = r"(\d+)(?![\w.])" if tool in MAJOR_ONLY else VERSION
+    return set(re.findall(rf"(?i)(?<![\w]){name}{between}{version}", instructions(dockerfile)))
 
 
 def environment_pins(text: str) -> dict[str, str | None]:
@@ -79,6 +84,16 @@ def compare(pipeline: str, environment: str, dockerfile: str) -> tuple[list[str]
         image_versions = dockerfile_versions(dockerfile, tool)
         name = DOCKERFILE_NAMES.get(tool, re.escape(tool))
         named_in_image = image_versions or re.search(rf"(?i)(?<![\w-]){name}(?![\w-])", image)
+        unversioned = (
+            re.search(rf"(?<![\w-]){UNVERSIONED_IN_IMAGE[tool]}(?![\w-])", image)
+            if tool in UNVERSIONED_IN_IMAGE
+            else None
+        )
+        if unversioned:
+            problems.append(
+                f"pipeline-{pipeline}: the image installs {unversioned.group(0)}, which does not fix the {tool} version"
+            )
+            continue
         if conda_version is None:
             if not named_in_image:
                 continue

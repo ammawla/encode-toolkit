@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl unzip gzip pigz \
     build-essential perl \
     python3 python3-pip \
-    default-jre \
+    openjdk-17-jre-headless \
     libncurses5-dev libbz2-dev liblzma-dev zlib1g-dev libcurl4-openssl-dev \
     libbigwig-dev \
     && rm -rf /var/lib/apt/lists/*

@@ -35,6 +35,15 @@ CATALOGS = {
     "life_stage": "LIFE_STAGES",
     "replication_type": "REPLICATION_TYPES",
 }
+# Tools that send these filters to the ENCODE portal, which matches them exactly. The tracker
+# tools (encode_list_tracked, ...) share the parameter names but match substrings locally.
+PORTAL_TOOLS = {
+    "encode_search_experiments",
+    "encode_search_files",
+    "encode_list_files",
+    "encode_batch_download",
+    "encode_get_facets",
+}
 
 CALL_RE = re.compile(r"\b(encode_[a-z_]+)\s*\(")
 KEYWORD_RE = re.compile(r"\s*([A-Za-z_]\w*)\s*=(?!=)")
@@ -83,7 +92,8 @@ def tool_signatures() -> dict[str, dict[str, set[str]]]:
     catalogs = catalog_values()
     return {
         node.name: {
-            arg.arg: literal_values(arg.annotation) or catalogs.get(arg.arg, set())
+            arg.arg: literal_values(arg.annotation)
+            or (catalogs.get(arg.arg, set()) if node.name in PORTAL_TOOLS else set())
             for arg in node.args.args + node.args.kwonlyargs
         }
         for node in tool_functions()
@@ -177,7 +187,8 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[
                 value = STRING_VALUE_RE.match(argument)
                 choices = signatures[tool][name]
                 if value and choices and value.group(2) not in choices and not PLACEHOLDER_RE.search(value.group(2)):
-                    accepted = ", ".join(sorted(choices)) if len(choices) <= 8 else f"the values in {CATALOGS[name]}"
+                    listed = len(choices) <= 8 or name not in CATALOGS
+                    accepted = ", ".join(sorted(choices)) if listed else f"the values in {CATALOGS[name]}"
                     problems.append(f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {accepted})')
     return problems
 
@@ -307,7 +318,8 @@ def check_output_examples(known: set[str]) -> list[str]:
     problems = []
     catalogs = catalog_values()
     catalog_value_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*"([^"]*)"')
-    # facet counts: "assay_title": [{"term": "total RNA-seq", "count": 12}, ...]
+    # arrays: facet counts ("assay_title": [{"term": "total RNA-seq", "count": 12}, ...]) and
+    # plain lists ("assembly": ["GRCh38"])
     facet_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*\[(.*?)\]', re.S)
     term_re = re.compile(r'"term"\s*:\s*"([^"]*)"')
     for doc in sorted(SKILLS.rglob("*.md")):
@@ -330,7 +342,11 @@ def check_output_examples(known: set[str]) -> list[str]:
                         problems.append(f"{where}: {previous_tool}() output has no field '{key}'")
                 # a value shown for a filter field must be one ENCODE uses, so it can be searched for
                 shown = catalog_value_re.findall(body)
-                shown += [(field, term) for field, terms in facet_re.findall(body) for term in term_re.findall(terms)]
+                for field, items in facet_re.findall(body):
+                    if "{" in items:  # facet objects
+                        shown += [(field, term) for term in term_re.findall(items)]
+                    else:  # plain values: "assembly": ["GRCh38", "mm10"]
+                        shown += [(field, item) for item in re.findall(r'"([^"]*)"', items)]
                 for field, value in shown:
                     if value not in catalogs[field] and not PLACEHOLDER_RE.search(value):
                         where = f"{doc.relative_to(ROOT)}:{line}"

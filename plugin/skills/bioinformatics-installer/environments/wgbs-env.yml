@@ -22,6 +22,7 @@ dependencies:
   - fastqc=0.12.1
   - trim-galore=0.6.10
   - cutadapt=4.6  # run by Trim Galore; pinned to the version in the image
+  - openjdk=17  # FastQC (and Picard, Juicer tools) run on Java; the image has OpenJDK 17
   - multiqc=1.21
   # Bowtie2 (required by Bismark as backend aligner)
   - bowtie2=2.5.4
