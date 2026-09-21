@@ -574,3 +574,53 @@ def test_gzipped_blacklist_is_read(tmp_path, script, filename, row):
     # Assert
     assert code == 0, output
     assert "RESULT: PASS" in output, output
+
+
+@pytest.mark.parametrize(
+    ("script", "filename", "good_rows", "negative_row", "valid_label"),
+    [
+        (
+            ACCESSIBILITY,
+            "neg.narrowPeak",
+            [narrow_peak_row(), narrow_peak_row(start=2000, end=2200)],
+            narrow_peak_row(start=-10, end=20),
+            "Valid peaks",
+        ),
+        (
+            HISTONE,
+            "neg.narrowPeak",
+            [narrow_peak_row(), narrow_peak_row(start=2000, end=2200)],
+            narrow_peak_row(start=-10, end=20),
+            "Valid peaks",
+        ),
+        (
+            LOOPS,
+            "neg.bedpe",
+            [bedpe_row(), bedpe_row(start1=2_000_000, end1=2_010_000)],
+            bedpe_row(start1=-10_000, end1=0),
+            "Valid loops",
+        ),
+        (
+            METHYLATION,
+            "neg.bedMethyl",
+            [encode_methyl_row(), encode_methyl_row(start=2000, end=2001)],
+            encode_methyl_row(start=-1, end=0),
+            "Valid CpGs",
+        ),
+    ],
+)
+def test_a_row_with_a_negative_coordinate_is_malformed_and_left_out_of_the_statistics(
+    tmp_path, script, filename, good_rows, negative_row, valid_label
+):
+    # Arrange: start < end holds for the bad row, so only the sign gives it away
+    path = tmp_path / filename
+    write_lines(path, [*good_rows, negative_row])
+
+    # Act
+    code, output = run_script(script, path)
+
+    # Assert
+    assert code == 1, output
+    assert "negative" in output, output
+    assert re.search(rf"{valid_label}:\s+2\b", output), output
+    assert re.search(r"Malformed lines:\s+1\b", output), output

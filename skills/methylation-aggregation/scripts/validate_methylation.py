@@ -231,6 +231,8 @@ def validate_methylation(input_path, min_coverage, blacklist_path, requested_sca
                 errors.append(f"Line {line_num}: negative end coordinate ({end})")
             if start >= end:
                 errors.append(f"Line {line_num}: start ({start}) >= end ({end})")
+            # an impossible interval is malformed: count it once and keep it out of the statistics
+            if start < 0 or end < 0 or start >= end:
                 bad_lines += 1
                 continue
 

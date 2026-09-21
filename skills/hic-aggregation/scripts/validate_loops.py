@@ -141,20 +141,20 @@ def validate_loops(input_path, min_distance, expected_resolution):
                 bad_lines += 1
                 continue
 
-            # Non-negative coordinates
+            # Non-negative coordinates, and start < end for each anchor. A row that breaks either
+            # rule is malformed: count it once and keep it out of the statistics.
+            impossible_anchor = False
             for label, val in [("start1", start1), ("end1", end1), ("start2", start2), ("end2", end2)]:
                 if val < 0:
                     errors.append(f"Line {line_num}: negative {label} ({val})")
-
-            # Start < end for each anchor
-            reversed_anchor = False
+                    impossible_anchor = True
             if start1 >= end1:
                 errors.append(f"Line {line_num}: anchor1 start ({start1}) >= end ({end1})")
-                reversed_anchor = True
+                impossible_anchor = True
             if start2 >= end2:
                 errors.append(f"Line {line_num}: anchor2 start ({start2}) >= end ({end2})")
-                reversed_anchor = True
-            if reversed_anchor:
+                impossible_anchor = True
+            if impossible_anchor:
                 bad_lines += 1
                 continue
 
