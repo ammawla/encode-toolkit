@@ -118,4 +118,4 @@ RIS format (for Endnote, Zotero, Mendeley) is also available via `export_format=
 | `disease-research` | Connecting ENCODE regulatory data to disease biology |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

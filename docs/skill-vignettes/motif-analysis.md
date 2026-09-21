@@ -117,4 +117,4 @@ encode_log_derived_file(
 - **publication-trust** -- Verify literature claims backing motif analysis decisions.
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

@@ -39,21 +39,20 @@ encode_download_files(
 ### Step 2: Execute the Pipeline
 
 ```bash
-nextflow run main.nf \
+nextflow run skills/pipeline-wgbs/scripts/main.nf \
     -profile local \
     --reads '/data/pancreas_wgbs/*_R{1,2}.fastq.gz' \
     --genome_dir '/ref/bismark_index' \
-    --lambda_genome '/ref/lambda_index' \
     --min_coverage 5 \
     --outdir results/ \
     -resume
 ```
 
-The `--lambda_genome` flag directs the pipeline to align reads against lambda phage DNA (fully unmethylated) and compute the bisulfite conversion rate. Without this, you have no conversion QC.
+ENCODE FASTQs are named by accession, so link each pair to `<sample>_R1.fastq.gz` / `<sample>_R2.fastq.gz` names before the run. `--genome_dir` is the folder made by `bismark_genome_preparation` (it also holds the FASTA). The workflow has no bisulfite conversion-rate stage: it does not align to lambda, so conversion QC is a separate, manual check (next step).
 
-### Step 3: Check Bisulfite Conversion (Lambda Spike-in)
+### Step 3: Check Bisulfite Conversion (Manual; Lambda Spike-in)
 
-Since lambda DNA is unmethylated, all methylation calls on lambda represent conversion failures.
+This is not computed by the workflow. If the library carries a lambda spike-in, align the reads to a Bismark index of the lambda genome yourself and extract methylation there: since lambda DNA is unmethylated, all methylation calls on lambda represent conversion failures.
 
 | Sample | Lambda CpG Methylation | Conversion Rate | Status |
 |--------|----------------------|-----------------|--------|
@@ -62,11 +61,11 @@ Since lambda DNA is unmethylated, all methylation calls on lambda represent conv
 
 Donor 1 passes at 99.7% -- well above the 98% threshold. Donor 2 at 98.6% fails. At 1.4% false positive rate across ~28 million CpGs, that contaminates hundreds of thousands of sites. Donor 2 must be excluded or re-prepared.
 
-If no lambda spike-in is available, check CHH context methylation as a proxy. Somatic tissues should show CHH below 1%. Values above that indicate conversion problems (exception: neurons and ESCs have genuine non-CpG methylation at 2--5%).
+If no lambda spike-in is available, check CHH context methylation as a proxy: the workflow writes it to `bismark/methylation/<sample>.CHH.bedMethyl.gz`. Somatic tissues should show CHH below 1%. Values above that indicate conversion problems (exception: neurons and ESCs have genuine non-CpG methylation at 2--5%).
 
 ### Step 4: Evaluate CpG Coverage for DMR Calling
 
-DMR analysis requires reliable per-CpG estimates, which demands sufficient read depth.
+DMR analysis requires reliable per-CpG estimates, which demands sufficient read depth. The coverage figures come from `coverage/<sample>.coverage_stats.txt`, the mapping rate from the Bismark report in `bismark/alignments/`, and the duplication rate from `bismark/dedup_reports/`.
 
 | Metric | Donor 1 | ENCODE Threshold |
 |--------|---------|-----------------|
@@ -79,14 +78,14 @@ DMR analysis requires reliable per-CpG estimates, which demands sufficient read 
 Donor 1 meets all ENCODE thresholds. The 18.4x mean coverage exceeds the 10x minimum for quantitative DMR analysis (Foox et al. 2021). Below 10x, beta values are too noisy for detecting small methylation differences.
 
 ### Step 5: Review M-bias and Trim if Needed
-MethylDackel generates M-bias plots showing methylation by read position. End-repair artifacts inflate methylation at the 5' end of read 2. If the plot shows a spike at positions 1--10, re-run extraction with:
+MethylDackel generates M-bias plots showing methylation by read position (`bismark/mbias/`, with the suggested bounds in `<sample>_mbias_report.txt`). End-repair artifacts inflate methylation at the 5' end of read 2. The workflow extracts without trimming, so if the plot shows a spike at positions 1--10, re-run the extraction by hand on the published BAM:
 
 ```bash
-MethylDackel extract --mergeContext --minDepth 5 --OT 0,0,0,0 --OB 0,0,10,0 \
-    /ref/genome.fa results/bismark/alignments/donor1.bam
+MethylDackel extract --mergeContext --nOT 0,0,10,0 --nOB 0,0,10,0 \
+    /ref/genome.fa results/bismark/alignments/donor1.sorted.bam
 ```
 
-The `--OB 0,0,10,0` trims 10 bp from the 5' end of the original bottom strand (read 2), which is standard ENCODE practice.
+`--nOT` and `--nOB` take four numbers: bases to ignore at the start of read 1, the end of read 1, the start of read 2 and the end of read 2, for the original top and bottom strands. `0,0,10,0` on both ignores the first 10 bp of read 2.
 
 ### Step 6: Log Provenance
 ```
@@ -96,7 +95,7 @@ encode_log_derived_file(
     description="CpG methylation calls, bisulfite conversion 99.7%, mean 18.4x coverage",
     file_type="bedMethyl",
     tool_used="Bismark 0.24.2 + MethylDackel 0.6.1",
-    parameters="--mergeContext --minDepth 5 --OB 0,0,10,0; lambda conversion 99.7%"
+    parameters="--merge_context true, --min_coverage 5; lambda conversion 99.7% from a separate alignment"
 )
 ```
 
@@ -104,7 +103,7 @@ encode_log_derived_file(
 
 - **Never skip conversion QC.** A library at 98% conversion introduces ~560,000 false methylation calls across the human genome. Always use lambda spike-in or CHH proxy.
 - **Do not mix RRBS and WGBS.** RRBS covers ~10% of CpGs near MspI sites. Use `--skip_dedup true` for RRBS since fragments share cut sites by design.
-- **Always merge CpG strands.** Forward and reverse reads at a CpG dinucleotide measure the same site. Use `--mergeContext` to avoid double-counting and halving apparent coverage.
+- **Always merge CpG strands.** Forward and reverse reads at a CpG dinucleotide measure the same site. Keep the workflow's default `--merge_context true` (MethylDackel `--mergeContext`) to avoid double-counting and halving apparent coverage.
 - **Coverage thresholds depend on the question.** 5x is adequate for binary calls (methylated vs. unmethylated). 10x is the minimum for quantitative DMR detection. 30x is needed for allele-specific methylation.
 
 ## Related Skills
@@ -117,4 +116,4 @@ encode_log_derived_file(
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

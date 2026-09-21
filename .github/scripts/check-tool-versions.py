@@ -31,6 +31,7 @@ DOCKERFILE_NAMES = {
     "star": r"star",
     "bismark": r"bismark",
     "methyldackel": r"methyldackel",
+    "ucsc-bedgraphtobigwig": r"bedGraphToBigWig",
 }
 # tools whose version is a single number on both sides: "openjdk=17" and "openjdk-17-jre-headless"
 MAJOR_ONLY = {"openjdk"}
@@ -41,6 +42,7 @@ NOT_COMPARED = {
     "numpy": "build constraint for MACS2's extension in the image; conda's MACS2 build brings its own",
     "r-base": f"interpreter; {UBUNTU} (SEACR needs base R only)",
     "bedops": UBUNTU,
+    "ucsc-bedgraphtobigwig": "UCSC publishes its binaries at an unversioned URL, so neither side can pin it",
     "pigz": UBUNTU,
     "wget": UBUNTU,
     "curl": UBUNTU,

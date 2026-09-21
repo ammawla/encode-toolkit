@@ -140,6 +140,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   TAD calling, a WGBS conversion-rate stage, RNA-SeQC, Trimmomatic) and flags they do not use.
   The doc checker now covers all of these folders, and CI also compares `agents/` and
   `commands/` with their copies under `plugin/`.
+- The pipeline vignettes and the pipeline-execution walkthrough told users to run
+  `nextflow run ENCODE-DCC/chip-seq-pipeline2` (the official ENCODE pipelines are WDL, not
+  Nextflow), to pull images that were never verified, and to pass options that no longer exist
+  (`--motif_db`, `--restriction_site`, `--gtf`, `--lambda_genome`, `--single_end`). They now
+  build the image from the skill's Dockerfile and run the toolkit's own workflows with real
+  parameters, outputs and versions; DNase-seq is documented as paired-end only, and WGBS
+  conversion rate as a manual check.
 - Examples used values ENCODE does not have: the assay title `RNA-seq` (it is `total RNA-seq`,
   `polyA plus RNA-seq`, ...), and the output types `chromatin interactions` (it is `loops`) and
   `filtered feature barcode matrix`. Four `encode_link_reference` calls omitted the experiment.

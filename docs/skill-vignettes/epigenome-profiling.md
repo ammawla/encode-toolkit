@@ -108,4 +108,4 @@ The summary confirms 24 tracked experiments across 6 histone marks, ATAC-seq, an
 - **pipeline-chipseq** -- Process raw ChIP-seq data through the ENCODE-aligned pipeline.
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

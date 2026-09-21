@@ -117,4 +117,4 @@ Higher `num_sites` indicates a more robust PWM. Profiles from ChIP-seq or HT-SEL
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

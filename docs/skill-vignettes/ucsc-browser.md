@@ -117,4 +117,4 @@ This URL opens the browser at the INS locus with cCREs in pack mode, TF clusters
 - **visualization-workflow** -- Full-featured visualization setup beyond the track hub basics shown here.
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

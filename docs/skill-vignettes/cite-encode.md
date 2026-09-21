@@ -138,4 +138,4 @@ derived_file_count and external_reference_count. Include this as Supplementary T
 | `publication-trust` | Verifying cited papers are not retracted or compromised |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

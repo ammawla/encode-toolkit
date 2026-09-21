@@ -23,7 +23,7 @@
 
 - **Citation:** Merkel D. Docker: lightweight Linux containers for consistent development and deployment. Linux Journal, 239(2), 2014.
 - **Citations:** ~5,000
-- **Key findings:** Docker containers provide OS-level virtualization ensuring that bioinformatics tools run identically regardless of the host system. The ENCODE consortium distributes official Docker images for each pipeline (encodedcc/*), and this skill's Nextflow setup guide configures Docker as the default container runtime. Docker is essential for ENCODE pipeline reproducibility because tool behavior can depend on system libraries, compiler versions, and kernel features.
+- **Key findings:** Docker containers provide OS-level virtualization ensuring that bioinformatics tools run identically regardless of the host system. The ENCODE consortium distributes Docker images for several of its WDL pipelines (encodedcc/*); the Nextflow pipeline skills in this toolkit build their own images instead, and this skill's Nextflow setup guide configures Docker as the default container runtime. Docker is essential for ENCODE pipeline reproducibility because tool behavior can depend on system libraries, compiler versions, and kernel features.
 
 ---
 

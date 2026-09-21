@@ -281,6 +281,8 @@ def check_pipeline_examples() -> list[str]:
             named = re.search(r"(pipeline-\w+)", command)
             if skill in contracts:
                 params, profiles = contracts[skill]
+            elif doc.stem in contracts:  # docs/skill-vignettes/pipeline-hic.md
+                params, profiles = contracts[doc.stem]
             elif named and named.group(1) in contracts:
                 params, profiles = contracts[named.group(1)]
             elif skill.startswith("pipeline-"):

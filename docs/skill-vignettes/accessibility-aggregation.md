@@ -116,4 +116,4 @@ ENCODE's historical catalog is richest in DNase-seq; newer experiments favor ATA
 - **pipeline-atacseq** -- Process raw ATAC-seq FASTQ through the ENCODE-aligned Nextflow pipeline.
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

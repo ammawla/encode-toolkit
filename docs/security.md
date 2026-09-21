@@ -361,17 +361,19 @@ User (Claude) <--stdio--> MCP Server <--HTTPS--> encodeproject.org
 
 ## Test Coverage
 
-159 tests covering all security controls:
+The security controls are covered by the unit tests in `tests/` (counts change with every
+release, so they are not listed here; `pytest --collect-only -q` prints them):
 
-| Test File | Tests | Coverage Area |
-|-----------|------:|---------------|
-| `test_validation.py` | 30 | Accession format, date format, path traversal, SSRF, URL validation, SQL escaping, Lucene escaping, limit clamping, enum validation |
-| `test_auth.py` | 8 | PBKDF2 key derivation, credential encryption, keyring integration |
-| `test_downloader.py` | 9 | Path resolution, organize_by validation, path traversal prevention |
-| `test_tracker.py` | 24 | SQL operations, LIKE escaping, metadata size limits, compatibility analysis |
-| `test_client.py` | 8 | Input validation, limit clamping, client lifecycle |
-| `test_server.py` | 65 | Tool registration, input validation at tool boundary |
-| `test_models.py` | 15 | Data model parsing, safe defaults |
+| Test File | Coverage Area |
+|-----------|---------------|
+| `test_validation.py` | Accession format, date format, path traversal, SSRF, URL validation, SQL escaping, Lucene escaping, limit clamping, enum validation |
+| `test_auth.py` | PBKDF2 key derivation, credential encryption, keyring integration |
+| `test_downloader.py` | Path resolution, organize_by validation, path traversal prevention |
+| `test_tracker.py` | SQL operations, LIKE escaping, metadata size limits, compatibility analysis |
+| `test_client.py` | Input validation, limit clamping, pagination, client lifecycle |
+| `test_server.py` | Tool registration, input validation at tool boundary |
+| `test_tool_responses.py` | Response shape of every tool, including runs against a real tracker |
+| `test_models.py` | Data model parsing, safe defaults |
 
 Run all tests:
 ```bash

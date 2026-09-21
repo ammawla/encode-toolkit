@@ -16,19 +16,25 @@ Executes the ENCODE RNA-seq pipeline from raw FASTQ files through STAR 2-pass al
 
 A researcher has paired-end RNA-seq from human pancreatic islets and needs gene-level TPM values aligned to GRCh38 with GENCODE annotation.
 
-### Step 1: Detect Library Strandedness
+### Step 1: Set and Verify Library Strandedness
 
-The sample sheet does not specify strandedness. Before running the full pipeline, confirm the library protocol. If unknown, the pipeline auto-detects using RSeQC `infer_experiment.py`:
+`--strandedness` is one setting for the whole run (`reverse`, `forward` or `none`; default `reverse`, the dUTP protocol ENCODE uses). It drives RSEM, kallisto and the signal tracks, so it has to be right before quantification: the workflow does not detect it for you. RSeQC `infer_experiment.py` runs as a QC step and lets you verify the choice afterwards:
 
 ```
-nextflow run scripts/main.nf \
+nextflow run skills/pipeline-rnaseq/scripts/main.nf \
   -profile local \
-  --reads 'fastq/*_R{1,2}.fq.gz' \
+  --reads 'fastq/*_R{1,2}.fastq.gz' \
   --genome GRCh38 \
+  --star_index /refs/star_gencode_v44 \
+  --rsem_index /refs/rsem_gencode_v44/GRCh38 \
+  --kallisto_index /refs/gencode_v44.kallisto.idx \
+  --rseqc_bed /refs/gencode_v44.bed12 \
+  --chrom_sizes /refs/GRCh38.chrom.sizes \
+  --strandedness reverse \
   --outdir results/
 ```
 
-The QC stage reports strandedness from `infer_experiment.py`:
+`qc/rseqc/<sample>.infer_experiment.txt` reports the strandedness:
 
 | Metric | Value | Interpretation |
 |---|---|---|
@@ -36,26 +42,17 @@ The QC stage reports strandedness from `infer_experiment.py`:
 | "1+-,1-+,2++,2--" (antisense) | 96.1% | Reads matching antisense strand |
 | Undetermined | 0.7% | Ambiguous |
 
-Antisense fraction above 90% confirms **reverse stranded** (dUTP protocol), the ENCODE standard. The pipeline proceeds with `--strandedness reverse` automatically. If this fraction were near 50/50, the library would be unstranded (e.g., SMART-Seq2), requiring `--strandedness unstranded`.
+Antisense fraction above 90% confirms **reverse stranded** (dUTP protocol), the ENCODE standard, so the run above used the right setting. If this fraction were near 50/50, the library would be unstranded (e.g., SMART-Seq2) and the run has to be repeated with `--strandedness none`; a sense fraction above 90% calls for `--strandedness forward`.
 
 ### Step 2: Select GENCODE Annotation
 
-The `--genome GRCh38` flag defaults to GENCODE v38 for human (`--genome mm10` uses vM27 for mouse). To override with a specific annotation:
-
-```
-nextflow run scripts/main.nf \
-  -profile local \
-  --reads 'fastq/*_R{1,2}.fq.gz' \
-  --genome GRCh38 \
-  --gtf /refs/gencode.v44.annotation.gtf \
-  --outdir results/
-```
+The workflow takes no GTF. The annotation is fixed when you build the references it reads: the STAR index (`--star_index`, built with `--sjdbGTFfile`), the RSEM reference (`--rsem_index`, a prefix from `rsem-prepare-reference --gtf`), the kallisto index (`--kallisto_index`, built with kallisto 0.50.1 from the same transcripts) and the BED12 gene model for RSeQC (`--rseqc_bed`). Build all four from one GENCODE release, as in the command above.
 
 GENCODE comprehensive annotation includes all gene biotypes. For protein-coding-only analysis, filter the GTF before indexing. Never mix annotation versions across samples in the same study.
 
 ### Step 3: Evaluate Alignment QC
 
-After the pipeline completes, inspect `results/star/logs/Log.final.out` for each sample:
+After the pipeline completes, inspect `results/star/<sample>.Log.final.out` for each sample:
 
 | Metric | Sample 1 | Sample 2 | Threshold |
 |---|---|---|---|
@@ -69,7 +66,7 @@ Both samples exceed the 70% uniquely mapped threshold. The ENCODE standard also 
 
 ### Step 4: Check Expression-Level QC
 
-From the RSeQC and RSEM output:
+From the RSeQC output (`qc/rseqc/`) and the RSEM results (`rsem/`). The workflow does not compute the rRNA rate or the duplication rate; measure those separately (for example with an rRNA interval list and `samtools view -c -L`, and Picard MarkDuplicates):
 
 | Metric | Sample 1 | Sample 2 | Threshold |
 |---|---|---|---|
@@ -101,7 +98,7 @@ Compare your TPM distributions against the ENCODE reference. Concordance of hous
 
 ## Key Principles
 
-- **STAR 2-pass mode is non-negotiable for novel junction discovery.** Pass 1 identifies splice junctions across all samples; pass 2 re-aligns using the combined junction set. This recovers tissue-specific splicing events missed by annotation alone (Dobin et al. 2013).
+- **STAR 2-pass mode is non-negotiable for novel junction discovery.** The workflow runs `--twopassMode Basic`: for each sample, pass 1 finds splice junctions and pass 2 re-aligns with them. This recovers tissue-specific splicing events missed by annotation alone (Dobin et al. 2013).
 - **STAR requires 32GB RAM for human.** The genome index loads entirely into shared memory. Machines below this threshold will fail silently or crash at the alignment step.
 - **Use TPM, not FPKM, for cross-sample comparison.** FPKM depends on total library composition and is not comparable between samples. TPM normalizes to a fixed sum per sample (Li & Dewey 2011).
 - **Do not pre-filter multi-mapped reads before RSEM.** RSEM uses expectation-maximization to probabilistically assign multi-mappers. Removing them first discards signal from gene families and repetitive elements.
@@ -117,4 +114,4 @@ Compare your TPM distributions against the ENCODE reference. Concordance of hous
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*
