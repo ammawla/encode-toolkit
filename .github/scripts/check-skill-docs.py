@@ -10,7 +10,8 @@ The skills, ``agents/``, ``commands/``, ``docs/`` and the README are checked.
 2. Every ``nextflow run`` example in a pipeline skill must use only parameters that the
    pipeline declares and only profiles that its nextflow.config defines.
 3. A JSON example that directly follows a tool call is that tool's output, so every field name
-   in it must be one the server can emit (a field of its models or a key it writes).
+   in it must be one THAT TOOL can emit: a key the tool or the code it calls writes, a field of
+   the models involved, or a column of the rows it returns.
 """
 
 from __future__ import annotations
@@ -62,7 +63,8 @@ PLACEHOLDER_RE = re.compile(r"^$|\.\.\.|[<>|{}]")
 def documents() -> list[Path]:
     """Everything a user reads: skills, agents, commands, docs and the README (tracked files only)."""
     folders = [SKILLS, ROOT / "agents", ROOT / "commands", DOCS]
-    found = [doc for folder in folders for doc in folder.rglob("*.md")] + [ROOT / "README.md"]
+    found = [doc for folder in folders for doc in folder.rglob("*.md")]
+    found += [doc for doc in [ROOT / "README.md"] if doc.exists()]
     listing = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False)
     if listing.returncode == 0 and listing.stdout:
         tracked = set(listing.stdout.splitlines())
@@ -309,39 +311,94 @@ JSON_TOKEN_RE = re.compile(r'"((?:[^"\\]|\\.)*)"\s*(:)?|[{}]')
 FIELD_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
 
 
-def server_field_names() -> set[str]:
-    """Names the server can emit as a JSON key.
-
-    Model fields, keys of dict literals and ``dict(key=...)`` calls, keys assigned with
-    ``result["key"] = ...`` or ``setdefault("key", ...)``, and SQLite column names and aliases
-    (rows are returned as dicts). Other string literals (messages, URLs, filter values) do not count.
-    """
+def _own_keys(node: ast.AST) -> set[str]:
+    """Keys a piece of code writes: dict literals, ``x["key"] = ...``, ``dict(key=...)``, ``setdefault``."""
     names: set[str] = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Dict):
+            names |= {key.value for key in sub.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
+        elif isinstance(sub, ast.Subscript) and isinstance(sub.ctx, ast.Store):
+            if isinstance(sub.slice, ast.Constant) and isinstance(sub.slice.value, str):
+                names.add(sub.slice.value)
+        elif isinstance(sub, ast.Call):
+            called = getattr(sub.func, "id", getattr(sub.func, "attr", ""))
+            if called == "dict":
+                names |= {keyword.arg for keyword in sub.keywords if keyword.arg}
+            elif called == "setdefault" and sub.args and isinstance(sub.args[0], ast.Constant):
+                names.add(str(sub.args[0].value))
+    return names
+
+
+def _selected_columns(sql: str, tables: dict[str, set[str]]) -> set[str]:
+    """Columns a SELECT returns as row keys. Existence checks, counts and writes return none."""
+    names: set[str] = set()
+    for columns, table in re.findall(r"SELECT\s+(.*?)\s+FROM\s+(\w+)", sql, re.S | re.I):
+        if columns.strip() == "*":
+            names |= tables.get(table, set())
+        else:
+            names |= set(re.findall(r"\bAS\s+([a-z_][a-z0-9_]*)", columns, re.I))
+            names |= {c for c in re.findall(r"\b([a-z_][a-z0-9_]*)\b", columns) if c in tables.get(table, set())}
+    return names
+
+
+def tool_output_fields() -> dict[str, set[str]]:
+    """Tool name -> the keys its reply can contain.
+
+    Followed from the source: the keys the tool function writes, plus those of the functions and
+    methods it calls (three levels deep, matched by name), the fields of the models those use
+    (with nested models and base classes), and the columns of the SQL rows they return.
+    """
+    functions: dict[str, list[ast.AST]] = {}
+    classes: dict[str, ast.ClassDef] = {}
+    tables: dict[str, set[str]] = {}
     for source in (ROOT / "src" / "encode_connector").rglob("*.py"):
         text = source.read_text()
         for node in ast.walk(ast.parse(text)):
-            if isinstance(node, ast.ClassDef):
-                names |= {
-                    field.target.id
-                    for field in node.body
-                    if isinstance(field, ast.AnnAssign) and isinstance(field.target, ast.Name)
-                }
-            elif isinstance(node, ast.Dict):
-                names |= {
-                    key.value for key in node.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)
-                }
-            elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
-                if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
-                    names.add(node.slice.value)
-            elif isinstance(node, ast.Call):
-                called = getattr(node.func, "id", getattr(node.func, "attr", ""))
-                if called == "dict":
-                    names |= {keyword.arg for keyword in node.keywords if keyword.arg}
-                elif called == "setdefault" and node.args and isinstance(node.args[0], ast.Constant):
-                    names.add(str(node.args[0].value))
-        names |= set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", text, re.M))
-        names |= set(re.findall(r"\)\s+[Aa][Ss]\s+([a-z_][a-z0-9_]*)", text))
-    return names
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                functions.setdefault(node.name, []).append(node)
+            elif isinstance(node, ast.ClassDef):
+                classes[node.name] = node
+        for name, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\n\s*\)", text, re.S):
+            tables[name] = set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", body, re.M))
+
+    def class_fields(name: str, seen: set[str]) -> set[str]:
+        if name in seen or name not in classes:
+            return set()
+        seen.add(name)
+        fields: set[str] = set()
+        for item in classes[name].body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                fields.add(item.target.id)
+                for ref in ast.walk(item.annotation):
+                    if isinstance(ref, ast.Name):
+                        fields |= class_fields(ref.id, seen)
+        for base in classes[name].bases:
+            if isinstance(base, ast.Name):
+                fields |= class_fields(base.id, seen)
+        return fields
+
+    def reachable(node: ast.AST, depth: int, seen: set[int]) -> set[str]:
+        if id(node) in seen:
+            return set()
+        seen.add(id(node))
+        names = _own_keys(node)
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Name) and sub.id in classes:
+                names |= class_fields(sub.id, set())
+            elif isinstance(sub, ast.Constant) and isinstance(sub.value, str) and "SELECT" in sub.value.upper():
+                names |= _selected_columns(sub.value, tables)
+            elif isinstance(sub, ast.Call) and depth:
+                called = getattr(sub.func, "id", getattr(sub.func, "attr", ""))
+                if not called.startswith("encode_"):
+                    for callee in functions.get(called, []):
+                        names |= reachable(callee, depth - 1, seen)
+            elif isinstance(sub, ast.Attribute) and depth:  # a property such as tracker.stats
+                for callee in functions.get(sub.attr, []):
+                    if any(getattr(decorator, "id", "") == "property" for decorator in callee.decorator_list):
+                        names |= reachable(callee, depth - 1, seen)
+        return names
+
+    return {name: reachable(nodes[0], 3, set()) for name, nodes in functions.items() if name.startswith("encode_")}
 
 
 def example_keys(body: str):
@@ -361,7 +418,7 @@ def example_keys(body: str):
             yield pending, [name for name in stack if name]
 
 
-def check_output_examples(known: set[str]) -> list[str]:
+def check_output_examples(contracts: dict[str, set[str]]) -> list[str]:
     problems = []
     catalogs = catalog_values()
     catalog_value_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*"([^"]*)"')
@@ -405,7 +462,10 @@ def check_output_examples(known: set[str]) -> list[str]:
                     # counts keyed by data values (facets, by_assay, ...) are not field names
                     if any(name == "facets" or name.startswith("by_") for name in ancestors):
                         continue
-                    if FIELD_NAME_RE.fullmatch(key) and key not in known:
+                    # the top-level keys of a facet reply are ENCODE's facet field names
+                    if previous_tool == "encode_get_facets" and not ancestors:
+                        continue
+                    if FIELD_NAME_RE.fullmatch(key) and key not in contracts.get(previous_tool, set()):
                         where = f"{doc.relative_to(ROOT)}:{line}"
                         problems.append(f"{where}: {previous_tool}() output has no field '{key}'")
                 # a value shown for a filter field must be one ENCODE uses, so it can be searched for
@@ -446,7 +506,7 @@ def check_parameter_lines() -> list[str]:
 
 def main() -> int:
     problems = check_tool_calls(tool_signatures(), required_parameters()) + check_pipeline_examples()
-    problems += check_output_examples(server_field_names())
+    problems += check_output_examples(tool_output_fields())
     problems += check_parameter_lines()
     for problem in problems:
         print(problem)

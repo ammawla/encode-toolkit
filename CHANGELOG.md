@@ -167,6 +167,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SQLite columns, read from the source with `ast`). It also rejects a call that omits a required
   argument, and filter values ENCODE does not use (`assay_title="RNA-seq"`), in calls to the
   tools that query the portal and in example outputs (single values, lists and facet terms).
+  Example outputs are checked against the fields that the documented tool itself can return,
+  followed through the code it calls, its models and the SQL rows it reads, not against one
+  list for the whole server.
 - Image smoke tests start FastQC and Trim Galore; the preview suite covers the new parameters
   and the cloud-profile checks.
 
