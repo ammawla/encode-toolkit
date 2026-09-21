@@ -1151,6 +1151,49 @@ class TestBatchDownloadResponse:
         assert data["has_more"] is False
         assert "suggestion" in data
 
+    @pytest.mark.asyncio
+    async def test_batch_download_says_when_the_search_stopped_before_the_last_experiment(self):
+        # "No files found" reads as exhaustive; the client's note that it stopped early must survive
+        note = "Lower bound: ...; stopped after reading 1000 of 4200 experiments"
+        mock_client = AsyncMock()
+        mock_client.search_files.return_value = {**_make_file_search_result([], total=0), "total_note": note}
+
+        with (
+            patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)),
+            patch("encode_connector.server.main._get_downloader", return_value=MagicMock()),
+        ):
+            from encode_connector.server.main import encode_batch_download
+
+            raw = await encode_batch_download(download_dir="/tmp/test", file_format="hic")
+
+        assert json.loads(raw)["total_note"] == note
+
+    @pytest.mark.asyncio
+    async def test_batch_download_preview_keeps_the_search_note(self):
+        note = "Lower bound: files collected so far from matching experiments, not the full count"
+        mock_client = AsyncMock()
+        mock_client.search_files.return_value = {
+            **_make_file_search_result([_mock_file_summary()], total=1),
+            "total_note": note,
+        }
+        mock_downloader = MagicMock()
+        mock_downloader.preview_downloads.return_value = {
+            "file_count": 1,
+            "total_size": 1,
+            "total_size_human": "1 B",
+            "files": [],
+        }
+
+        with (
+            patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)),
+            patch("encode_connector.server.main._get_downloader", return_value=mock_downloader),
+        ):
+            from encode_connector.server.main import encode_batch_download
+
+            raw = await encode_batch_download(download_dir="/tmp/test", file_format="bed", dry_run=True)
+
+        assert json.loads(raw)["total_note"] == note
+
 
 # ======================================================================
 # 11. Manage Credentials Response Tests

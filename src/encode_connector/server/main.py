@@ -715,6 +715,8 @@ async def encode_batch_download(
     )
 
     files = search_result["results"]
+    # the file search may stop before it has read every experiment; keep its note in every reply
+    total_note = search_result.get("total_note")
 
     if not files:
         empty_result = {
@@ -724,6 +726,8 @@ async def encode_batch_download(
             "next_offset": None,
             "suggestion": "Try broadening your search filters. Use encode_get_facets to see what data is available for your criteria.",
         }
+        if total_note:
+            empty_result["total_note"] = total_note
         if filter_warnings:
             empty_result["filter_warnings"] = filter_warnings
         return json.dumps(empty_result, indent=2)
@@ -738,6 +742,8 @@ async def encode_batch_download(
         preview["search_total"] = search_total
         preview["has_more"] = search_total > limit
         preview["next_offset"] = limit if search_total > limit else None
+        if total_note:
+            preview["total_note"] = total_note
         if filter_warnings:
             preview["filter_warnings"] = filter_warnings
         return json.dumps(_serialize(preview), indent=2)
@@ -759,6 +765,8 @@ async def encode_batch_download(
         "has_more": search_total > limit,
         "next_offset": limit if search_total > limit else None,
     }
+    if total_note:
+        output["total_note"] = total_note
     if filter_warnings:
         output["filter_warnings"] = filter_warnings
     return json.dumps(output, indent=2)

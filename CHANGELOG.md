@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that exceeds the page when more files exist. The search also stopped after the first 200
   experiments, and after the first 200 files of each experiment, so later files were never
   found; it now reads further pages of both until the requested page is full (at most 1,000
-  experiments, and it says so when it stops there).
+  experiments, and it says so when it stops there, also in `encode_batch_download`'s replies).
 - A negative `offset` in `encode_search_experiments` and `encode_search_files` is treated as 0,
   in the request, in the reported `offset` and in `has_more` / `next_offset`, instead of hiding
   or repeating pages.
@@ -88,8 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   smallest), and HiCCUPS
   gets one peak width, window width and merge radius per resolution (juicer_tools exits when
   the `-d` list has a different length).
-- The conda environments pin cutadapt 4.6, samtools 1.19 and OpenJDK 17 exactly, as the images
-  do; they resolved to cutadapt 5.2, samtools 1.19.2 and Java 22 before. cutadapt 4.6 has no
+- The conda environments pin every tool with `==` (a single `=` is a prefix match in conda) and
+  add cutadapt 4.6 and OpenJDK 17, as in the images; they resolved to cutadapt 5.2, samtools
+  1.19.2 and Java 22 before. Every pin now resolves as written. cutadapt 4.6 has no
   Python 3.11 build, so all seven environments use Python 3.10. The Hi-C and WGBS images
   install `openjdk-17-jre-headless` like the other five instead of Ubuntu's `default-jre`
   (Java 11), and the image smoke tests assert Java 17.

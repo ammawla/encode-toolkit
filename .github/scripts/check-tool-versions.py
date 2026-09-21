@@ -45,9 +45,12 @@ NOT_COMPARED = {
     "wget": UBUNTU,
     "curl": UBUNTU,
 }
-# "- samtools=1.19", "- bioconda::samtools==1.19", "- samtools=1.19=h50ea8bc_0  # note", "- r-base>=4.3", "- pigz"
+# "- samtools==1.19", "- bioconda::samtools==1.19", "- samtools=1.19=h50ea8bc_0  # note", "- r-base>=4.3", "- pigz"
 DEPENDENCY = re.compile(r"^\s*-\s*(?:[\w-]+::)?([A-Za-z][\w.-]*)\s*([<>=!~][^\s#]*)?\s*(?:#.*)?$", re.M)
-EXACT = re.compile(r"==?(\d[\w.]*)(?:=[\w.]+)?")
+# conda reads "samtools=1.19" as a prefix (it resolved to 1.19.2); only "==1.19" or a spec with
+# a build string ("=1.19=h50ea8bc_0") fixes the version
+EXACT = re.compile(r"==(\d[\w.]*)|=(\d[\w.]*)=[\w.]+")
+FUZZY = re.compile(r"=(\d[\w.]*)")
 PIP_IN_IMAGE = re.compile(r"(?<![\w.-])([A-Za-z][\w.-]*)==(\d[\w.]*)")
 VERSION = r"(\d+\.\d+(?:\.\d+)*[a-z]?)"
 
@@ -66,11 +69,19 @@ def dockerfile_versions(dockerfile: str, tool: str) -> set[str]:
 
 
 def environment_pins(text: str) -> dict[str, str | None]:
-    """Package -> exact version, or None when the environment lists it without an exact pin."""
+    """Package -> exact version, or None when the environment lists it without an exact pin.
+
+    Tools compared by release line (Java) are exact with "openjdk=17".
+    """
     pins = {}
     for name, spec in DEPENDENCY.findall(text):
         exact = EXACT.fullmatch(spec)
-        pins[name.lower()] = exact.group(1) if exact else None
+        if exact:
+            pins[name.lower()] = exact.group(1) or exact.group(2)
+        elif name.lower() in MAJOR_ONLY and FUZZY.fullmatch(spec):
+            pins[name.lower()] = FUZZY.fullmatch(spec).group(1)
+        else:
+            pins[name.lower()] = None
     return pins
 
 
@@ -105,7 +116,10 @@ def compare(pipeline: str, environment: str, dockerfile: str, tracked: set[str])
             if tool in NOT_COMPARED:
                 skipped.append(f"pipeline-{pipeline}: {tool} is not compared: {NOT_COMPARED[tool]}")
             else:
-                problems.append(f"pipeline-{pipeline}: {tool} is in the image but has no exact pin in the environment")
+                problems.append(
+                    f"pipeline-{pipeline}: {tool} is in the image but has no exact pin in the environment "
+                    '(write "==version"; a single "=" is a prefix match in conda)'
+                )
         elif image_versions:
             compared += 1
             if conda_version not in image_versions:
