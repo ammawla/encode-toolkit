@@ -91,6 +91,8 @@ process STAR_ALIGN {
     path("${sample_id}.Log.final.out"),                                               emit: log
     path("${sample_id}.SJ.out.tab"),                                                  emit: junctions
     path("${sample_id}.ReadsPerGene.out.tab"),                                        emit: gene_counts
+    // STAR always names the first pair of signal files ".str1", also with --outWigStrand
+    // Unstranded, which writes str1 only (STAR 2.7.11b, source/signalFromBAM.cpp lines 45-49).
     tuple val(sample_id), path("${sample_id}.Signal.UniqueMultiple.str*.out.bg"),    emit: bedgraph
     path("${sample_id}.Signal.Unique.str*.out.bg"),                                   emit: bedgraph_unique
 

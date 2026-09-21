@@ -34,6 +34,9 @@ cat(sprintf("R version: %s\n", r_version))
 bioc_version <- BiocManager::version()
 cat(sprintf("Bioconductor version: %s\n\n", bioc_version))
 
+# Packages that could not be installed or loaded; the script exits non-zero when any are left
+failed_pkgs <- character(0)
+
 # Helper function
 install_pkgs <- function(pkgs, category) {
   cat(sprintf("\n--- Installing %s packages (%d) ---\n", category, length(pkgs)))
@@ -48,9 +51,11 @@ install_pkgs <- function(pkgs, category) {
           cat(sprintf("  [OK] %s installed successfully\n", pkg))
         } else {
           cat(sprintf("  [!!] %s install completed but package not loadable\n", pkg))
+          failed_pkgs <<- c(failed_pkgs, pkg)
         }
       }, error = function(e) {
         cat(sprintf("  [FAIL] %s: %s\n", pkg, conditionMessage(e)))
+        failed_pkgs <<- c(failed_pkgs, pkg)
       })
     }
   }
@@ -146,6 +151,13 @@ if (install_all || "--stats" %in% args) {
 
 # --- Summary ---
 cat("\n============================================\n")
+if (length(failed_pkgs) > 0) {
+  cat(sprintf("Installation INCOMPLETE: %d package(s) failed:\n  %s\n",
+              length(failed_pkgs), paste(failed_pkgs, collapse = ", ")))
+  cat("Fix the errors above and run the script again.\n")
+  cat("============================================\n")
+  quit(status = 1)
+}
 cat("Installation complete.\n")
 cat("Run BiocManager::valid() to check for version mismatches.\n")
 cat("============================================\n")

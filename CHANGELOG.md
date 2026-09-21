@@ -5,6 +5,18 @@ All notable changes to the ENCODE Toolkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `install-r-packages.R` printed a package that failed to install or to load and still ended
+  with "Installation complete" and exit status 0. It now lists the failed packages and exits 1.
+
+### Documentation
+
+- The RNA-seq workflow states, with the STAR source line, why it reads `Signal.*.str1.out.bg` for
+  unstranded libraries too: STAR names the first pair of signal files `.str1` in every mode.
+
 ## [0.3.4] - 2026-09-20
 
 Bug-fix release for the MCP server, with the pipeline skills, their images and conda environments, the validation scripts and all documentation checked against the code.
