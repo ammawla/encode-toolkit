@@ -285,6 +285,19 @@ class TestPublications:
 
         assert len(tracker.get_publications("ENCSR133RZO")) == 2
 
+    def test_a_row_stored_with_an_empty_pmid_by_an_older_version_is_replaced(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+        conn = tracker._get_conn()
+        conn.execute(
+            "INSERT INTO publications (experiment_accession, pmid, doi, title) VALUES (?, '', ?, ?)",
+            ("ENCSR133RZO", "10.1/a", "Paper A"),
+        )
+        conn.commit()
+
+        tracker.store_publications("ENCSR133RZO", [{"pmid": "", "doi": "10.1/a", "title": "Paper A"}])
+
+        assert len(tracker.get_publications("ENCSR133RZO")) == 1
+
     def test_store_duplicate_pmid_replaces(self, tracker, sample_experiment):
         """Cover line 354-355: IntegrityError on INSERT OR REPLACE handles duplicates."""
         tracker.track_experiment(sample_experiment)

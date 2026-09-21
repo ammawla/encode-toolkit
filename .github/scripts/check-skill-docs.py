@@ -26,6 +26,8 @@ STRING_VALUE_RE = re.compile(r"""\s*[A-Za-z_]\w*\s*=\s*(["'])([^"']*)\1\s*$""")
 FENCE_RE = re.compile(r"```[^\n]*\n(.*?)```", re.S)
 FLAG_RE = re.compile(r"(?<![\w-])--([A-Za-z_]\w*)")
 PROFILE_RE = re.compile(r"(?<![\w-])-profile[ =]+([\w,]+)")
+# values that are not meant literally: "", "...", "<type>", "csv|tsv", "{accession}"
+PLACEHOLDER_RE = re.compile(r"^$|\.\.\.|[<>|{}]")
 
 
 def literal_values(annotation: ast.expr | None) -> set[str]:
@@ -35,7 +37,8 @@ def literal_values(annotation: ast.expr | None) -> set[str]:
     return {
         constant.value
         for node in ast.walk(annotation)
-        if isinstance(node, ast.Subscript) and getattr(node.value, "id", "") == "Literal"
+        # both spellings: Literal[...] and typing.Literal[...]
+        if isinstance(node, ast.Subscript) and getattr(node.value, "id", getattr(node.value, "attr", "")) == "Literal"
         for constant in ast.walk(node.slice)
         if isinstance(constant, ast.Constant) and isinstance(constant.value, str)
     }
@@ -121,8 +124,7 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
                     continue
                 value = STRING_VALUE_RE.match(argument)
                 choices = signatures[tool][name]
-                # placeholders such as "..." or "<type>" are not meant literally
-                if value and choices and value.group(2) not in choices and value.group(2).isidentifier():
+                if value and choices and value.group(2) not in choices and not PLACEHOLDER_RE.search(value.group(2)):
                     problems.append(
                         f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {", ".join(sorted(choices))})'
                     )
@@ -199,15 +201,37 @@ FIELD_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
 
 
 def server_field_names() -> set[str]:
-    """Every name the server could use as a JSON key: string literals, model fields, keywords."""
+    """Names the server can emit as a JSON key.
+
+    Model fields, keys of dict literals and ``dict(key=...)`` calls, keys assigned with
+    ``result["key"] = ...`` or ``setdefault("key", ...)``, and SQLite column names and aliases
+    (rows are returned as dicts). Other string literals (messages, URLs, filter values) do not count.
+    """
     names: set[str] = set()
     for source in (ROOT / "src" / "encode_connector").rglob("*.py"):
         text = source.read_text()
-        names |= set(re.findall(r"[\"']([A-Za-z_][\w.]*)[\"']", text))
-        names |= set(re.findall(r"^\s{4}([a-z_][a-z0-9_]*):\s", text, re.M))
-        names |= set(re.findall(r"\b([a-z_][a-z0-9_]*)=", text))
-        # rows read back from SQLite use the column names of the CREATE TABLE statements
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ClassDef):
+                names |= {
+                    field.target.id
+                    for field in node.body
+                    if isinstance(field, ast.AnnAssign) and isinstance(field.target, ast.Name)
+                }
+            elif isinstance(node, ast.Dict):
+                names |= {
+                    key.value for key in node.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)
+                }
+            elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
+                if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                    names.add(node.slice.value)
+            elif isinstance(node, ast.Call):
+                called = getattr(node.func, "id", getattr(node.func, "attr", ""))
+                if called == "dict":
+                    names |= {keyword.arg for keyword in node.keywords if keyword.arg}
+                elif called == "setdefault" and node.args and isinstance(node.args[0], ast.Constant):
+                    names.add(str(node.args[0].value))
         names |= set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", text, re.M))
+        names |= set(re.findall(r"\)\s+[Aa][Ss]\s+([a-z_][a-z0-9_]*)", text))
     return names
 
 

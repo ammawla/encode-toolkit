@@ -31,9 +31,10 @@ reported.
 
 ### Key Parameters
 
-`-r`, `-f`, `-p` and `-i` take one value per resolution, in the order given to
-`--hiccups_resolutions`; the peak and window widths are Juicer's published
-defaults for 5 kb, 10 kb and 25 kb.
+`-r`, `-f`, `-p`, `-i` and `-d` take one value per resolution, in the order given to
+`--hiccups_resolutions`; the peak widths, window widths and merge radii are Juicer's
+published defaults for 5 kb, 10 kb and 25 kb. With `--hiccups_resolutions 10000` the
+workflow runs `-r 10000 -f 0.1 -p 2 -i 5 -d 20000`.
 
 | Parameter | Value | Meaning |
 |-----------|-------|---------|
@@ -43,7 +44,7 @@ defaults for 5 kb, 10 kb and 25 kb.
 | `-f` | 0.1,0.1,0.1 | FDR threshold per resolution |
 | `-p` | 4,2,1 | Peak width (pixels) per resolution |
 | `-i` | 7,5,3 | Window width (pixels) of the local background region per resolution |
-| `-d` | 20000,20000,50000 | Merge radius around a loop centroid. In juicer_tools 2.20.00 this always takes exactly three values -- for 5 kb, 10 kb and 25 kb -- and entries for resolutions that are not being run are ignored |
+| `-d` | 20000,20000,50000 | Merge radius (bp) around a loop centroid per resolution: 20 kb at 5 kb and 10 kb, 50 kb at 25 kb. juicer_tools 2.20.00 reads one value per `-r` resolution (`HiCCUPSConfiguration.extractIntegerValues(..., resolutions.length)`); its usage text still says "three values", but a list of any other length (except a single value, which is applied to every resolution) stops HiCCUPS with "Must pass N parameters" and exit code 30 |
 
 `juicer_tools pre` must have written the `-k` vector into the .hic file:
 `main.nf` builds KR, VC and VC_SQRT.

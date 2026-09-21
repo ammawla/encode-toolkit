@@ -353,7 +353,9 @@ class ExperimentTracker:
             pmid = pub.get("pmid") or None
             if pmid is None:
                 conn.execute(
-                    "DELETE FROM publications WHERE experiment_accession = ? AND pmid IS NULL AND doi = ? AND title = ?",
+                    # older versions stored a missing PMID as "": replace such a row too
+                    "DELETE FROM publications WHERE experiment_accession = ? "
+                    "AND (pmid IS NULL OR pmid = '') AND doi = ? AND title = ?",
                     (accession, pub.get("doi", ""), pub.get("title", "")),
                 )
             try:

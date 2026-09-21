@@ -24,7 +24,8 @@ DOCKERFILE_NAMES = {
     "bismark": r"bismark",
     "methyldackel": r"methyldackel",
 }
-CONDA_PIN = re.compile(r"^\s*-\s*([A-Za-z][\w.-]*?)\s*==?\s*(\d[\w.]*)\s*$", re.M)
+# "- samtools=1.19", "- bioconda::samtools=1.19" and "- samtools=1.19=h50ea8bc_0" all pin 1.19
+CONDA_PIN = re.compile(r"^\s*-\s*(?:[\w-]+::)?([A-Za-z][\w.-]*?)\s*==?\s*(\d[\w.]*)(?:=[\w.]+)?\s*$", re.M)
 PIP_PIN = re.compile(r"^\s*-\s*([A-Za-z][\w.-]*?)==(\d[\w.]*)\s*$", re.M)
 VERSION = r"(\d+\.\d+(?:\.\d+)*[a-z]?)"
 
@@ -32,8 +33,10 @@ VERSION = r"(\d+\.\d+(?:\.\d+)*[a-z]?)"
 def dockerfile_versions(dockerfile: str, tool: str) -> set[str]:
     """Versions that follow the tool's name: samtools-1.19, multiqc==1.21, picard/releases/download/3.1.1."""
     name = DOCKERFILE_NAMES.get(tool, re.escape(tool))
+    # a comment such as "# samtools 1.19" says nothing about what the image installs
+    instructions = "\n".join(line for line in dockerfile.splitlines() if not line.lstrip().startswith("#"))
     between = r"(?:[-_=/ v]|linux|releases/download|archive|refs/tags)*"
-    return set(re.findall(rf"(?i)(?<![\w]){name}{between}{VERSION}", dockerfile))
+    return set(re.findall(rf"(?i)(?<![\w]){name}{between}{VERSION}", instructions))
 
 
 def main() -> int:

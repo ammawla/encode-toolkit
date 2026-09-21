@@ -19,6 +19,12 @@ params.min_mapq         = 30
 params.assembly         = 'hg38'
 params.hiccups_gpu      = false   // HiCCUPS runs its CPU mode unless an NVIDIA GPU and CUDA are available
 
+// "--resolutions 5000" arrives as a number and "1000, 5000" carries spaces, so every use of the
+// two resolution lists goes through this parser and renders the normalized list.
+def parseResolutions(value) {
+    return value.toString().tokenize(',').collect { r -> r.trim() as long }
+}
+
 // ---- Processes ----
 
 process FASTQC_RAW {
@@ -164,7 +170,8 @@ process JUICER_HIC {
 
     script:
     // The JVM needs memory beyond its heap, so the heap gets 85% of the task's allocation
-    def heap_gb = Math.max(1, (task.memory.toGiga() * 0.85) as int)
+    def heap_gb     = Math.max(1, (task.memory.toGiga() * 0.85) as int)
+    def resolutions = parseResolutions(params.resolutions).join(',')
     """
     # Convert to Juicer short format: str1 chr1 pos1 frag1 str2 chr2 pos2 frag2.
     # No restriction-site file is used, so the fragment fields carry the dummy values
@@ -179,7 +186,7 @@ process JUICER_HIC {
     # single-threaded (pre says so on stderr) because no --mndindex is supplied.
     java -Xmx${heap_gb}g -jar /opt/juicer_tools.jar pre \\
         --threads ${task.cpus} \\
-        -r ${params.resolutions} \\
+        -r ${resolutions} \\
         -k KR,VC,VC_SQRT \\
         juicer_medium.txt \\
         ${sample_id}.hic \\
@@ -204,7 +211,8 @@ process COOLER_MCOOL {
 
     script:
     // Bin at the smallest requested resolution; zoomify coarsens that into the others
-    def base_bin = params.resolutions.toString().tokenize(',').collect { r -> r as long }.min()
+    def resolutions = parseResolutions(params.resolutions)
+    def base_bin    = resolutions.min()
     """
     cooler cload pairs \\
         --chrom1 2 --pos1 3 --chrom2 4 --pos2 5 \\
@@ -215,7 +223,7 @@ process COOLER_MCOOL {
 
     cooler zoomify \\
         --balance \\
-        --resolutions ${params.resolutions} \\
+        --resolutions ${resolutions.join(',')} \\
         --nproc ${task.cpus} \\
         ${sample_id}_base.cool \\
         -o ${sample_id}.mcool
@@ -239,13 +247,20 @@ process HICCUPS {
     // CPU mode only searches near the diagonal (8 Mb by default).
     def cpu_flag = params.hiccups_gpu ? '' : '--cpu'
     def heap_gb  = Math.max(1, (task.memory.toGiga() * 0.85) as int)
-    // Juicer's published settings per resolution: peak width (-p) and window width (-i).
-    // -d always takes three merge radii, for 5, 10 and 25 kb; unused ones are ignored.
-    def settings = [5000: [peak: 4, window: 7], 10000: [peak: 2, window: 5], 25000: [peak: 1, window: 3]]
-    def loop_res = params.hiccups_resolutions.toString().tokenize(',').collect { r -> r as int }
+    // Juicer's published settings per resolution: peak width (-p), window width (-i) and the
+    // radius for merging nearby pixels (-d). HiCCUPS wants one value per resolution for each
+    // of them (HiCCUPSConfiguration reads every list with resolutions.length), whatever its
+    // usage text says about -d.
+    def settings = [
+        5000L:  [peak: 4, window: 7, radius: 20000],
+        10000L: [peak: 2, window: 5, radius: 20000],
+        25000L: [peak: 1, window: 3, radius: 50000],
+    ]
+    def loop_res = parseResolutions(params.hiccups_resolutions)
     def fdr      = loop_res.collect { _r -> '0.1' }.join(',')
     def peaks    = loop_res.collect { r -> settings[r].peak }.join(',')
     def windows  = loop_res.collect { r -> settings[r].window }.join(',')
+    def radii    = loop_res.collect { r -> settings[r].radius }.join(',')
     """
     java -Xmx${heap_gb}g -jar /opt/juicer_tools.jar hiccups \\
         ${cpu_flag} \\
@@ -255,7 +270,7 @@ process HICCUPS {
         -f ${fdr} \\
         -p ${peaks} \\
         -i ${windows} \\
-        -d 20000,20000,50000 \\
+        -d ${radii} \\
         ${hic} \\
         hiccups_out/
 
@@ -308,12 +323,12 @@ workflow {
 
     // cooler bins once at the smallest resolution and coarsens from there, and HiCCUPS reads
     // its resolutions from the .hic file, so both lists have to be consistent.
-    def resolutions = params.resolutions.toString().tokenize(',').collect { r -> r as long }
+    def resolutions = parseResolutions(params.resolutions)
     def off_grid    = resolutions.findAll { r -> r % resolutions.min() != 0 }
     if (off_grid) {
         error "--resolutions must all be multiples of the smallest one (${resolutions.min()}): ${off_grid.join(', ')} are not"
     }
-    def loop_res    = params.hiccups_resolutions.toString().tokenize(',').collect { r -> r as long }
+    def loop_res    = parseResolutions(params.hiccups_resolutions)
     def unsupported = loop_res.findAll { r -> !(r in [5000L, 10000L, 25000L]) }
     if (unsupported) {
         error "--hiccups_resolutions accepts 5000, 10000 and 25000 only (got ${unsupported.join(', ')})"

@@ -780,6 +780,37 @@ class TestAdditionalResponses:
         assert data["has_more"] is False
         assert data["next_offset"] is None
 
+    @pytest.mark.asyncio
+    async def test_search_experiments_treats_a_negative_offset_as_zero(self):
+        # offset=-30 with 40 hits used to report has_more=False and hide the second page
+        mock_client = AsyncMock()
+        mock_client.search_experiments.return_value = _make_search_result([_mock_experiment_summary()], total=40)
+
+        with patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)):
+            from encode_connector.server.main import encode_search_experiments
+
+            raw = await encode_search_experiments(assay_title="Histone ChIP-seq", offset=-30)
+
+        data = json.loads(raw)
+        assert mock_client.search_experiments.call_args.kwargs["offset"] == 0
+        assert data["has_more"] is True
+        assert data["next_offset"] == 25
+
+    @pytest.mark.asyncio
+    async def test_search_files_treats_a_negative_offset_as_zero(self):
+        mock_client = AsyncMock()
+        mock_client.search_files.return_value = _make_file_search_result([_mock_file_summary()], total=40)
+
+        with patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)):
+            from encode_connector.server.main import encode_search_files
+
+            raw = await encode_search_files(file_format="bed", offset=-30)
+
+        data = json.loads(raw)
+        assert mock_client.search_files.call_args.kwargs["offset"] == 0
+        assert data["has_more"] is True
+        assert data["next_offset"] == 25
+
 
 # ======================================================================
 # 7. Helper Function Tests

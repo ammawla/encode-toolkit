@@ -375,7 +375,9 @@ encode_batch_download(
 - **IDR compares every pair of replicates**: all samples matched by `--reads` are treated
   as replicates of one experiment, and `idr` runs once per pair (two samples give one
   comparison, three give three). No replicate is dropped, and with a single sample IDR is
-  skipped silently. There is still no pooled peak call, no pseudoreplicates, and no rescue
+  skipped silently. Run one target and condition per invocation: samples of different marks
+  or conditions matched by the same glob are paired as well, and those comparisons are
+  meaningless. There is still no pooled peak call, no pseudoreplicates, and no rescue
   or self-consistency ratio.
 
 ## Walkthrough: Processing ENCODE H3K27ac ChIP-seq from FASTQ to Peaks
