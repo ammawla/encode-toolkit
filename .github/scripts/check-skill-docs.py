@@ -220,10 +220,16 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[
             if not elided and required[tool] - given:
                 missing = ", ".join(sorted(required[tool] - given))
                 problems.append(f"{where}: {tool}() is called without its required {missing}")
+            # a positional argument fills the next positional parameter: give it that name so
+            # it gets the same checks as a keyword argument
+            positions = iter(order[tool])
             for argument in parts:
+                if not KEYWORD_RE.match(argument):
+                    parameter = next(positions, None)
+                    if parameter is None or elided:
+                        continue
+                    argument = f"{parameter}={argument.strip()}"
                 keyword = KEYWORD_RE.match(argument)
-                if not keyword:
-                    continue
                 name = keyword.group(1)
                 if name not in signatures[tool]:
                     accepted = ", ".join(sorted(signatures[tool]))
@@ -292,6 +298,9 @@ def check_pipeline_examples() -> list[str]:
             else:
                 continue  # a third-party workflow, not one of the pipeline skills
             where = f"{doc.relative_to(ROOT)}:{line}"
+            script = re.search(r"nextflow\s+run\s+(\S+main\.nf)", command)
+            if script and not doc.is_relative_to(SKILLS) and not (ROOT / script.group(1)).exists():
+                problems.append(f"{where}: {script.group(1)} does not exist from the repository root")
             for flag in FLAG_RE.findall(command):
                 if flag not in params:
                     problems.append(f"{where}: --{flag} is not a parameter of this pipeline")

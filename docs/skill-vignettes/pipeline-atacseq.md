@@ -19,7 +19,7 @@ Runs the ENCODE ATAC-seq pipeline end-to-end: Bowtie2 alignment, Tn5 transposase
 ### Step 1: Run the Pipeline
 
 ```bash
-nextflow run scripts/main.nf \
+nextflow run skills/pipeline-atacseq/scripts/main.nf \
   -profile local \
   --reads 'fastq/islet_*_R{1,2}.fq.gz' \
   --genome GRCh38 \

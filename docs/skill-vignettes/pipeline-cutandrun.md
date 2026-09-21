@@ -34,7 +34,7 @@ Three properties of CUT&RUN data require a fundamentally different pipeline.
 Claude runs the pipeline that ships with the skill, with spike-in calibration enabled.
 
 ```bash
-nextflow run main.nf \
+nextflow run skills/pipeline-cutandrun/scripts/main.nf \
     -profile local \
     --reads '/data/cutandrun/fastq/Rep*_R{1,2}.fastq.gz' \
     --bowtie2_index '/ref/bowtie2_index/genome' \
