@@ -4,7 +4,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.3.4-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.5-green)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-beta-yellow)]()
 [![Skills](https://img.shields.io/badge/skills-47-orange)](docs/skill-vignettes/)
 [![Tools](https://img.shields.io/badge/MCP_tools-20-purple)](src/encode_connector/server/main.py)
