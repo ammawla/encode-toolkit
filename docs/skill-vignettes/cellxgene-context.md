@@ -114,4 +114,4 @@ If ENCODE scATAC-seq is available for pancreas, chromatin accessibility in beta 
 | `epigenome-profiling` | Building tissue epigenomic profiles with cell-type context |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

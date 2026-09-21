@@ -163,7 +163,7 @@ status stop the run.
 | `--bwa_index` | required | BWA index prefix: the genome FASTA path whose `.amb .ann .bwt .pac .sa` files sit beside it (every file starting with this prefix is staged) |
 | `--chrom_sizes` | required | Chromosome sizes file |
 | `--outdir` | `./results` | Output directory |
-| `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions for `juicer_tools pre` and `cooler zoomify`. The smallest value is the cooler base bin, and every other value must be a multiple of it; the workflow stops with an error otherwise |
+| `--resolutions` | `1000,5000,10000,25000,50000,100000,250000,500000,1000000` | Matrix resolutions for `juicer_tools pre` and `cooler zoomify`: a comma-separated list of positive integers. The smallest value is the cooler base bin, and every other value must be a multiple of it; the workflow stops with an error otherwise |
 | `--hiccups_resolutions` | `5000,10000,25000` | Resolutions HiCCUPS calls loops at. Only 5000, 10000 and 25000 are accepted, and each must also be listed in `--resolutions`; the workflow stops with an error otherwise. Peak width (`-p`), window width (`-i`), merge radius (`-d`) and FDR (`-f`) follow Juicer's published per-resolution defaults, one value per resolution |
 | `--min_mapq` | `30` | Minimum MAPQ passed to `pairtools parse` |
 | `--hiccups_gpu` | `false` | Run HiCCUPS on an NVIDIA GPU. By default the CPU mode is used, which only searches within 8 Mb of the diagonal |

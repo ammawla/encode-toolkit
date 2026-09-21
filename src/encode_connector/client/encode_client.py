@@ -19,8 +19,12 @@ from encode_connector.client.constants import (
     DEFAULT_LIMIT,
     DEFAULT_TIMEOUT,
     EXPERIMENT_FILTER_MAP,
+    EXPERIMENT_FRAME,
+    EXPERIMENT_PAGE_SIZE,
     EXPERIMENT_SEARCH_FIELDS,
     FILE_FILTER_MAP,
+    FILES_PAGE_SIZE,
+    MAX_EXPERIMENTS_SCANNED,
     MAX_REQUESTS_PER_SECOND,
     METADATA_MAP,
     USER_AGENT,
@@ -302,11 +306,11 @@ class EncodeClient:
         }
 
     async def get_experiment_raw(self, accession: str) -> dict:
-        """Get raw experiment data with embedded frame."""
+        """Get raw experiment data: linked objects embedded, audits included."""
         validate_accession(accession)
         return await self._request(
             f"/experiments/{accession}/",
-            {"format": "json", "frame": "embedded"},
+            {"format": "json", "frame": EXPERIMENT_FRAME},
         )
 
     async def get_experiment(self, accession: str) -> ExperimentDetail:
@@ -315,7 +319,7 @@ class EncodeClient:
         # Get experiment data
         exp_data = await self._request(
             f"/experiments/{accession}/",
-            {"format": "json", "frame": "embedded"},
+            {"format": "json", "frame": EXPERIMENT_FRAME},
         )
 
         # Get files for this experiment
@@ -348,6 +352,7 @@ class EncodeClient:
         status: str | None = None,
         preferred_default: bool | None = None,
         limit: int = 200,
+        offset: int = 0,
     ) -> list[FileSummary]:
         """List files for a specific experiment with optional filters."""
         validate_accession(experiment_accession)
@@ -359,6 +364,8 @@ class EncodeClient:
             "frame": "object",
             "limit": limit,
         }
+        if offset > 0:
+            params["from"] = offset
 
         filter_values = {
             "file_format": file_format,
@@ -400,6 +407,7 @@ class EncodeClient:
     ) -> dict[str, Any]:
         """Search files across all experiments with combined filters."""
         limit = clamp_limit(limit)
+        offset = max(0, offset)
         params: dict[str, Any] = {
             "type": "File",
             "format": "json",
@@ -439,44 +447,60 @@ class EncodeClient:
         # For organism filtering on files, we need a two-step approach:
         # search experiments first, then get files from matching experiments
         if organism:
-            # For non-human organisms, do a two-step search
-            exp_result = await self.search_experiments(
-                assay_title=assay_title,
-                organism=organism,
-                organ=organ,
-                biosample_type=biosample_type,
-                target=target,
-                status=status or "released",
-                search_term=search_term,
-                limit=200,
-            )
-            if not exp_result["results"]:
-                return {"results": [], "total": 0, "limit": limit, "offset": offset}
-
-            # Get files from matching experiments, one file past the requested page so the
-            # caller can tell that more exist
-            offset = max(0, offset)
+            # Collect one file past the requested page so the caller can tell that more exist.
+            # Matching files may belong to experiments far down the list, so keep reading
+            # experiment pages until the page is full or the experiments run out.
             wanted = offset + limit + 1
-            all_files = []
-            for exp in exp_result["results"]:
-                exp_files = await self.list_files(
-                    experiment_accession=exp.accession,
-                    file_format=file_format,
-                    file_type=file_type,
-                    output_type=output_type,
-                    output_category=output_category,
-                    assembly=assembly,
-                    status=status,
-                    preferred_default=preferred_default,
+            all_files: list[FileSummary] = []
+            experiment_offset = 0
+            experiment_total = 0
+            while len(all_files) < wanted and experiment_offset < MAX_EXPERIMENTS_SCANNED:
+                exp_result = await self.search_experiments(
+                    assay_title=assay_title,
+                    organism=organism,
+                    organ=organ,
+                    biosample_type=biosample_type,
+                    target=target,
+                    status=status or "released",
+                    search_term=search_term,
+                    limit=EXPERIMENT_PAGE_SIZE,
+                    offset=experiment_offset,
                 )
-                all_files.extend(exp_files)
-                if len(all_files) >= wanted:
+                experiments = exp_result["results"]
+                experiment_total = exp_result.get("total", 0)
+                for exp in experiments:
+                    # one experiment can hold more files than a request returns
+                    file_offset = 0
+                    while len(all_files) < wanted:
+                        exp_files = await self.list_files(
+                            experiment_accession=exp.accession,
+                            file_format=file_format,
+                            file_type=file_type,
+                            output_type=output_type,
+                            output_category=output_category,
+                            assembly=assembly,
+                            status=status,
+                            preferred_default=preferred_default,
+                            limit=FILES_PAGE_SIZE,
+                            offset=file_offset,
+                        )
+                        all_files.extend(exp_files)
+                        file_offset += len(exp_files)
+                        if len(exp_files) < FILES_PAGE_SIZE:
+                            break
+                    if len(all_files) >= wanted:
+                        break
+                experiment_offset += len(experiments)
+                if not experiments or experiment_offset >= experiment_total:
                     break
 
+            total_note = "Lower bound: files collected so far from matching experiments, not the full count"
+            if len(all_files) < wanted and experiment_total > experiment_offset >= MAX_EXPERIMENTS_SCANNED:
+                total_note += f"; stopped after reading {experiment_offset} of {experiment_total} experiments"
             return {
                 "results": all_files[offset : offset + limit],
                 "total": len(all_files),
-                "total_note": "Lower bound: files collected so far from matching experiments, not the full count",
+                "total_note": total_note,
                 "limit": limit,
                 "offset": offset,
             }

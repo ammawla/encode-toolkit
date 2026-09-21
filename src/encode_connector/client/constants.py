@@ -12,6 +12,15 @@ DOWNLOAD_CONCURRENCY = 3
 DEFAULT_TIMEOUT = 30.0
 DOWNLOAD_TIMEOUT = 300.0
 DEFAULT_LIMIT = 25
+# Frame for a single experiment. "page" is "embedded" plus the "audit" property; with
+# "embedded" ENCODE omits the audits and every experiment looks free of errors and warnings.
+EXPERIMENT_FRAME = "page"
+# experiments read per request while a file search walks the experiments of one organism
+EXPERIMENT_PAGE_SIZE = 200
+# ...and how many experiments it reads at most: each one costs a request to ENCODE
+MAX_EXPERIMENTS_SCANNED = 1000
+# files of one experiment read per request during that walk
+FILES_PAGE_SIZE = 200
 try:
     import importlib.metadata
 
@@ -239,8 +248,18 @@ FILE_FORMATS = [
     "vcf",
     "bigInteract",
     "idx",
-    "dat",
     "txt",
+    "h5ad",
+    "hdf5",
+    "sam",
+    "wig",
+    "starch",
+    "chain",
+    "PWM",
+    "btr",
+    "cndb",
+    "nucle3d",
+    "yaml",
 ]
 
 OUTPUT_TYPES = [
@@ -277,7 +296,6 @@ OUTPUT_TYPES = [
     "pseudoreplicated peaks",
     "pseudoreplicated IDR thresholded peaks",
     "replicated peaks",
-    "stable peaks",
     "hotspots",
     "footprints",
     "peaks and background as input for IDR",
@@ -289,6 +307,10 @@ OUTPUT_TYPES = [
     "filtered peaks",
     # Quantifications
     "gene quantifications",
+    "sparse gene count matrix of unique reads",
+    "sparse gene count matrix of all reads",
+    "unfiltered sparse gene count matrix of unique reads",
+    "unfiltered sparse gene count matrix of all reads",
     "transcript quantifications",
     "exon quantifications",
     "microRNA quantifications",
@@ -347,7 +369,6 @@ OUTPUT_CATEGORIES = [
     "annotation",
     "quantification",
     "reference",
-    "quality metric",
 ]
 
 FILE_STATUSES = [
@@ -381,6 +402,14 @@ ASSEMBLIES = [
     "dm3",
     "ce11",
     "ce10",
+    "GRCh38-minimal",
+    "mm10-minimal",
+    "T2T-CHM13",
+    "J02459.1",
+    "ENC001.1",
+    "ENC002.1",
+    "ENC003.1",
+    "ENC004.1",
 ]
 
 LIFE_STAGES = [

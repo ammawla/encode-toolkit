@@ -321,6 +321,16 @@ workflow {
     if (!params.bwa_index)   { error "Missing required parameter: --bwa_index" }
     if (!params.chrom_sizes) { error "Missing required parameter: --chrom_sizes" }
 
+    // Reject empty lists, zero, negative and non-numeric values before anything does arithmetic
+    // on them (the smallest resolution is a divisor below and cooler's bin size).
+    [resolutions: params.resolutions, hiccups_resolutions: params.hiccups_resolutions].each { name, value ->
+        // split(',', -1) keeps empty fields, so "5000," and "5000,,10000" are rejected too
+        def tokens = value.toString().split(',', -1).collect { r -> r.trim() }
+        if (tokens.any { r -> !(r ==~ /[1-9][0-9]*/) }) {
+            error "--${name} must be a comma-separated list of positive integers (got '${value}')"
+        }
+    }
+
     // cooler bins once at the smallest resolution and coarsens from there, and HiCCUPS reads
     // its resolutions from the .hic file, so both lists have to be consistent.
     def resolutions = parseResolutions(params.resolutions)

@@ -26,14 +26,31 @@ Before searching, check what pancreas data exists to set expectations.
 encode_get_facets(organ="pancreas", assay_title="Histone ChIP-seq")
 ```
 
+The top-level keys are ENCODE's own facet field names, and each holds a list of
+`{"term", "count"}` objects:
+
 ```json
 {
-  "total_experiments": 38,
-  "facets": {
-    "target": {"H3K27ac": 6, "H3K4me3": 8, "H3K27me3": 7, "H3K4me1": 5, "H3K36me3": 4},
-    "biosample_type": {"tissue": 22, "cell line": 10, "in vitro differentiated cells": 6},
-    "biosample_term_name": {"pancreas": 14, "islet of Langerhans": 8, "PANC-1": 6}
-  }
+  "assay_title": [
+    {"term": "Histone ChIP-seq", "count": 38}
+  ],
+  "target.label": [
+    {"term": "H3K4me3", "count": 8},
+    {"term": "H3K27me3", "count": 7},
+    {"term": "H3K27ac", "count": 6},
+    {"term": "H3K4me1", "count": 5},
+    {"term": "H3K36me3", "count": 4}
+  ],
+  "biosample_ontology.classification": [
+    {"term": "tissue", "count": 22},
+    {"term": "cell line", "count": 10},
+    {"term": "in vitro differentiated cells", "count": 6}
+  ],
+  "biosample_ontology.term_name": [
+    {"term": "pancreas", "count": 14},
+    {"term": "islet of Langerhans", "count": 8},
+    {"term": "PANC-1", "count": 6}
+  ]
 }
 ```
 
@@ -54,19 +71,22 @@ encode_search_experiments(
   "total": 4,
   "results": [
     {"accession": "ENCSR831YAX", "biosample_summary": "islet of Langerhans, adult male 54y",
-     "target": "H3K27ac-human", "lab": "Bing Ren, UCSD",
-     "audit": {"WARNING": 1, "NOT_COMPLIANT": 0, "ERROR": 0}},
+     "target": "H3K27ac", "lab": "Bing Ren, UCSD",
+     "audit_error_count": 0, "audit_not_compliant_count": 0, "audit_warning_count": 1},
     {"accession": "ENCSR976DGM", "biosample_summary": "islet of Langerhans, adult female 47y",
-     "target": "H3K27ac-human", "lab": "Bing Ren, UCSD",
-     "audit": {"WARNING": 0, "NOT_COMPLIANT": 0, "ERROR": 0}},
+     "target": "H3K27ac", "lab": "Bing Ren, UCSD",
+     "audit_error_count": 0, "audit_not_compliant_count": 0, "audit_warning_count": 0},
     {"accession": "ENCSR149DGJ", "biosample_summary": "islet of Langerhans, adult male 38y",
-     "target": "H3K27ac-human", "lab": "Bradley Bernstein, Broad",
-     "audit": {"WARNING": 2, "NOT_COMPLIANT": 0, "ERROR": 0}},
+     "target": "H3K27ac", "lab": "Bradley Bernstein, Broad",
+     "audit_error_count": 0, "audit_not_compliant_count": 0, "audit_warning_count": 2},
     {"accession": "ENCSR440KDQ", "biosample_summary": "islet of Langerhans, adult female 62y",
-     "target": "H3K27ac-human", "lab": "Bradley Bernstein, Broad",
-     "audit": {"WARNING": 1, "NOT_COMPLIANT": 1, "ERROR": 0}}
+     "target": "H3K27ac", "lab": "Bradley Bernstein, Broad",
+     "audit_error_count": 0, "audit_not_compliant_count": 1, "audit_warning_count": 1}
   ],
-  "has_more": false
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -85,7 +105,7 @@ Next steps: use `encode_list_files` on these accessions to retrieve IDR threshol
 
 | Parameter | Description | Example Values |
 |---|---|---|
-| `assay_title` | Assay type (must match ENCODE vocabulary) | `"Histone ChIP-seq"`, `"ATAC-seq"`, `"RNA-seq"` |
+| `assay_title` | Assay type (must match ENCODE vocabulary) | `"Histone ChIP-seq"`, `"ATAC-seq"`, `"total RNA-seq"` |
 | `organ` | Broad anatomical system | `"pancreas"`, `"brain"`, `"liver"`, `"heart"` |
 | `biosample_term_name` | Specific cell or tissue name | `"islet of Langerhans"`, `"GM12878"`, `"K562"` |
 | `biosample_type` | Sample classification | `"tissue"`, `"cell line"`, `"primary cell"`, `"organoid"` |
@@ -106,4 +126,4 @@ Next steps: use `encode_list_files` on these accessions to retrieve IDR threshol
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

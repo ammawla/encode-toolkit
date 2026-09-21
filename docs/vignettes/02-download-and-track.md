@@ -22,14 +22,17 @@ its processed data, add it to your local research library, and prepare citations
 
 **Claude calls:** `encode_list_files(experiment_accession="ENCSR133RZO")`
 
+The tool returns a JSON array of file records. Each record carries 19 fields; the ones
+that drive file choice are shown here:
+
 ```json
 [
-  {"accession": "ENCFF635JIA", "format": "bed",    "output_type": "pseudoreplicated peaks",  "size": "39.5 KB",  "preferred_default": true},
-  {"accession": "ENCFF199LSM", "format": "bigBed", "output_type": "pseudoreplicated peaks",  "size": "179.0 KB", "preferred_default": true},
-  {"accession": "ENCFF387ALH", "format": "bigWig", "output_type": "signal p-value",          "size": "1.2 GB",   "preferred_default": true},
-  {"accession": "ENCFF186PZN", "format": "bigWig", "output_type": "fold change over control", "size": "1.2 GB",   "preferred_default": false},
-  {"accession": "ENCFF977UZL", "format": "bam",    "output_type": "alignments",              "size": "3.3 GB",   "preferred_default": false},
-  {"accession": "ENCFF763GUV", "format": "bam",    "output_type": "unfiltered alignments",   "size": "3.9 GB",   "preferred_default": false}
+  {"accession": "ENCFF635JIA", "file_format": "bed",    "output_type": "pseudoreplicated peaks",   "file_size": 40482,      "file_size_human": "39.5 KB",  "assembly": "GRCh38", "preferred_default": true},
+  {"accession": "ENCFF199LSM", "file_format": "bigBed", "output_type": "pseudoreplicated peaks",   "file_size": 183334,     "file_size_human": "179.0 KB", "assembly": "GRCh38", "preferred_default": true},
+  {"accession": "ENCFF387ALH", "file_format": "bigWig", "output_type": "signal p-value",           "file_size": 1239311158, "file_size_human": "1.2 GB",   "assembly": "GRCh38", "preferred_default": true},
+  {"accession": "ENCFF186PZN", "file_format": "bigWig", "output_type": "fold change over control", "file_size": 1325853979, "file_size_human": "1.2 GB",   "assembly": "GRCh38", "preferred_default": false},
+  {"accession": "ENCFF977UZL", "file_format": "bam",    "output_type": "alignments",               "file_size": 3546672634, "file_size_human": "3.3 GB",   "assembly": "GRCh38", "preferred_default": false},
+  {"accession": "ENCFF763GUV", "file_format": "bam",    "output_type": "unfiltered alignments",    "file_size": 4221319561, "file_size_human": "3.9 GB",   "assembly": "GRCh38", "preferred_default": false}
 ]
 ```
 
@@ -47,12 +50,34 @@ BAM and FASTQ files are only needed if you plan to re-align or re-call peaks.
 **Claude calls:** `encode_download_files(file_accessions=["ENCFF635JIA"], download_dir="/data/encode")`
 
 ```json
-{"file": "ENCFF635JIA.bed.gz", "size": 40482, "path": "/data/encode/ENCFF635JIA.bed.gz", "md5_verified": true}
+{
+  "downloaded": [
+    {
+      "accession": "ENCFF635JIA",
+      "file_path": "/data/encode/ENCFF635JIA.bed.gz",
+      "file_size": 40482,
+      "file_size_human": "39.5 KB",
+      "success": true,
+      "error": "",
+      "md5_verified": true
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "total_requested": 1,
+    "successful": 1,
+    "failed": 0,
+    "total_size": 40482,
+    "total_size_human": "39.5 KB"
+  }
+}
 ```
 
 **Interpretation:** The file downloaded and its MD5 checksum matches the ENCODE registry,
-confirming data integrity. For batch downloads, use `encode_batch_download` with search
-filters -- Claude previews the download list before proceeding.
+confirming data integrity (`md5_verified: true`). Files land directly in `download_dir`
+because `organize_by` defaults to `"flat"`; pass `"experiment"` to get one subdirectory per
+experiment. For batch downloads, use `encode_batch_download` with search filters -- Claude
+previews the download list before proceeding.
 
 ## Step 3: Track the Experiment
 
@@ -64,19 +89,33 @@ Tracking stores metadata, publications, and pipeline information in a local SQLi
 
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR133RZO",
-  "metadata_stored": {"assay_title": "Histone ChIP-seq", "target": "H3K27me3",
-    "biosample_summary": "Homo sapiens pancreas tissue female child (16 years)",
-    "lab": "Bradley Bernstein, Broad", "date_released": "2021-06-24"},
+  "tracking": {
+    "accession": "ENCSR133RZO",
+    "action": "tracked"
+  },
+  "auto_linked_references": [
+    {"type": "geo_accession", "id": "GSE187091"}
+  ],
   "publications_found": 0,
-  "pipelines_found": 1
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {
+      "title": "Histone ChIP-seq 2 (unreplicated)",
+      "version": "1.7.1",
+      "software": [{"name": "bowtie2", "version": "2.3.4.3"}],
+      "status": "released"
+    }
+  ]
 }
 ```
 
-**Interpretation:** The experiment is now in your local library. Zero publications were
-found -- common for tissue samples from large-scale mapping efforts. The pipeline record
-captures the ENCODE ChIP-seq processing pipeline version used.
+**Interpretation:** The experiment is now in your local library -- `tracking.action` is
+`"tracked"` on first insert and `"updated"` when you track it again. The GEO cross-reference
+in the ENCODE record was linked automatically. Zero publications were found -- common for
+tissue samples from large-scale mapping efforts. The pipeline record captures the ENCODE
+ChIP-seq processing pipeline version used. The stored metadata is not echoed back here; read
+it with `encode_list_tracked`.
 
 ## Step 4: Get Citations
 
@@ -84,22 +123,31 @@ captures the ENCODE ChIP-seq processing pipeline version used.
 
 **Claude calls:** `encode_get_citations(export_format="bibtex")`
 
+```text
+No publications found.
+```
+
+**Interpretation:** ENCSR133RZO has no experiment-specific publication, and the citation
+export only covers publications stored by `encode_track_experiment` -- so there is nothing
+to export yet. Cite the Consortium's own reference paper yourself in that case. Once you
+track an experiment whose ENCODE record does cite a paper, the same call returns one entry
+per publication:
+
 ```bibtex
-@article{ENCODE_Consortium_2012,
-  title   = {An integrated encyclopedia of {DNA} elements in the human genome},
-  author  = {{The ENCODE Project Consortium}},
+@article{22955616,
+  title = {An integrated encyclopedia of DNA elements in the human genome},
+  author = {The ENCODE Project Consortium},
   journal = {Nature},
-  volume  = {489},
-  pages   = {57--74},
-  year    = {2012},
-  doi     = {10.1038/nature11247},
-  note    = {Primary ENCODE reference for experiment ENCSR133RZO}
+  year = {2012},
+  doi = {10.1038/nature11247},
+  pmid = {22955616},
+  note = {ENCODE experiment: ENCSR000AKS},
 }
 ```
 
-**Interpretation:** Since ENCSR133RZO has no experiment-specific publications, the tool returns
-the primary Consortium reference. For experiments with linked publications, those specific
-citations appear instead. RIS format (Endnote, Zotero, Mendeley) is also available.
+The entry key is the PMID when there is one, otherwise the DOI. Only the fields the
+publication record holds are emitted -- there is no `volume` or `pages`. RIS format
+(Endnote, Zotero, Mendeley) is also available with `export_format="ris"`.
 
 ## Step 5: Log a Derived File
 
@@ -111,7 +159,7 @@ After analysis, log derived files to maintain a provenance chain back to ENCODE 
 ```python
 encode_log_derived_file(
     file_path="/data/encode/ENCSR133RZO_H3K27me3_filtered.bed",
-    source_accessions=["ENCFF635JIA"],
+    source_accessions=["ENCSR133RZO", "ENCFF635JIA"],
     description="Blacklist-filtered H3K27me3 peaks from pancreas tissue",
     tool_used="bedtools subtract",
     parameters="bedtools subtract -a ENCFF635JIA.bed.gz -b hg38-blacklist.v2.bed"
@@ -120,17 +168,21 @@ encode_log_derived_file(
 
 ```json
 {
-  "status": "logged",
-  "provenance_id": "prov_001",
+  "success": true,
+  "record_id": 1,
   "file_path": "/data/encode/ENCSR133RZO_H3K27me3_filtered.bed",
-  "source_accessions": ["ENCFF635JIA"],
-  "tool_used": "bedtools subtract",
-  "logged_at": "2026-03-07T14:32:00Z"
+  "source_accessions": ["ENCSR133RZO", "ENCFF635JIA"],
+  "message": "Provenance logged. Use encode_get_provenance to view the full chain."
 }
 ```
 
 **Interpretation:** The provenance record links your filtered file back to ENCFF635JIA with
-the exact tool and parameters. You or a reviewer can trace any result to its ENCODE source.
+the exact tool and parameters. List the experiment accession among the sources as well: the
+library counts a derived file against an experiment by looking for its accession in
+`source_accessions`, so naming ENCSR133RZO is what makes it show up in that experiment's
+`derived_file_count`. The response echoes only the identifying fields; the tool, parameters
+and timestamp are stored and come back from `encode_get_provenance`. You or a reviewer can
+trace any result to its ENCODE source.
 
 ## Step 6: Export Your Library
 
@@ -139,15 +191,18 @@ the exact tool and parameters. You or a reviewer can trace any result to its ENC
 **Claude calls:** `encode_export_data(format="csv")`
 
 ```csv
-accession,assay_title,target,biosample_summary,lab,date_released,publications,derived_files
-ENCSR133RZO,Histone ChIP-seq,H3K27me3,"pancreas tissue female child (16 years)","Bradley Bernstein, Broad",2021-06-24,0,1
-ENCSR511LIV,Histone ChIP-seq,H3K27me3,"pancreas tissue female adult (61 years)","Bradley Bernstein, Broad",2021-06-24,0,0
-ENCSR368EPJ,Histone ChIP-seq,H3K9me3,"pancreas tissue female adult (59 years)","Bradley Bernstein, Broad",2021-06-24,0,0
+accession,assay_title,target,organism,organ,biosample_type,biosample_summary,lab,assembly,status,date_released,replication_type,life_stage,publication_count,pmids,derived_file_count,external_reference_count
+ENCSR133RZO,Histone ChIP-seq,H3K27me3,Homo sapiens,pancreas,tissue,"Homo sapiens pancreas tissue female child (16 years)","Bradley Bernstein, Broad",GRCh38,released,2021-06-24,unreplicated,child 16 years,0,,1,1
+ENCSR511LIV,Histone ChIP-seq,H3K27me3,Homo sapiens,pancreas,tissue,"Homo sapiens pancreas tissue female adult (61 years)","Bradley Bernstein, Broad",GRCh38,released,2021-06-24,unreplicated,adult 61 years,0,,0,1
+ENCSR368EPJ,Histone ChIP-seq,H3K9me3,Homo sapiens,pancreas,tissue,"Homo sapiens pancreas tissue female adult (59 years)","Bradley Bernstein, Broad",GRCh38,released,2021-06-24,unreplicated,adult 59 years,0,,0,1
 ```
 
-**Interpretation:** Each row is one tracked experiment. The `derived_files` column tracks
-analysis progress -- ENCSR133RZO shows one derived file logged, while the others await
-processing. TSV and JSON formats are also available.
+**Interpretation:** Each row is one tracked experiment, with the same 17 columns every
+time. The `derived_file_count` column tracks analysis progress -- ENCSR133RZO shows one
+derived file logged, while the others await processing. `pmids` is a semicolon-joined list
+and is empty here because none of these experiments cites a paper. TSV and JSON are also
+available; the JSON rows are wider, adding `description`, `award`, `url`, `tracked_at`,
+`updated_at` and `notes`.
 
 ---
 

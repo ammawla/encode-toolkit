@@ -90,8 +90,8 @@ Combine frequency and constraint into a prioritization matrix:
 ```
 encode_log_derived_file(
     file_path="/data/pancreas_t2d/prioritized_regulatory_variants.tsv",
-    source_accessions=["ENCSR...", "gnomAD_v4.1"],
-    description="47 T2D GWAS variants in pancreas H3K27ac peaks, annotated with gnomAD AF and gene constraint",
+    source_accessions=["ENCSR..."],
+    description="47 T2D GWAS variants in pancreas H3K27ac peaks, annotated with gnomAD v4.1 AF and gene constraint",
     tool_used="bedtools intersect v2.31.0 + gnomAD GraphQL API",
     parameters="AF filter: absent/rare (<0.01); constraint: LOEUF<0.35; assembly=GRCh38"
 )
@@ -115,4 +115,4 @@ encode_log_derived_file(
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

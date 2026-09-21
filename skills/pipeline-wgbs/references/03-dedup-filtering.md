@@ -107,10 +107,11 @@ samtools depth -a bismark/alignments/sample.sorted.bam \
 
 samtools flagstat bismark/alignments/sample.sorted.bam > sample_flagstat.txt
 
-# CpG-specific coverage
-bedtools intersect \
-    -a bismark/alignments/sample.sorted.bam \
-    -b /ref/CpG_sites.bed \
-    -wa -wb \
+# CpG-specific coverage: reads overlapping each CpG (last column), as a histogram.
+# The BED goes in -a so the output is text; with a BAM in -a, bedtools writes BAM.
+bedtools coverage \
+    -a /ref/CpG_sites.bed \
+    -b bismark/alignments/sample.sorted.bam \
+    -counts \
     | awk '{print $NF}' | sort -n | uniq -c
 ```

@@ -117,4 +117,4 @@ encode_link_reference(experiment_accession="ENCSR976DGM", reference_type="other"
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

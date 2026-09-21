@@ -106,7 +106,12 @@ awk '{print $7}' sample.filtered.narrowPeak | sort -n | awk 'NR==1{print "Pre-fi
 awk '{print $7}' sample.qfiltered.narrowPeak | sort -n | awk 'NR==1{print "Post-filter min:", $1} END{print "Post-filter max:", $1}'
 ```
 
-Use `validate_peaks.py` from the scripts directory to verify file integrity after filtering.
+Verify file integrity after filtering. `--format` must match the file: narrowPeak has 10 columns, broadPeak 9.
+
+```bash
+python3 scripts/validate_peaks.py sample.qfiltered.narrowPeak
+python3 scripts/validate_peaks.py sample.qfiltered.broadPeak --format broad
+```
 
 ## Alternative Approaches
 

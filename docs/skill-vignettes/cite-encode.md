@@ -15,18 +15,26 @@ acknowledgment section -- all compliant with ENCODE data use policy.
 
 ## Step 1: Track Experiments to Auto-Link Publications
 
-**You ask Claude:** "Track ENCSR133RZO so I can cite it properly."
+**You ask Claude:** "Track ENCSR425FUS so I can cite it properly."
 
-**Claude calls:** `encode_track_experiment(accession="ENCSR133RZO", fetch_publications=True)`
+**Claude calls:** `encode_track_experiment(accession="ENCSR425FUS", fetch_publications=True)`
 
 ```json
-{"status": "tracked", "accession": "ENCSR133RZO", "publications_found": 1,
- "publications": [{"pmid": "32728249", "title": "Expanded encyclopaedias of DNA elements...",
-   "journal": "Nature", "year": 2020, "doi": "10.1038/s41586-020-2493-4"}]}
+{"tracking": {"accession": "ENCSR425FUS", "action": "tracked"},
+ "publications_found": 1,
+ "publications": [{"pmid": "35045337", "doi": "10.1016/j.neuron.2021.12.019",
+   "title": "Genome-wide Identification of the Genetic Basis of Amyotrophic Lateral Sclerosis",
+   "authors": "Sai Zhang, Johnathan Cooper-Knock, Annika K. Weimer, Minyi Shi, Tobias Moll, Jack N.G. Marshall, Calum Harvey, Helia Ghahremani Nezhad, John Franklin, Cleide dos Santos Souza",
+   "journal": "Neuron", "year": "2022", "abstract": ""}],
+ "pipelines_found": 1, "pipelines": ["..."]}
 ```
 
 When `fetch_publications=True` (the default), tracking automatically discovers and stores
-associated publications. No manual linking required for papers in the ENCODE portal.
+associated publications. No manual linking required for papers in the ENCODE portal. Each
+publication carries the seven fields shown; `year` is the first four characters of the
+publication date, so it is a string, and `authors` keeps the first ten names. Many
+experiments list no publication on the portal (ENCSR133RZO is one): `publications_found` is
+then 0, and you cite the ENCODE consortium papers instead.
 
 ## Step 2: Export BibTeX for LaTeX
 
@@ -35,36 +43,47 @@ associated publications. No manual linking required for papers in the ENCODE por
 **Claude calls:** `encode_get_citations(export_format="bibtex")`
 
 ```bibtex
-@article{Moore2020_ENCODE3,
-  title   = {Expanded encyclopaedias of {DNA} elements in the human and mouse genomes},
-  author  = {Moore, Jill E. and Purcaro, Michael J. and Pratt, Henry E. and others},
-  journal = {Nature},
-  volume  = {583},
-  pages   = {699--710},
-  year    = {2020},
-  doi     = {10.1038/s41586-020-2493-4},
-  note    = {Linked to ENCODE experiment ENCSR133RZO}
+@article{35045337,
+  title = {Genome-wide Identification of the Genetic Basis of Amyotrophic Lateral Sclerosis},
+  author = {Sai Zhang and Johnathan Cooper-Knock and Annika K. Weimer and Minyi Shi and Tobias Moll and Jack N.G. Marshall and Calum Harvey and Helia Ghahremani Nezhad and John Franklin and Cleide dos Santos Souza},
+  journal = {Neuron},
+  year = {2022},
+  doi = {10.1016/j.neuron.2021.12.019},
+  pmid = {35045337},
+  note = {ENCODE experiment: ENCSR425FUS},
 }
 ```
 
-Paste directly into your `.bib` file. The `note` field ties each publication back to
-its ENCODE accession -- useful when reviewers ask which paper corresponds to which dataset.
+Paste directly into your `.bib` file. The entry key is the publication's PMID (the DOI when
+there is no PMID). Only the fields the stored record holds are written -- there is no
+`volume` or `pages`, so add those by hand if your style needs them. The `note` field ties
+each publication back to its ENCODE accession -- useful when reviewers ask which paper
+corresponds to which dataset.
 
 ## Step 3: Export RIS for Reference Managers
 
 **You ask Claude:** "I also need RIS format for Zotero."
 
-**Claude calls:** `encode_get_citations(accession="ENCSR133RZO", export_format="ris")`
+**Claude calls:** `encode_get_citations(accession="ENCSR425FUS", export_format="ris")`
 
 ```ris
 TY  - JOUR
-TI  - Expanded encyclopaedias of DNA elements in the human and mouse genomes
-AU  - Moore, Jill E.
-AU  - Purcaro, Michael J.
-JO  - Nature
-VL  - 583
-PY  - 2020
-DO  - 10.1038/s41586-020-2493-4
+TI  - Genome-wide Identification of the Genetic Basis of Amyotrophic Lateral Sclerosis
+AU  - Sai Zhang
+AU  - Johnathan Cooper-Knock
+AU  - Annika K. Weimer
+AU  - Minyi Shi
+AU  - Tobias Moll
+AU  - Jack N.G. Marshall
+AU  - Calum Harvey
+AU  - Helia Ghahremani Nezhad
+AU  - John Franklin
+AU  - Cleide dos Santos Souza
+JO  - Neuron
+PY  - 2022
+DO  - 10.1016/j.neuron.2021.12.019
+AN  - PMID:35045337
+N1  - ENCODE experiment: ENCSR425FUS
 ER  -
 ```
 
@@ -97,9 +116,10 @@ acknowledgment is required by ENCODE data use policy.
 
 **You ask Claude:** "Export a supplementary table of all experiments I used."
 
-**Claude calls:** `encode_export_data(format="tsv")` -- the output includes accession,
-assay, target, biosample, organism, assembly, lab, and release date. Include this as
-Supplementary Table S1.
+**Claude calls:** `encode_export_data(format="tsv")` -- the output is a 17-column table:
+accession, assay_title, target, organism, organ, biosample_type, biosample_summary, lab,
+assembly, status, date_released, replication_type, life_stage, publication_count, pmids,
+derived_file_count and external_reference_count. Include this as Supplementary Table S1.
 
 ## Best Practices
 
@@ -118,4 +138,4 @@ Supplementary Table S1.
 | `publication-trust` | Verifying cited papers are not retracted or compromised |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

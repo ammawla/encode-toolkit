@@ -100,4 +100,4 @@ After liftover, always verify that lifted coordinates still overlap the expected
 - **disease-research** -- Connect annotated regulatory variants to disease mechanisms.
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

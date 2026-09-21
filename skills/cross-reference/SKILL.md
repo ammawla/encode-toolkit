@@ -567,11 +567,11 @@ Step 7: Document the full chain with provenance
   -> Track all ENCODE experiments used:
   encode_track_experiment(accession="ENCSR...", fetch_publications=True)
   -> Link all references:
-  encode_link_reference(reference_type="other", reference_id="rs7903146",
+  encode_link_reference(experiment_accession="ENCSR...", reference_type="other", reference_id="rs7903146",
     description="GWAS lead SNP, TCF7L2 locus, T2D")
-  encode_link_reference(reference_type="pmid", reference_id="...",
+  encode_link_reference(experiment_accession="ENCSR...", reference_type="pmid", reference_id="...",
     description="Original GWAS discovery paper")
-  encode_link_reference(reference_type="nct_id", reference_id="NCT...",
+  encode_link_reference(experiment_accession="ENCSR...", reference_type="nct_id", reference_id="NCT...",
     description="Relevant clinical trial")
   -> Log any derived analysis files:
   encode_log_derived_file(

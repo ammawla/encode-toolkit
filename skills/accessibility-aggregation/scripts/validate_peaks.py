@@ -7,9 +7,13 @@ Tn5 bias artifacts, and reports summary statistics.
 Usage:
     python validate_peaks.py input.narrowPeak [--blacklist hg38-blacklist.v2.bed] [--assay atac|dnase]
     python validate_peaks.py input.narrowPeak --assay atac --blacklist hg38-blacklist.v2.bed
+
+Plain and gzipped (.gz) inputs and blacklists are both accepted.
 """
 
 import argparse
+import gzip
+import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -22,6 +26,9 @@ NARROWPEAK_COLS = 10
 ATAC_LARGE_THRESHOLD = 2000
 DNASE_LARGE_THRESHOLD = 3000
 ATAC_SMALL_THRESHOLD = 50  # Sub-nucleosomal Tn5 artifacts
+
+MAX_COLUMN_ERRORS = 5
+MAX_WARNINGS = 20
 
 
 def parse_args():
@@ -51,10 +58,26 @@ def parse_args():
     return parser.parse_args()
 
 
+def open_text(path):
+    """Open a plain or gzipped text file for reading."""
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt")
+    return open(path)
+
+
+def quartiles(values):
+    """25th percentile, median and 75th percentile (interpolated)."""
+    median = statistics.median(values)
+    if len(values) < 2:
+        return values[0], median, values[0]
+    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+    return q1, median, q3
+
+
 def load_blacklist(path):
     """Load blacklist regions as a dict of chrom -> list of (start, end)."""
     regions = defaultdict(list)
-    with open(path) as f:
+    with open_text(path) as f:
         for line in f:
             if line.startswith("#") or line.strip() == "":
                 continue
@@ -81,12 +104,16 @@ def overlaps_blacklist(chrom, start, end, blacklist):
 def validate_accessibility_peaks(input_path, blacklist_path, assay):
     errors = []
     warnings = []
+    dropped_warnings = 0
     chrom_counts = Counter()
     peak_sizes = []
     signal_values = []
     start_positions = Counter()  # Track exact start positions for Tn5 pileup detection
     total_lines = 0
+    # Every line excluded from the statistics below counts as malformed, so
+    # total_lines == valid_peaks + bad_lines always holds.
     bad_lines = 0
+    column_errors = 0
     blacklist_overlaps = 0
     chrm_peaks = 0
     large_peaks = 0
@@ -105,7 +132,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
         print(f"ERROR: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(input_path) as f:
+    with open_text(input_path) as f:
         for line_num, line in enumerate(f, 1):
             if line.startswith("#") or line.startswith("track") or line.startswith("browser"):
                 continue
@@ -117,13 +144,15 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
             fields = line.split("\t")
 
             # Accessibility peaks should always be narrowPeak
-            if len(fields) < NARROWPEAK_COLS:
-                errors.append(f"Line {line_num}: expected {NARROWPEAK_COLS} columns (narrowPeak), got {len(fields)}")
+            if len(fields) != NARROWPEAK_COLS:
                 bad_lines += 1
-                if bad_lines > 5:
-                    if bad_lines == 6:
-                        errors.append("... suppressing further column-count errors")
-                    continue
+                column_errors += 1
+                if column_errors <= MAX_COLUMN_ERRORS:
+                    errors.append(
+                        f"Line {line_num}: expected {NARROWPEAK_COLS} columns (narrowPeak), got {len(fields)}"
+                    )
+                elif column_errors == MAX_COLUMN_ERRORS + 1:
+                    errors.append("... suppressing further column-count errors")
                 continue
 
             chrom = fields[0]
@@ -132,6 +161,12 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
                     errors.append(f"Line {line_num}: invalid chromosome '{chrom}'")
                     bad_lines += 1
                     continue
+                if len(warnings) < MAX_WARNINGS:
+                    warnings.append(
+                        f"Line {line_num}: non-standard chromosome '{chrom}' (not in chr1-22, chrX, chrY, chrM)"
+                    )
+                else:
+                    dropped_warnings += 1
 
             try:
                 start = int(fields[1])
@@ -147,11 +182,29 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
                 errors.append(f"Line {line_num}: negative end coordinate ({end})")
             if start >= end:
                 errors.append(f"Line {line_num}: start ({start}) >= end ({end})")
+            # an impossible interval is malformed: count it once and keep it out of the statistics
+            if start < 0 or end < 0 or start >= end:
+                bad_lines += 1
+                continue
+
+            # signalValue, pValue and qValue are checked before anything is counted: a row with
+            # an unusable value is malformed and stays out of every statistic
+            scores = {}
+            for col_idx, col_name in [(6, "signalValue"), (7, "pValue"), (8, "qValue")]:
+                try:
+                    scores[col_name] = float(fields[col_idx])
+                except ValueError:
+                    errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
+            if scores.get("signalValue", 0) < 0:
+                errors.append(f"Line {line_num}: negative signalValue ({scores['signalValue']})")
+            if len(scores) < 3 or scores["signalValue"] < 0:
+                bad_lines += 1
                 continue
 
             peak_size = end - start
             peak_sizes.append(peak_size)
             chrom_counts[chrom] += 1
+            signal_values.append(scores["signalValue"])
 
             # Track start positions for Tn5 pileup detection (ATAC-specific)
             if assay == "atac":
@@ -166,25 +219,15 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
             if peak_size < ATAC_SMALL_THRESHOLD:
                 tiny_peaks += 1
 
-            # SignalValue validation
-            try:
-                signal_val = float(fields[6])
-                signal_values.append(signal_val)
-                if signal_val < 0:
-                    errors.append(f"Line {line_num}: negative signalValue ({signal_val})")
-            except (ValueError, IndexError):
-                errors.append(f"Line {line_num}: invalid signalValue in column 7")
-
-            # pValue and qValue validation
-            for col_idx, col_name in [(7, "pValue"), (8, "qValue")]:
-                try:
-                    float(fields[col_idx])
-                except (ValueError, IndexError):
-                    errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
-
             # Blacklist overlap check
             if blacklist and overlaps_blacklist(chrom, start, end, blacklist):
                 blacklist_overlaps += 1
+
+    if total_lines == 0:
+        print(f"ERROR: no data rows in {input_path} (only comments, headers or blank lines)", file=sys.stderr)
+        sys.exit(1)
+
+    valid_peaks = total_lines - bad_lines
 
     # --- Tn5 Pileup Detection (ATAC-specific) ---
     tn5_pileup_count = 0
@@ -199,16 +242,17 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
     print()
 
     print("--- Summary ---")
-    print(f"Total peaks: {total_lines:,}")
+    print(f"Data lines: {total_lines:,}")
+    print(f"Valid peaks: {valid_peaks:,}")
     print(f"Malformed lines: {bad_lines}")
     if blacklist_path:
-        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(total_lines, 1):.1f}%)")
+        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(valid_peaks, 1):.1f}%)")
     print()
 
     if peak_sizes:
         sorted_sizes = sorted(peak_sizes)
         n = len(sorted_sizes)
-        median_size = sorted_sizes[n // 2]
+        size_q1, size_median, size_q3 = quartiles(sorted_sizes)
 
         # Count peaks in expected accessibility range (100-500bp)
         in_range = sum(1 for s in peak_sizes if 100 <= s <= 500)
@@ -216,28 +260,28 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
 
         print("--- Peak Size Distribution ---")
         print(f"Min:    {sorted_sizes[0]:,} bp")
-        print(f"25th:   {sorted_sizes[n // 4]:,} bp")
-        print(f"Median: {median_size:,} bp")
-        print(f"75th:   {sorted_sizes[3 * n // 4]:,} bp")
+        print(f"25th:   {size_q1:,.1f} bp")
+        print(f"Median: {size_median:,.1f} bp")
+        print(f"75th:   {size_q3:,.1f} bp")
         print(f"Max:    {sorted_sizes[-1]:,} bp")
         print(f"In typical range (100-500bp): {in_range:,} ({in_range_pct:.1f}%)")
         print()
 
     if signal_values:
         sorted_sig = sorted(signal_values)
-        n_sig = len(sorted_sig)
+        sig_q1, sig_median, sig_q3 = quartiles(sorted_sig)
         print("--- SignalValue Distribution ---")
         print(f"Min:    {sorted_sig[0]:.2f}")
-        print(f"25th:   {sorted_sig[n_sig // 4]:.2f}")
-        print(f"Median: {sorted_sig[n_sig // 2]:.2f}")
-        print(f"75th:   {sorted_sig[3 * n_sig // 4]:.2f}")
+        print(f"25th:   {sig_q1:.2f}")
+        print(f"Median: {sig_median:.2f}")
+        print(f"75th:   {sig_q3:.2f}")
         print(f"Max:    {sorted_sig[-1]:.2f}")
         print()
 
     print("--- Chromosome Distribution ---")
     for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
         count = chrom_counts[chrom]
-        pct = 100 * count / max(total_lines, 1)
+        pct = 100 * count / max(valid_peaks, 1)
         print(f"  {chrom:<6} {count:>8,}  ({pct:5.1f}%)")
     print()
 
@@ -278,8 +322,10 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
         )
         print(msg, file=sys.stderr)
 
-    for w in warnings[:20]:
+    for w in warnings:
         print(w, file=sys.stderr)
+    if dropped_warnings:
+        print(f"  ... and {dropped_warnings} more warning(s) suppressed", file=sys.stderr)
 
     # --- Errors ---
     if errors:

@@ -127,6 +127,14 @@ encode_download_files(
 )
 ```
 
+Validate the downloaded files before filtering. The scale of the methylation column
+is decided once per file; override it with `--scale` if the file is not ENCODE
+bedMethyl. Gzipped inputs are read directly.
+
+```bash
+python3 scripts/validate_methylation.py sample.bedMethyl [--min-coverage 5] [--scale auto|percent|fraction] [--blacklist hg38-blacklist.v2.bed]
+```
+
 ## Step 4: Per-Sample Quality Filtering
 
 ### 4a. Coverage Filtering (CRITICAL)
@@ -148,6 +156,7 @@ awk '$10 >= 5' sample.bedMethyl > sample.covfiltered.bedMethyl
 ### 4b. ENCODE Blocklist Filtering (Amemiya et al. 2019)
 ```bash
 # Download from: https://github.com/Boyle-Lab/Blacklist/blob/master/lists/hg38-blacklist.v2.bed.gz
+gunzip -k hg38-blacklist.v2.bed.gz
 bedtools intersect -a sample.covfiltered.bedMethyl -b hg38-blacklist.v2.bed -v > sample.filtered.bedMethyl
 ```
 

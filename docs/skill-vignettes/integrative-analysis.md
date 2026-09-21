@@ -28,7 +28,7 @@ encode_search_experiments(assay_title="total RNA-seq", organ="liver", biosample_
 |---|---|---|---|---|
 | H3K27ac | ENCSR832RBL | liver, adult male 37y | Ren, UCSD | Clean |
 | ATAC-seq | ENCSR862GLC | liver, adult male 37y | Ren, UCSD | Clean |
-| RNA-seq | ENCSR094PJT | liver, adult female 51y | Gingeras, CSHL | WARNING: 1 |
+| total RNA-seq | ENCSR094PJT | liver, adult female 51y | Gingeras, CSHL | WARNING: 1 |
 
 Donor-matched H3K27ac and ATAC-seq from the same lab minimize batch effects. The RNA-seq is from a different donor -- acceptable for expression-level filtering but noted for provenance.
 
@@ -117,4 +117,4 @@ encode_log_derived_file(
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

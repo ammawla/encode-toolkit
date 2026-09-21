@@ -22,13 +22,15 @@ while maintaining a complete provenance chain for publication.
 **Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="geo_accession", reference_id="GSE187091", description="Original GEO submission for H3K27me3 pancreas ChIP-seq")`
 
 ```json
-{"status": "linked", "experiment_accession": "ENCSR133RZO",
+{"action": "already_linked", "experiment_accession": "ENCSR133RZO",
  "reference_type": "geo_accession", "reference_id": "GSE187091"}
 ```
 
-**Interpretation:** GEO may contain supplementary metadata not in ENCODE (donor clinical
-annotations, custom processing). Reviewers may also require the GEO accession alongside
-the ENCODE accession.
+**Interpretation:** `action` came back as `"already_linked"` because tracking the experiment
+already extracted this GEO accession from the ENCODE record's `dbxrefs`; a genuinely new
+link returns `"linked"`. Either way the reference is attached. GEO may contain supplementary
+metadata not in ENCODE (donor clinical annotations, custom processing). Reviewers may also
+require the GEO accession alongside the ENCODE accession.
 
 ## Step 2: Link to PubMed
 
@@ -37,7 +39,7 @@ the ENCODE accession.
 **Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="pmid", reference_id="32728249", description="ENCODE Phase 3 integrative analysis (Moore et al., Nature 2020)")`
 
 ```json
-{"status": "linked", "experiment_accession": "ENCSR133RZO",
+{"action": "linked", "experiment_accession": "ENCSR133RZO",
  "reference_type": "pmid", "reference_id": "32728249"}
 ```
 
@@ -53,14 +55,19 @@ also be passed to PubMed MCP tools for abstract retrieval or related articles.
 
 ```json
 {"references": [
-   {"experiment_accession": "ENCSR133RZO", "reference_type": "geo_accession",
-    "reference_id": "GSE187091"},
-   {"experiment_accession": "ENCSR133RZO", "reference_type": "pmid",
-    "reference_id": "32728249"}
- ], "total": 2}
+   {"id": 2, "experiment_accession": "ENCSR133RZO", "reference_type": "pmid",
+    "reference_id": "32728249",
+    "description": "ENCODE Phase 3 integrative analysis (Moore et al., Nature 2020)",
+    "linked_at": 1739452801.334567},
+   {"id": 1, "experiment_accession": "ENCSR133RZO", "reference_type": "geo_accession",
+    "reference_id": "GSE187091",
+    "description": "Auto-extracted from ENCODE dbxrefs",
+    "linked_at": 1739452800.223456}
+ ], "count": 2}
 ```
 
-**Interpretation:** Your library now bridges ENCODE, GEO, and PubMed. Filter by type
+**Interpretation:** Your library now bridges ENCODE, GEO, and PubMed. References are
+returned newest first and `linked_at` is epoch seconds. Filter by type
 with `encode_get_references(reference_type="pmid")`. Supported types: `pmid`, `doi`,
 `geo_accession`, `nct_id` (ClinicalTrials.gov), `preprint_doi`, and `other`.
 

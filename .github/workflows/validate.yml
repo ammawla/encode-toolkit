@@ -60,8 +60,11 @@ jobs:
       - name: Check tool versions in images against the conda environments
         run: python .github/scripts/check-tool-versions.py
 
-      - name: skills/ and plugin/skills/ must be identical
-        run: diff -r skills plugin/skills
+      - name: The plugin's copies of skills/, agents/ and commands/ must be identical to the originals
+        run: |
+          diff -r skills plugin/skills
+          diff -r agents plugin/agents
+          diff -r commands plugin/commands
 
       - name: Run tests
         run: pytest tests/ -v --tb=short

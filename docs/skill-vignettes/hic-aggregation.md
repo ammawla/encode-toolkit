@@ -29,7 +29,7 @@ Not all Hi-C experiments include called loops. Search specifically for BEDPE fil
 ```
 encode_search_files(
     assay_title="Hi-C", organ="brain",
-    output_type="chromatin interactions", assembly="GRCh38", limit=50)
+    output_type="loops", file_format="bedpe", assembly="GRCh38", limit=50)
 ```
 
 Each BEDPE row encodes one loop as a pair of anchor regions:
@@ -118,4 +118,4 @@ encode_log_derived_file(
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

@@ -67,7 +67,7 @@ ENCODE's reference collection.
 2. `encode_link_reference(experiment_accession="ENCSR604VJZ", reference_type="geo_accession", reference_id="GSE149038", description="NAFLD vs healthy liver ATAC-seq (24 samples)")`
 
 ```json
-{"status": "linked", "experiment_accession": "ENCSR604VJZ",
+{"action": "linked", "experiment_accession": "ENCSR604VJZ",
  "reference_type": "geo_accession", "reference_id": "GSE149038"}
 ```
 
@@ -85,21 +85,27 @@ retrieve it later with `encode_get_references(experiment_accession="ENCSR604VJZ"
 ```json
 {
   "references": [
-    {"reference_type": "geo_accession", "reference_id": "GSE149038",
-     "description": "NAFLD vs healthy liver ATAC-seq (24 samples)"},
-    {"reference_type": "geo_accession", "reference_id": "GSE118683",
-     "description": "Liver developmental ATAC-seq (18 samples, fetal to adult)"}
+    {"id": 2, "experiment_accession": "ENCSR604VJZ", "reference_type": "geo_accession",
+     "reference_id": "GSE118683",
+     "description": "Liver developmental ATAC-seq (18 samples, fetal to adult)",
+     "linked_at": 1739453102.481233},
+    {"id": 1, "experiment_accession": "ENCSR604VJZ", "reference_type": "geo_accession",
+     "reference_id": "GSE149038",
+     "description": "NAFLD vs healthy liver ATAC-seq (24 samples)",
+     "linked_at": 1739453017.902114}
   ],
-  "total": 2
+  "count": 2
 }
 ```
 
 After running your combined analysis, log the output for provenance:
 
-**Claude calls:** `encode_log_derived_file(file_path="/data/liver_meta/encode_geo_union_peaks.bed", source_accessions=["ENCSR604VJZ", "GSE149038", "GSE118683"], description="Union peak set from ENCODE + GEO liver ATAC-seq (3 studies, 44 samples)", tool_used="bedtools merge v2.31.0", parameters="bedtools merge -d 200 -c 5 -o max")`
+**Claude calls:** `encode_log_derived_file(file_path="/data/liver_meta/encode_geo_union_peaks.bed", source_accessions=["ENCSR604VJZ"], description="Union peak set from ENCODE + GEO liver ATAC-seq (3 studies, 44 samples); GEO sources GSE149038, GSE118683", tool_used="bedtools merge v2.31.0", parameters="bedtools merge -d 200 -c 5 -o max")`
 
-This creates a full provenance chain from your derived file back to both ENCODE
-and GEO source data.
+`source_accessions` only accepts ENCODE accessions -- a GSE identifier is rejected before
+anything is written -- so name the GEO studies in the description and keep them attached to
+the experiment through `encode_link_reference`. Together that gives a full provenance chain
+from your derived file back to both ENCODE and GEO source data.
 
 ## Tips
 
@@ -126,4 +132,4 @@ and GEO source data.
 | `ensembl-annotation` | Annotating genomic coordinates from merged peak sets |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

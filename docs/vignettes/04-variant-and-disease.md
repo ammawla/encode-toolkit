@@ -25,18 +25,24 @@ variants fall in regulatory elements active in pancreatic islets.
       "accession": "ENCSR000DDA",
       "assay_title": "FAIRE-seq",
       "biosample_summary": "Homo sapiens islet of Langerhans tissue",
-      "lab": "jason-lieb",
+      "organ": "pancreas",
+      "lab": "Jason Lieb, UNC",
       "replication_type": "unreplicated"
     },
     {
       "accession": "ENCSR000DFB",
       "assay_title": "RRBS",
       "biosample_summary": "Homo sapiens islet of Langerhans tissue",
-      "lab": "richard-myers",
+      "organ": "pancreas",
+      "lab": "Richard Myers, HAIB",
       "replication_type": "isogenic"
     }
   ],
-  "total": 2
+  "total": 2,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 

@@ -319,7 +319,7 @@ Expected output:
     {"term": "Histone ChIP-seq", "count": 120},
     {"term": "TF ChIP-seq", "count": 45},
     {"term": "ATAC-seq", "count": 32},
-    {"term": "RNA-seq", "count": 28},
+    {"term": "total RNA-seq", "count": 28},
     {"term": "DNase-seq", "count": 22},
     {"term": "Hi-C", "count": 8}
   ]
@@ -403,7 +403,7 @@ Expected output:
   "assay_title": [
     {"term": "Histone ChIP-seq", "count": 120},
     {"term": "ATAC-seq", "count": 32},
-    {"term": "RNA-seq", "count": 28},
+    {"term": "total RNA-seq", "count": 28},
     {"term": "Hi-C", "count": 8}
   ]
 }

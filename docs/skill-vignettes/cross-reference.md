@@ -24,7 +24,7 @@ submission, then export everything as BibTeX for your manuscript.
 **Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="pmid", reference_id="32728249", description="ENCODE Phase 3 integrative analysis (Moore et al., Nature 2020)")`
 
 ```json
-{"status": "linked", "experiment_accession": "ENCSR133RZO",
+{"action": "linked", "experiment_accession": "ENCSR133RZO",
  "reference_type": "pmid", "reference_id": "32728249"}
 ```
 
@@ -38,9 +38,14 @@ tools (`get_article_metadata`, `find_related_articles`) for literature explorati
 **Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="geo_accession", reference_id="GSE187091", description="GEO submission with supplementary metadata and raw data")`
 
 ```json
-{"status": "linked", "experiment_accession": "ENCSR133RZO",
+{"action": "already_linked", "experiment_accession": "ENCSR133RZO",
  "reference_type": "geo_accession", "reference_id": "GSE187091"}
 ```
+
+`action` is `"linked"` for a new link and `"already_linked"` when that identifier is
+attached already -- as here, because `encode_track_experiment` picked this GEO accession
+out of the ENCODE record's `dbxrefs` when you tracked the experiment. Re-linking is
+harmless, but it does not overwrite the description stored the first time.
 
 GEO accessions use the GSE format (series level), not GSM (sample level). You can
 find GEO accessions in the `dbxrefs` field of `encode_get_experiment` output.
@@ -54,19 +59,23 @@ find GEO accessions in the `dbxrefs` field of `encode_get_experiment` output.
 ```json
 {
   "references": [
-    {"experiment_accession": "ENCSR133RZO", "reference_type": "pmid",
+    {"id": 2, "experiment_accession": "ENCSR133RZO", "reference_type": "pmid",
      "reference_id": "32728249",
-     "description": "ENCODE Phase 3 integrative analysis (Moore et al., Nature 2020)"},
-    {"experiment_accession": "ENCSR133RZO", "reference_type": "geo_accession",
+     "description": "ENCODE Phase 3 integrative analysis (Moore et al., Nature 2020)",
+     "linked_at": 1739452801.334567},
+    {"id": 1, "experiment_accession": "ENCSR133RZO", "reference_type": "geo_accession",
      "reference_id": "GSE187091",
-     "description": "GEO submission with supplementary metadata and raw data"}
+     "description": "Auto-extracted from ENCODE dbxrefs",
+     "linked_at": 1739452800.223456}
   ],
-  "total": 2
+  "count": 2
 }
 ```
 
-Filter by type with `reference_type="pmid"` to retrieve only PubMed links. Supported
-types: `pmid`, `doi`, `geo_accession`, `nct_id`, `preprint_doi`, `other`.
+References come back newest first, with `linked_at` as epoch seconds. The GEO row still
+carries the description written when tracking auto-linked it. Filter by type with
+`reference_type="pmid"` to retrieve only PubMed links. Supported types: `pmid`, `doi`,
+`geo_accession`, `nct_id`, `preprint_doi`, `other`.
 
 ## Step 4: Export Citations as BibTeX
 
@@ -75,15 +84,14 @@ types: `pmid`, `doi`, `geo_accession`, `nct_id`, `preprint_doi`, `other`.
 **Claude calls:** `encode_get_citations(accession="ENCSR133RZO", export_format="bibtex")`
 
 ```bibtex
-@article{Moore2020_ENCODE3,
-  title   = {Expanded encyclopaedias of {DNA} elements in the human and mouse genomes},
-  author  = {Moore, Jill E. and Purcaro, Michael J. and Pratt, Henry E. and others},
+@article{32728249,
+  title = {Expanded encyclopaedias of DNA elements in the human and mouse genomes},
+  author = {Moore JE and Purcaro MJ and Pratt HE},
   journal = {Nature},
-  volume  = {583},
-  pages   = {699--710},
-  year    = {2020},
-  doi     = {10.1038/s41586-020-2493-4},
-  note    = {Linked to ENCODE experiment ENCSR133RZO}
+  year = {2020},
+  doi = {10.1038/s41586-020-2493-4},
+  pmid = {32728249},
+  note = {ENCODE experiment: ENCSR133RZO},
 }
 ```
 
@@ -110,4 +118,4 @@ RIS format (for Endnote, Zotero, Mendeley) is also available via `export_format=
 | `disease-research` | Connecting ENCODE regulatory data to disease biology |
 
 ---
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

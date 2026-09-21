@@ -102,4 +102,4 @@ For the excluded experiments: ENCSR265PLT could be rescued only if re-sequenced 
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

@@ -22,7 +22,7 @@ A researcher investigates rs7903146 (chr10:112998590, C>T), the strongest common
 encode_get_facets(organ="pancreas")
 ```
 
-Pancreas has ATAC-seq (4 experiments), Histone ChIP-seq (18 across H3K27ac, H3K4me3, H3K4me1, H3K27me3), Hi-C (2), and RNA-seq (6). Sufficient for multi-layer annotation.
+Pancreas has ATAC-seq (4 experiments), Histone ChIP-seq (18 across H3K27ac, H3K4me3, H3K4me1, H3K27me3), Hi-C (2), and total RNA-seq (6). Sufficient for multi-layer annotation.
 
 ### Step 2: Gather Islet Chromatin Accessibility
 
@@ -117,4 +117,4 @@ encode_link_reference(
 
 ---
 
-*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 43 skills for genomics research*
+*Part of the [ENCODE Toolkit](https://github.com/ammawla/encode-toolkit) -- 47 skills for genomics research*

@@ -1,24 +1,54 @@
 #!/usr/bin/env python3
 """Keep the skill documentation honest about the code it describes.
 
-1. Every ``encode_*`` tool call shown in a skill must name a real MCP tool and use only
-   keyword arguments that the tool accepts (read from the server source with ``ast``).
+The skills, ``agents/``, ``commands/``, ``docs/`` and the README are checked.
+
+1. Every ``encode_*`` tool call shown there must name a real MCP tool, pass every required
+   argument, and use only keyword arguments and values that the tool accepts: ``Literal``
+   choices, and for filters such as ``assay_title`` the server's catalog of ENCODE values
+   (all read from the source with ``ast``).
 2. Every ``nextflow run`` example in a pipeline skill must use only parameters that the
    pipeline declares and only profiles that its nextflow.config defines.
 3. A JSON example that directly follows a tool call is that tool's output, so every field name
-   in it must be one the server can emit (a field of its models or a key it writes).
+   in it must be one THAT TOOL can emit: a key the tool or the code it calls writes, a field of
+   the models involved, or a column of the rows it returns.
 """
 
 from __future__ import annotations
 
 import ast
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / "skills"
+DOCS = ROOT / "docs"
 SERVER = ROOT / "src" / "encode_connector" / "server" / "main.py"
+CONSTANTS = ROOT / "src" / "encode_connector" / "client" / "constants.py"
+# tool parameter -> the list in constants.py that holds the values ENCODE uses for it
+CATALOGS = {
+    "assay_title": "ASSAY_TITLES",
+    "organism": "ORGANISMS",
+    "organ": "ORGAN_SLIMS",
+    "biosample_type": "BIOSAMPLE_CLASSIFICATIONS",
+    "file_format": "FILE_FORMATS",
+    "output_type": "OUTPUT_TYPES",
+    "output_category": "OUTPUT_CATEGORIES",
+    "assembly": "ASSEMBLIES",
+    "life_stage": "LIFE_STAGES",
+    "replication_type": "REPLICATION_TYPES",
+}
+# Tools that send these filters to the ENCODE portal, which matches them exactly. The tracker
+# tools (encode_list_tracked, ...) share the parameter names but match substrings locally.
+PORTAL_TOOLS = {
+    "encode_search_experiments",
+    "encode_search_files",
+    "encode_list_files",
+    "encode_batch_download",
+    "encode_get_facets",
+}
 
 CALL_RE = re.compile(r"\b(encode_[a-z_]+)\s*\(")
 KEYWORD_RE = re.compile(r"\s*([A-Za-z_]\w*)\s*=(?!=)")
@@ -28,6 +58,18 @@ FLAG_RE = re.compile(r"(?<![\w-])--([A-Za-z_]\w*)")
 PROFILE_RE = re.compile(r"(?<![\w-])-profile[ =]+([\w,]+)")
 # values that are not meant literally: "", "...", "<type>", "csv|tsv", "{accession}"
 PLACEHOLDER_RE = re.compile(r"^$|\.\.\.|[<>|{}]")
+
+
+def documents() -> list[Path]:
+    """Everything a user reads: skills, agents, commands, docs and the README (tracked files only)."""
+    folders = [SKILLS, ROOT / "agents", ROOT / "commands", DOCS]
+    found = [doc for folder in folders for doc in folder.rglob("*.md")]
+    found += [doc for doc in [ROOT / "README.md"] if doc.exists()]
+    listing = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=False)
+    if listing.returncode == 0 and listing.stdout:
+        tracked = set(listing.stdout.splitlines())
+        found = [doc for doc in found if str(doc.relative_to(ROOT)) in tracked]
+    return sorted(found)
 
 
 def literal_values(annotation: ast.expr | None) -> set[str]:
@@ -44,14 +86,68 @@ def literal_values(annotation: ast.expr | None) -> set[str]:
     }
 
 
+def catalog_values() -> dict[str, set[str]]:
+    """Filter parameter -> the values the server lists for it in constants.py."""
+    lists = {
+        node.targets[0].id: {item.value for item in node.value.elts if isinstance(item, ast.Constant)}
+        for node in ast.parse(CONSTANTS.read_text()).body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List) and isinstance(node.targets[0], ast.Name)
+    }
+    return {parameter: lists[name] for parameter, name in CATALOGS.items()}
+
+
+def metadata_values() -> dict[str, set[str]]:
+    """``encode_get_metadata`` type -> the values it returns (METADATA_MAP in constants.py)."""
+    tree = ast.parse(CONSTANTS.read_text())
+    lists = {
+        node.targets[0].id: {item.value for item in node.value.elts if isinstance(item, ast.Constant)}
+        for node in tree.body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List) and isinstance(node.targets[0], ast.Name)
+    }
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "METADATA_MAP":
+            return {
+                key.value: lists[value.id]
+                for key, value in zip(node.value.keys, node.value.values)
+                if isinstance(value, ast.Name)
+            }
+    return {}
+
+
+def tool_functions() -> list[ast.AsyncFunctionDef | ast.FunctionDef]:
+    return [
+        node
+        for node in ast.walk(ast.parse(SERVER.read_text()))
+        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and node.name.startswith("encode_")
+    ]
+
+
 def tool_signatures() -> dict[str, dict[str, set[str]]]:
     """Tool name -> parameter name -> allowed string values (empty when the parameter is free-form)."""
-    tree = ast.parse(SERVER.read_text())
+    catalogs = catalog_values()
     return {
-        node.name: {arg.arg: literal_values(arg.annotation) for arg in node.args.args + node.args.kwonlyargs}
-        for node in ast.walk(tree)
-        if isinstance(node, ast.AsyncFunctionDef | ast.FunctionDef) and node.name.startswith("encode_")
+        node.name: {
+            arg.arg: literal_values(arg.annotation)
+            or (catalogs.get(arg.arg, set()) if node.name in PORTAL_TOOLS else set())
+            for arg in node.args.args + node.args.kwonlyargs
+        }
+        for node in tool_functions()
     }
+
+
+def required_parameters() -> dict[str, set[str]]:
+    """Tool name -> parameters that have no default."""
+    required = {}
+    for node in tool_functions():
+        positional = node.args.args[: len(node.args.args) - len(node.args.defaults)]
+        keyword_only = [arg for arg, default in zip(node.args.kwonlyargs, node.args.kw_defaults) if default is None]
+        required[node.name] = {arg.arg for arg in positional + keyword_only}
+    return required
+
+
+def positional_parameters() -> dict[str, list[str]]:
+    """Tool name -> its parameters in the order positional arguments fill them."""
+    return {node.name: [arg.arg for arg in node.args.args] for node in tool_functions()}
 
 
 def call_arguments(text: str, start: int) -> str | None:
@@ -99,9 +195,10 @@ def top_level_arguments(arguments: str) -> list[str]:
     return [*parts, current]
 
 
-def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
+def check_tool_calls(signatures: dict[str, dict[str, set[str]]], required: dict[str, set[str]]) -> list[str]:
     problems = []
-    for doc in sorted(SKILLS.rglob("*.md")):
+    order = positional_parameters()
+    for doc in documents():
         text = doc.read_text()
         for match in CALL_RE.finditer(text):
             tool = match.group(1)
@@ -113,10 +210,26 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
             if tool not in signatures:
                 problems.append(f"{where}: unknown tool {tool}")
                 continue
-            for argument in top_level_arguments(arguments):
+            parts = [part for part in top_level_arguments(arguments) if part.strip()]
+            named = {match.group(1) for match in map(KEYWORD_RE.match, parts) if match}
+            unnamed = [part.strip() for part in parts if not KEYWORD_RE.match(part)]
+            # "encode_x(...)" and "**filters" say nothing about which parameters are set;
+            # a plain positional argument fills the next positional parameter
+            elided = any(part.startswith(("...", "*", "…")) for part in unnamed)
+            given = named | set(order[tool][: len(unnamed)])
+            if not elided and required[tool] - given:
+                missing = ", ".join(sorted(required[tool] - given))
+                problems.append(f"{where}: {tool}() is called without its required {missing}")
+            # a positional argument fills the next positional parameter: give it that name so
+            # it gets the same checks as a keyword argument
+            positions = iter(order[tool])
+            for argument in parts:
+                if not KEYWORD_RE.match(argument):
+                    parameter = next(positions, None)
+                    if parameter is None or elided:
+                        continue
+                    argument = f"{parameter}={argument.strip()}"
                 keyword = KEYWORD_RE.match(argument)
-                if not keyword:
-                    continue
                 name = keyword.group(1)
                 if name not in signatures[tool]:
                     accepted = ", ".join(sorted(signatures[tool]))
@@ -125,9 +238,9 @@ def check_tool_calls(signatures: dict[str, dict[str, set[str]]]) -> list[str]:
                 value = STRING_VALUE_RE.match(argument)
                 choices = signatures[tool][name]
                 if value and choices and value.group(2) not in choices and not PLACEHOLDER_RE.search(value.group(2)):
-                    problems.append(
-                        f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {", ".join(sorted(choices))})'
-                    )
+                    listed = len(choices) <= 8 or name not in CATALOGS
+                    accepted = ", ".join(sorted(choices)) if listed else f"the values in {CATALOGS[name]}"
+                    problems.append(f'{where}: {tool}({name}="{value.group(2)}") is not accepted (choices: {accepted})')
     return problems
 
 
@@ -169,13 +282,15 @@ def check_pipeline_examples() -> list[str]:
     all_params = set().union(*(params for params, _ in contracts.values()))
     all_profiles = set().union(*(profiles for _, profiles in contracts.values()))
     problems = []
-    for doc in sorted(SKILLS.rglob("*.md")):
-        skill = doc.relative_to(SKILLS).parts[0]
+    for doc in documents():
+        skill = doc.relative_to(SKILLS).parts[0] if doc.is_relative_to(SKILLS) else ""
         text = doc.read_text()
         for line, command in nextflow_commands(text):
             named = re.search(r"(pipeline-\w+)", command)
             if skill in contracts:
                 params, profiles = contracts[skill]
+            elif doc.stem in contracts:  # docs/skill-vignettes/pipeline-hic.md
+                params, profiles = contracts[doc.stem]
             elif named and named.group(1) in contracts:
                 params, profiles = contracts[named.group(1)]
             elif skill.startswith("pipeline-"):
@@ -183,6 +298,9 @@ def check_pipeline_examples() -> list[str]:
             else:
                 continue  # a third-party workflow, not one of the pipeline skills
             where = f"{doc.relative_to(ROOT)}:{line}"
+            script = re.search(r"nextflow\s+run\s+(\S+main\.nf)", command)
+            if script and not doc.is_relative_to(SKILLS) and not (ROOT / script.group(1)).exists():
+                problems.append(f"{where}: {script.group(1)} does not exist from the repository root")
             for flag in FLAG_RE.findall(command):
                 if flag not in params:
                     problems.append(f"{where}: --{flag} is not a parameter of this pipeline")
@@ -195,44 +313,101 @@ def check_pipeline_examples() -> list[str]:
     return problems
 
 
+HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$", re.M)
+TOOL_NAME_RE = re.compile(r"\b(encode_[a-z_]+)\b")
 BLOCK_RE = re.compile(r"```([^\n`]*)\n(.*?)```", re.S)  # any info string: ```R, ```json, ```bash
 JSON_TOKEN_RE = re.compile(r'"((?:[^"\\]|\\.)*)"\s*(:)?|[{}]')
 FIELD_NAME_RE = re.compile(r"[a-z_][a-z0-9_]*")
 
 
-def server_field_names() -> set[str]:
-    """Names the server can emit as a JSON key.
-
-    Model fields, keys of dict literals and ``dict(key=...)`` calls, keys assigned with
-    ``result["key"] = ...`` or ``setdefault("key", ...)``, and SQLite column names and aliases
-    (rows are returned as dicts). Other string literals (messages, URLs, filter values) do not count.
-    """
+def _own_keys(node: ast.AST) -> set[str]:
+    """Keys a piece of code writes: dict literals, ``x["key"] = ...``, ``dict(key=...)``, ``setdefault``."""
     names: set[str] = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Dict):
+            names |= {key.value for key in sub.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)}
+        elif isinstance(sub, ast.Subscript) and isinstance(sub.ctx, ast.Store):
+            if isinstance(sub.slice, ast.Constant) and isinstance(sub.slice.value, str):
+                names.add(sub.slice.value)
+        elif isinstance(sub, ast.Call):
+            called = getattr(sub.func, "id", getattr(sub.func, "attr", ""))
+            if called == "dict":
+                names |= {keyword.arg for keyword in sub.keywords if keyword.arg}
+            elif called == "setdefault" and sub.args and isinstance(sub.args[0], ast.Constant):
+                names.add(str(sub.args[0].value))
+    return names
+
+
+def _selected_columns(sql: str, tables: dict[str, set[str]]) -> set[str]:
+    """Columns a SELECT returns as row keys. Existence checks, counts and writes return none."""
+    names: set[str] = set()
+    for columns, table in re.findall(r"SELECT\s+(.*?)\s+FROM\s+(\w+)", sql, re.S | re.I):
+        if columns.strip() == "*":
+            names |= tables.get(table, set())
+        else:
+            names |= set(re.findall(r"\bAS\s+([a-z_][a-z0-9_]*)", columns, re.I))
+            names |= {c for c in re.findall(r"\b([a-z_][a-z0-9_]*)\b", columns) if c in tables.get(table, set())}
+    return names
+
+
+def tool_output_fields() -> dict[str, set[str]]:
+    """Tool name -> the keys its reply can contain.
+
+    Followed from the source: the keys the tool function writes, plus those of the functions and
+    methods it calls (three levels deep, matched by name), the fields of the models those use
+    (with nested models and base classes), and the columns of the SQL rows they return.
+    """
+    functions: dict[str, list[ast.AST]] = {}
+    classes: dict[str, ast.ClassDef] = {}
+    tables: dict[str, set[str]] = {}
     for source in (ROOT / "src" / "encode_connector").rglob("*.py"):
         text = source.read_text()
         for node in ast.walk(ast.parse(text)):
-            if isinstance(node, ast.ClassDef):
-                names |= {
-                    field.target.id
-                    for field in node.body
-                    if isinstance(field, ast.AnnAssign) and isinstance(field.target, ast.Name)
-                }
-            elif isinstance(node, ast.Dict):
-                names |= {
-                    key.value for key in node.keys if isinstance(key, ast.Constant) and isinstance(key.value, str)
-                }
-            elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
-                if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
-                    names.add(node.slice.value)
-            elif isinstance(node, ast.Call):
-                called = getattr(node.func, "id", getattr(node.func, "attr", ""))
-                if called == "dict":
-                    names |= {keyword.arg for keyword in node.keywords if keyword.arg}
-                elif called == "setdefault" and node.args and isinstance(node.args[0], ast.Constant):
-                    names.add(str(node.args[0].value))
-        names |= set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", text, re.M))
-        names |= set(re.findall(r"\)\s+[Aa][Ss]\s+([a-z_][a-z0-9_]*)", text))
-    return names
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                functions.setdefault(node.name, []).append(node)
+            elif isinstance(node, ast.ClassDef):
+                classes[node.name] = node
+        for name, body in re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\s*\((.*?)\n\s*\)", text, re.S):
+            tables[name] = set(re.findall(r"^\s+([a-z_][a-z0-9_]*)\s+(?:TEXT|INTEGER|REAL|BLOB)\b", body, re.M))
+
+    def class_fields(name: str, seen: set[str]) -> set[str]:
+        if name in seen or name not in classes:
+            return set()
+        seen.add(name)
+        fields: set[str] = set()
+        for item in classes[name].body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                fields.add(item.target.id)
+                for ref in ast.walk(item.annotation):
+                    if isinstance(ref, ast.Name):
+                        fields |= class_fields(ref.id, seen)
+        for base in classes[name].bases:
+            if isinstance(base, ast.Name):
+                fields |= class_fields(base.id, seen)
+        return fields
+
+    def reachable(node: ast.AST, depth: int, seen: set[int]) -> set[str]:
+        if id(node) in seen:
+            return set()
+        seen.add(id(node))
+        names = _own_keys(node)
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Name) and sub.id in classes:
+                names |= class_fields(sub.id, set())
+            elif isinstance(sub, ast.Constant) and isinstance(sub.value, str) and "SELECT" in sub.value.upper():
+                names |= _selected_columns(sub.value, tables)
+            elif isinstance(sub, ast.Call) and depth:
+                called = getattr(sub.func, "id", getattr(sub.func, "attr", ""))
+                if not called.startswith("encode_"):
+                    for callee in functions.get(called, []):
+                        names |= reachable(callee, depth - 1, seen)
+            elif isinstance(sub, ast.Attribute) and depth:  # a property such as tracker.stats
+                for callee in functions.get(sub.attr, []):
+                    if any(getattr(decorator, "id", "") == "property" for decorator in callee.decorator_list):
+                        names |= reachable(callee, depth - 1, seen)
+        return names
+
+    return {name: reachable(nodes[0], 3, set()) for name, nodes in functions.items() if name.startswith("encode_")}
 
 
 def example_keys(body: str):
@@ -252,34 +427,96 @@ def example_keys(body: str):
             yield pending, [name for name in stack if name]
 
 
-def check_output_examples(known: set[str]) -> list[str]:
+def check_output_examples(contracts: dict[str, set[str]]) -> list[str]:
     problems = []
-    for doc in sorted(SKILLS.rglob("*.md")):
+    catalogs = catalog_values()
+    catalog_value_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*"([^"]*)"')
+    # arrays: facet counts ("assay_title": [{"term": "total RNA-seq", "count": 12}, ...]) and
+    # plain lists ("assembly": ["GRCh38"])
+    facet_re = re.compile(rf'"({"|".join(catalogs)})"\s*:\s*\[(.*?)\]', re.S)
+    term_re = re.compile(r'"term"\s*:\s*"([^"]*)"')
+    metadata = metadata_values()
+    for doc in documents():
         text = doc.read_text()
-        previous_tool, previous_end = None, 0
+        previous_call, previous_end = "", 0
         for block in BLOCK_RE.finditer(text):
             language, body = block.groups()
             # "directly follows": only a short lead-in such as "Expected output:" in between,
             # and no new heading. JSON further away documents something else (a log format,
-            # another service's API).
+            # another service's API). The call is the last one in the block before, or one
+            # written inline in the lead-in ("Claude calls: `encode_get_facets(...)`").
             gap = text[previous_end : block.start()]
-            if language.strip().lower() == "json" and previous_tool and len(gap) < 200 and "\n#" not in gap:
+            lead = gap[-200:]
+            inline = [match.end() for match in CALL_RE.finditer(lead)]
+            call = lead[lead.rfind("encode_", 0, inline[-1]) :] if inline else (previous_call if len(gap) < 200 else "")
+            previous_tool = CALL_RE.search(call).group(1) if call and "\n#" not in lead else None
+            if not previous_tool:
+                # an API reference: "### `encode_x`" ... "#### Returns" followed by the JSON
+                headings = HEADING_RE.findall(text[: block.start()])
+                named = [match.group(1) for match in map(TOOL_NAME_RE.search, headings) if match]
+                if headings and named and headings[-1].lower().startswith("returns"):
+                    previous_tool, call = named[-1], ""
+            if language.strip().lower() == "json" and previous_tool:
                 line = text.count("\n", 0, block.start()) + 1
+                asked = re.search(r"""metadata_type["']?\s*[=:]\s*["'](\w+)["']""", call + body)
+                if previous_tool == "encode_get_metadata" and asked and asked.group(1) in metadata:
+                    values = re.search(r'"values"\s*:\s*\[(.*?)\]', body, re.S)
+                    for value in re.findall(r'"([^"]*)"', values.group(1)) if values else []:
+                        if value not in metadata[asked.group(1)] and not PLACEHOLDER_RE.search(value):
+                            where = f"{doc.relative_to(ROOT)}:{line}"
+                            problems.append(
+                                f'{where}: encode_get_metadata("{asked.group(1)}") does not return "{value}"'
+                            )
                 for key, ancestors in example_keys(body):
                     # counts keyed by data values (facets, by_assay, ...) are not field names
                     if any(name == "facets" or name.startswith("by_") for name in ancestors):
                         continue
-                    if FIELD_NAME_RE.fullmatch(key) and key not in known:
+                    # the top-level keys of a facet reply are ENCODE's facet field names
+                    if previous_tool == "encode_get_facets" and not ancestors:
+                        continue
+                    if FIELD_NAME_RE.fullmatch(key) and key not in contracts.get(previous_tool, set()):
                         where = f"{doc.relative_to(ROOT)}:{line}"
                         problems.append(f"{where}: {previous_tool}() output has no field '{key}'")
-            calls = CALL_RE.findall(body)
-            previous_tool, previous_end = (calls[-1] if calls else None), block.end()
+                # a value shown for a filter field must be one ENCODE uses, so it can be searched for
+                shown = catalog_value_re.findall(body)
+                for field, items in facet_re.findall(body):
+                    if "{" in items:  # facet objects
+                        shown += [(field, term) for term in term_re.findall(items)]
+                    else:  # plain values: "assembly": ["GRCh38", "mm10"]
+                        shown += [(field, item) for item in re.findall(r'"([^"]*)"', items)]
+                for field, value in shown:
+                    if value not in catalogs[field] and not PLACEHOLDER_RE.search(value):
+                        where = f"{doc.relative_to(ROOT)}:{line}"
+                        problems.append(f'{where}: "{field}": "{value}" is not a value in {CATALOGS[field]}')
+            calls = list(CALL_RE.finditer(body))
+            previous_call, previous_end = (body[calls[-1].start() :] if calls else ""), block.end()
+    return problems
+
+
+def check_parameter_lines() -> list[str]:
+    """A line that documents a filter (it names `assay_title`, `output_type`, ...) and quotes
+    example values must quote values ENCODE uses."""
+    problems = []
+    catalogs = catalog_values()
+    # the entry for one parameter: a table row or list item that starts with its name
+    entry = re.compile(rf"^\s*(?:[-*]|\|)\s*`({'|'.join(catalogs)})`")
+    for doc in documents():
+        for number, line in enumerate(doc.read_text().splitlines(), 1):
+            documented = entry.match(line)
+            if not documented or "encode_" in line:
+                continue  # calls are checked separately
+            parameter = documented.group(1)
+            for value in re.findall(r'"([^"]+)"', line):
+                if value not in catalogs[parameter] and not PLACEHOLDER_RE.search(value):
+                    where = f"{doc.relative_to(ROOT)}:{number}"
+                    problems.append(f'{where}: "{value}" is not a value in {CATALOGS[parameter]} (`{parameter}`)')
     return problems
 
 
 def main() -> int:
-    problems = check_tool_calls(tool_signatures()) + check_pipeline_examples()
-    problems += check_output_examples(server_field_names())
+    problems = check_tool_calls(tool_signatures(), required_parameters()) + check_pipeline_examples()
+    problems += check_output_examples(tool_output_fields())
+    problems += check_parameter_lines()
     for problem in problems:
         print(problem)
     print(f"{len(problems)} problem(s)")

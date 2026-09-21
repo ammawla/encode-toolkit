@@ -298,7 +298,7 @@ Search ENCODE experiments with 20+ filters.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `assay_title` | string | Assay type: "Histone ChIP-seq", "ATAC-seq", "RNA-seq", "Hi-C", etc. |
+| `assay_title` | string | Assay type: "Histone ChIP-seq", "ATAC-seq", "total RNA-seq", "Hi-C", etc. |
 | `organism` | string | Species (default: "Homo sapiens") |
 | `organ` | string | Organ: "pancreas", "brain", "liver", "heart", "kidney", etc. |
 | `biosample_type` | string | "tissue", "cell line", "primary cell", "organoid" |
@@ -463,7 +463,7 @@ Get grouped statistics of your tracked experiment collection.
 </details>
 
 <details>
-<summary><strong>Provenance and export tools (4)</strong></summary>
+<summary><strong>Provenance and export tools (5)</strong></summary>
 
 ### `encode_log_derived_file`
 
@@ -591,7 +591,7 @@ When installed as a Claude Code plugin, ENCODE Toolkit includes 47 literature-ba
 </details>
 
 <details>
-<summary><strong>Workflow skills (7)</strong></summary>
+<summary><strong>Workflow skills (10)</strong></summary>
 
 | Skill | Description |
 |-------|-------------|
@@ -648,7 +648,7 @@ Each pipeline includes a SKILL.md overview, 5-stage reference files (preprocessi
 | File | Description |
 |-------|-------------|
 | `skills/histone-aggregation/references/histone-marks-reference.md` | Comprehensive chromatin biology catalog (1,442 lines) — 21 histone marks with writers/erasers/readers, 5 novel acylation marks, ChromHMM state models (5 to 51 states), TF co-binding patterns, chromatin remodeling complexes, DNA methylation-chromatin interplay, nucleosome dynamics, 3D genome organization, chromatin in disease. 74 primary references |
-| `skills/*/references/literature.md` | 33 per-skill literature reference documents — ~250 papers cataloged with DOI, PMID, citation counts, and skill-relevant key findings |
+| `skills/*/references/literature.md` | 47 per-skill literature reference documents — about 240 papers cataloged with DOI, PMID, citation counts, and skill-relevant key findings |
 
 </details>
 
@@ -677,12 +677,12 @@ Most genomics tools give you one thing. ENCODE Toolkit gives you the full resear
 | Category | Assays |
 |----------|--------|
 | **Histone/Chromatin** | Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, CUT&RUN, CUT&Tag, MNase-seq |
-| **Transcription** | RNA-seq, total RNA-seq, small RNA-seq, long read RNA-seq, CAGE, RAMPAGE, PRO-seq, GRO-seq |
+| **Transcription** | total RNA-seq, polyA plus RNA-seq, small RNA-seq, long read RNA-seq, CAGE, RAMPAGE, PRO-seq, GRO-seq |
 | **3D Genome** | Hi-C, intact Hi-C, Micro-C, ChIA-PET, HiChIP, PLAC-seq, 5C |
 | **DNA Methylation** | WGBS, RRBS, MeDIP-seq, MRE-seq |
 | **Functional** | STARR-seq, MPRA, CRISPR screen, eCLIP, iCLIP |
-| **Single Cell** | scRNA-seq, snATAC-seq, 10x multiome, SHARE-seq, Parse SPLiT-seq |
-| **Perturbation** | CRISPRi + RNA-seq, shRNA + RNA-seq, siRNA + RNA-seq |
+| **Single Cell** | scRNA-seq, snATAC-seq, snRNA-seq, long read scRNA-seq |
+| **Perturbation** | CRISPRi RNA-seq, shRNA RNA-seq, siRNA RNA-seq, CRISPR RNA-seq |
 
 **Supported file formats**: `fastq` `bam` `bed` `bigWig` `bigBed` `tsv` `csv` `hic` `tagAlign` `bedpe` `pairs` `fasta` `vcf` `tar`
 

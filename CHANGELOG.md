@@ -26,9 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`encode_search_files` with an organism ignored `offset`** and reported the number of files
   it had collected as the total, so every page was the first page and `has_more` was false.
   `encode_batch_download` always took that path. Pages now advance and `total` is a lower bound
-  that exceeds the page when more files exist.
+  that exceeds the page when more files exist. The search also stopped after the first 200
+  experiments, and after the first 200 files of each experiment, so later files were never
+  found; it now reads further pages of both until the requested page is full (at most 1,000
+  experiments, and it says so when it stops there, also in `encode_batch_download`'s replies).
 - A negative `offset` in `encode_search_experiments` and `encode_search_files` is treated as 0,
-  in the request and in `has_more` / `next_offset`, instead of hiding or repeating pages.
+  in the request, in the reported `offset` and in `has_more` / `next_offset`, instead of hiding
+  or repeating pages.
+- **`encode_get_experiment` always reported zero audit flags.** It asked ENCODE for
+  `frame=embedded`, which leaves out the `audit` property, so every experiment looked free of
+  errors and warnings (the search tool was not affected). It now asks for `frame=page`. Checked
+  against the portal: ENCSR133RZO has 8 warnings and 2 internal-action flags, not 0.
+- BibTeX export joined author names with commas, which BibTeX reads as a single author; they
+  are joined with `and`.
+- **`encode_list_tracked` and `encode_export_data` ignored a filter that matched nothing** and
+  returned every tracked experiment. They now return none.
+- `encode_batch_download` reported `next_offset` but had no `offset` parameter to continue with;
+  it has one now.
+- The description of `encode_get_experiment` promised quality metrics. It returns audit counts,
+  replicate counts and possible controls, and now says so.
+- The value lists behind `encode_get_metadata` named three values ENCODE does not have (file
+  format `dat`, output type `stable peaks`, output category `quality metric`) and lacked eleven
+  file formats (among them `h5ad`) and eight assemblies. File formats, assemblies and output
+  categories now match ENCODE's file schema, and the output types include the single-cell
+  sparse gene count matrices.
 - `encode_connector.__version__` was a hard-coded `0.2.1`; it now reports the installed version.
 - **Four pipelines failed at their last step.** MultiQC names its report after `--title`, so
   CUT&RUN, DNase-seq, Hi-C and WGBS never produced the `multiqc_report.html` they declare. They
@@ -62,6 +83,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Trimmed-read FastQC reports are kept and passed to MultiQC in every pipeline that trims.
 - Conda environments: `idr` added to ATAC-seq, `picard` added to DNase-seq, BWA 0.7.18.
 
+- **The four validation scripts that ship in the aggregation skills had no tests and several
+  bugs.** `validate_methylation.py` rescaled every methylation value at or below 1 by 100, so in
+  an ENCODE bedMethyl (percentages) a CpG at 1% was reported as 100% methylated and every real
+  file triggered a "mixed formats" warning; the scale is now decided once per file (`--scale`).
+  Reversed intervals entered the statistics in the histone and Hi-C scripts, 9- and 10-column
+  bedMethyl files were read with the wrong columns, percentages were taken over malformed lines
+  too, gzipped inputs crashed, and an empty file passed. All fixed, with 37 tests that run the
+  scripts on synthetic files. The skills now say how to run them.
+
 ### Changed
 
 - **One version of every tool.** The ChIP-seq, ATAC-seq and RNA-seq images move to the versions
@@ -75,8 +105,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `peaks/idr/<sampleA>_vs_<sampleB>.idr_peaks.txt`.
 - **Hi-C honours `--resolutions`**: the cooler base bin is the smallest requested resolution,
   and the new `--hiccups_resolutions` selects the loop-calling resolutions. Both lists are
-  validated before anything runs, and HiCCUPS gets one peak width, window width and merge
-  radius per resolution (juicer_tools exits when the `-d` list has a different length).
+  validated before anything runs (positive integers with no empty fields, multiples of the
+  smallest), and HiCCUPS
+  gets one peak width, window width and merge radius per resolution (juicer_tools exits when
+  the `-d` list has a different length).
+- The conda environments pin every tool with `==` (a single `=` is a prefix match in conda) and
+  add cutadapt 4.6 and OpenJDK 17, as in the images; they resolved to cutadapt 5.2, samtools
+  1.19.2 and Java 22 before. Every pin now resolves as written. cutadapt 4.6 has no
+  Python 3.11 build, so all seven environments use Python 3.10. The Hi-C and WGBS images
+  install `openjdk-17-jre-headless` like the other five instead of Ubuntu's `default-jre`
+  (Java 11), and the image smoke tests assert Java 17.
 - ATAC-seq publishes `samtools idxstats` (which MultiQC reads) in place of a text line that
   needed `bc` and failed on genomes without the mitochondrial contig.
 - WGBS coverage statistics also report the run's `--min_coverage`; deduplication reports reach
@@ -94,17 +132,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   corrected.
 - Reference commands were checked against the pinned tool versions (Hotspot2, MethylDackel,
   SEACR, Juicer tools, pairtools, RGT, MPRAflow) and corrected.
+- **`docs/`, the README, `agents/` and `commands/` were never checked against the code.** The
+  API reference, showcase, walkthrough and vignettes showed invented response shapes (facets as
+  `key`/`doc_count`, a nested `audit` object, `href`, `files_found`, wrong compatibility verdicts);
+  all are corrected to what the server returns, and the API reference documents all 20 tools
+  instead of 16. The seven pipeline agents described steps the workflows do not run (Arrowhead
+  TAD calling, a WGBS conversion-rate stage, RNA-SeQC, Trimmomatic) and flags they do not use.
+  The doc checker now covers all of these folders, and CI also compares `agents/` and
+  `commands/` with their copies under `plugin/`.
+- The pipeline vignettes and the pipeline-execution walkthrough told users to run
+  `nextflow run ENCODE-DCC/chip-seq-pipeline2` (the official ENCODE pipelines are WDL, not
+  Nextflow), to pull images that were never verified, and to pass options that no longer exist
+  (`--motif_db`, `--restriction_site`, `--gtf`, `--lambda_genome`, `--single_end`). They now
+  build the image from the skill's Dockerfile and run the toolkit's own workflows with real
+  parameters, outputs and versions; DNase-seq is documented as paired-end only, and WGBS
+  conversion rate as a manual check.
+- Examples used values ENCODE does not have: the assay title `RNA-seq` (it is `total RNA-seq`,
+  `polyA plus RNA-seq`, ...), and the output types `chromatin interactions` (it is `loops`) and
+  `filtered feature barcode matrix`. Four `encode_link_reference` calls omitted the experiment.
+  The WGBS CpG-coverage one-liner piped BAM output into `awk`; it uses `bedtools coverage` now.
 
 ### CI
 
 - The seven `nextflow.config` files are generated by `.github/scripts/gen-pipeline-configs.py`, and CI fails
   when a config differs from what the generator writes.
 - `check-tool-versions.py` fails the build when a pipeline image and its conda environment pin
-  different versions of the same tool. Dockerfile comments do not count as evidence.
+  different versions of the same tool, when the image pins a package the environment does not,
+  or when both install a tool the environment leaves unpinned. It compares Java too and rejects
+  an unversioned `default-jre`. Dockerfile comments do not count as evidence, and the few
+  deliberate exceptions (packages from the Ubuntu base) are printed.
 - `check-skill-docs.py` fails the build when a skill shows a tool call the server would reject
   or a `nextflow run` example with a parameter or profile the pipeline does not declare, and
   when an example output uses a field the server never emits (model fields, dict keys and
-  SQLite columns, read from the source with `ast`).
+  SQLite columns, read from the source with `ast`). It also rejects a call that omits a required
+  argument, and filter values ENCODE does not use (`assay_title="RNA-seq"`), in calls to the
+  tools that query the portal and in example outputs (single values, lists and facet terms).
+  Example outputs are checked against the fields that the documented tool itself can return,
+  followed through the code it calls, its models and the SQL rows it reads, not against one
+  list for the whole server.
 - Image smoke tests start FastQC and Trim Galore; the preview suite covers the new parameters
   and the cloud-profile checks.
 

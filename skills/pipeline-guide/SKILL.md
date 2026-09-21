@@ -95,7 +95,7 @@ built for the WDL workflows and are not what the Nextflow skills here run.
 | Output Type | Format | Description | Use For |
 |------------|--------|-------------|---------|
 | contact matrix | hic | Interaction frequencies | TAD/compartment calling |
-| chromatin interactions | bedpe | Called loops | Loop analysis |
+| loops | bedpe | Called loops | Loop analysis |
 
 ## Choosing the Right Output Files
 

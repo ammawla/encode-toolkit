@@ -177,6 +177,14 @@ class TestLimitClamping:
             await client.search_files(limit=99999)
             assert captured["limit"] <= 1000
 
+    async def test_list_files_passes_an_offset_to_the_api(self):
+        client = EncodeClient()
+        client._request = AsyncMock(return_value={"@graph": []})
+
+        await client.list_files("ENCSR133RZO", offset=200)
+
+        assert client._request.call_args.args[1]["from"] == 200
+
     async def test_list_files_clamps_limit(self):
         async with EncodeClient() as client:
             captured = {}
@@ -1459,6 +1467,32 @@ class TestSearchAsksForUsableFields:
         assert result["offset"] == 0
 
 
+class TestExperimentDetailsCarryAudits:
+    # ENCODE leaves the "audit" property out of frame=embedded, so every experiment looked
+    # clean (0 errors, 0 warnings). frame=page is the embedded frame plus the audits.
+    async def test_get_experiment_asks_for_the_frame_that_has_audits(self):
+        client = EncodeClient()
+        client._request = AsyncMock(
+            side_effect=[
+                {"accession": "ENCSR133RZO", "audit": {"WARNING": [{}, {}], "ERROR": [{}]}},
+                {"@graph": []},
+            ]
+        )
+
+        detail = await client.get_experiment("ENCSR133RZO")
+
+        assert client._request.call_args_list[0].args[1]["frame"] == "page"
+        assert (detail.audit_error_count, detail.audit_warning_count) == (1, 2)
+
+    async def test_get_experiment_raw_asks_for_the_frame_that_has_audits(self):
+        client = EncodeClient()
+        client._request = AsyncMock(return_value={"accession": "ENCSR133RZO"})
+
+        await client.get_experiment_raw("ENCSR133RZO")
+
+        assert client._request.call_args.args[1]["frame"] == "page"
+
+
 class TestSearchFilesByOrganismPaginates:
     @staticmethod
     def _client_with_files(per_experiment: int, experiments: int) -> EncodeClient:
@@ -1501,3 +1535,139 @@ class TestSearchFilesByOrganismPaginates:
         result = await client.search_files(organism="Mus musculus", limit=25, offset=0)
 
         assert result["total"] > result["offset"] + result["limit"]
+
+    async def test_files_of_experiments_beyond_the_first_page_are_found(self):
+        # Only the third experiment has matching files, and it is on the second page of the
+        # experiment search. Stopping after one page returned an empty result with total 0.
+        from encode_connector.client.models import FileSummary
+
+        client = EncodeClient()
+        pages = {0: ["ENCSR000AAA", "ENCSR001AAA"], 2: ["ENCSR002AAA"]}
+        requested_offsets = []
+
+        async def mock_search_experiments(**kwargs):
+            requested_offsets.append(kwargs.get("offset", 0))
+            summaries = []
+            for accession in pages.get(kwargs.get("offset", 0), []):
+                summary = MagicMock()
+                summary.accession = accession
+                summaries.append(summary)
+            return {"results": summaries, "total": 3}
+
+        async def mock_list_files(experiment_accession, **kwargs):
+            if experiment_accession != "ENCSR002AAA":
+                return []
+            return [FileSummary.from_api({**SAMPLE_FILE_API, "accession": "ENCFF002AAA"})]
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+
+        result = await client.search_files(organism="Mus musculus", limit=25)
+
+        assert [f.accession for f in result["results"]] == ["ENCFF002AAA"]
+        assert requested_offsets == [0, 2]
+
+    async def test_an_experiment_with_more_files_than_one_request_returns_is_read_completely(self):
+        # list_files returns at most one page per request. Files past the first page of an
+        # experiment were skipped, so deeper offsets showed files of the next experiment instead.
+        from encode_connector.client.constants import FILES_PAGE_SIZE
+        from encode_connector.client.models import FileSummary
+
+        client = EncodeClient()
+        big = [f"BIG-{n}" for n in range(FILES_PAGE_SIZE + 5)]
+
+        async def mock_search_experiments(**kwargs):
+            summaries = []
+            for accession in ["ENCSR000AAA", "ENCSR001AAA"] if kwargs.get("offset", 0) == 0 else []:
+                summary = MagicMock()
+                summary.accession = accession
+                summaries.append(summary)
+            return {"results": summaries, "total": 2}
+
+        async def mock_list_files(experiment_accession, limit=200, offset=0, **kwargs):
+            names = big if experiment_accession == "ENCSR000AAA" else ["SMALL-0"]
+            return [
+                FileSummary.from_api({**SAMPLE_FILE_API, "accession": name}) for name in names[offset : offset + limit]
+            ]
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+
+        result = await client.search_files(organism="Mus musculus", limit=10, offset=FILES_PAGE_SIZE)
+
+        assert [f.accession for f in result["results"]] == [*big[FILES_PAGE_SIZE:], "SMALL-0"]
+
+    async def test_the_walk_over_experiments_is_bounded(self):
+        from encode_connector.client.constants import MAX_EXPERIMENTS_SCANNED
+
+        client = EncodeClient()
+        listed = []
+
+        async def mock_search_experiments(**kwargs):
+            summaries = []
+            for index in range(kwargs["limit"]):
+                summary = MagicMock()
+                summary.accession = f"ENCSR{kwargs['offset'] + index:06d}"
+                summaries.append(summary)
+            return {"results": summaries, "total": 50_000}
+
+        async def mock_list_files(experiment_accession, **kwargs):
+            listed.append(experiment_accession)
+            return []
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+
+        result = await client.search_files(organism="Mus musculus", file_format="hic")
+
+        assert len(listed) == MAX_EXPERIMENTS_SCANNED
+        assert result["results"] == []
+        assert "stopped after" in result["total_note"]
+
+    async def test_reading_every_experiment_is_not_reported_as_stopping_early(self):
+        # exactly as many experiments as the bound: all of them were read, nothing was cut off
+        from encode_connector.client.constants import MAX_EXPERIMENTS_SCANNED
+
+        client = EncodeClient()
+
+        async def mock_search_experiments(**kwargs):
+            remaining = max(0, MAX_EXPERIMENTS_SCANNED - kwargs["offset"])
+            summaries = []
+            for index in range(min(kwargs["limit"], remaining)):
+                summary = MagicMock()
+                summary.accession = f"ENCSR{kwargs['offset'] + index:06d}"
+                summaries.append(summary)
+            return {"results": summaries, "total": MAX_EXPERIMENTS_SCANNED}
+
+        async def mock_list_files(experiment_accession, **kwargs):
+            return []
+
+        client.search_experiments = mock_search_experiments
+        client.list_files = mock_list_files
+
+        result = await client.search_files(organism="Mus musculus", file_format="hic")
+
+        assert result["results"] == []
+        assert "stopped after" not in result["total_note"]
+
+    async def test_a_negative_offset_is_zero_with_an_organism_and_no_experiments(self):
+        client = EncodeClient()
+
+        async def mock_search_experiments(**kwargs):
+            return {"results": [], "total": 0}
+
+        client.search_experiments = mock_search_experiments
+
+        result = await client.search_files(organism="Mus musculus", offset=-5)
+
+        assert result["results"] == [] and result["total"] == 0
+        assert result["offset"] == 0
+
+    async def test_a_negative_offset_is_zero_without_an_organism(self):
+        client = EncodeClient()
+        client._request = AsyncMock(return_value={"@graph": [], "total": 0})
+
+        result = await client.search_files(file_format="bed", offset=-5)
+
+        assert result["offset"] == 0
+        assert "from" not in client._request.call_args.args[1]
