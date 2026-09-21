@@ -26,7 +26,7 @@ try:
 
     _version = importlib.metadata.version("encode-toolkit")
 except importlib.metadata.PackageNotFoundError:
-    _version = "0.3.5"
+    _version = "0.3.4"
 USER_AGENT = f"encode-toolkit/{_version} (MCP; +https://github.com/ammawla/encode-toolkit)"
 
 # Keyring service name for credential storage
