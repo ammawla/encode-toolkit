@@ -143,7 +143,7 @@ def validate_peaks(input_path, blacklist_path, peak_format):
             fields = line.split("\t")
 
             # Column count check
-            if len(fields) < expected_cols:
+            if len(fields) != expected_cols:
                 bad_lines += 1
                 column_errors += 1
                 if column_errors <= MAX_COLUMN_ERRORS:
@@ -188,37 +188,32 @@ def validate_peaks(input_path, blacklist_path, peak_format):
                 bad_lines += 1
                 continue
 
+            # Col 7 = signalValue, Col 8 = pValue (-log10), Col 9 = qValue (-log10). They are
+            # checked before anything is counted: a row with an unusable value is malformed and
+            # stays out of every statistic.
+            scores = {}
+            for col_idx, col_name in [(6, "signalValue"), (7, "pValue"), (8, "qValue")]:
+                try:
+                    scores[col_name] = float(fields[col_idx])
+                except ValueError:
+                    errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
+            if scores.get("signalValue", 0) < 0:
+                errors.append(f"Line {line_num}: negative signalValue ({scores['signalValue']})")
+            if len(scores) < 3 or scores["signalValue"] < 0:
+                bad_lines += 1
+                continue
+
             peak_size = end - start
             peak_sizes.append(peak_size)
             chrom_counts[chrom] += 1
+            signal_values.append(scores["signalValue"])
+            p_values.append(scores["pValue"])
+            q_values.append(scores["qValue"])
 
             if chrom == "chrM":
                 chrm_peaks += 1
             if peak_size > large_threshold:
                 large_peaks += 1
-
-            # Signal/score validation (columns 5, 7, 8, 9 in narrowPeak)
-            # Col 5 = score (int 0-1000), Col 7 = signalValue (float),
-            # Col 8 = pValue (float, -log10), Col 9 = qValue (float, -log10)
-            try:
-                signal_val = float(fields[6])
-                signal_values.append(signal_val)
-                if signal_val < 0:
-                    errors.append(f"Line {line_num}: negative signalValue ({signal_val})")
-            except (ValueError, IndexError):
-                errors.append(f"Line {line_num}: invalid signalValue in column 7")
-
-            try:
-                p_val = float(fields[7])
-                p_values.append(p_val)
-            except (ValueError, IndexError):
-                errors.append(f"Line {line_num}: invalid pValue in column 8")
-
-            try:
-                q_val = float(fields[8])
-                q_values.append(q_val)
-            except (ValueError, IndexError):
-                errors.append(f"Line {line_num}: invalid qValue in column 9")
 
             # Blacklist overlap check
             if blacklist and overlaps_blacklist(chrom, start, end, blacklist):

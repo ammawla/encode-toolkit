@@ -624,3 +624,67 @@ def test_a_row_with_a_negative_coordinate_is_malformed_and_left_out_of_the_stati
     assert "negative" in output, output
     assert re.search(rf"{valid_label}:\s+2\b", output), output
     assert re.search(r"Malformed lines:\s+1\b", output), output
+
+
+@pytest.mark.parametrize("script", [ACCESSIBILITY, HISTONE])
+@pytest.mark.parametrize("bad_signal", ["abc", "-3.0"])
+def test_a_peak_with_an_invalid_signal_value_is_left_out_of_the_statistics(tmp_path, script, bad_signal):
+    # Arrange: two good peaks and one 5 kb peak whose signalValue cannot be used
+    bad_row = narrow_peak_row(start=10_000, end=15_000, signal=bad_signal)
+    path = tmp_path / "signal.narrowPeak"
+    write_lines(path, [narrow_peak_row(), narrow_peak_row(start=2000, end=2200), bad_row])
+
+    # Act
+    code, output = run_script(script, path)
+
+    # Assert: the bad row is malformed, and its 5,000 bp size never reaches the size statistics
+    assert code == 1, output
+    assert re.search(r"Valid peaks:\s+2\b", output), output
+    assert re.search(r"Malformed lines:\s+1\b", output), output
+    assert "5,000" not in output, output
+
+
+def test_histone_rejects_a_narrowpeak_file_read_as_broadpeak(tmp_path):
+    # Arrange: narrowPeak has 10 columns, broadPeak 9; a longer row is not a broadPeak row
+    path = tmp_path / "narrow.narrowPeak"
+    write_lines(path, [narrow_peak_row(), narrow_peak_row(start=2000, end=2200)])
+
+    # Act
+    code, output = run_script(HISTONE, path, "--format", "broad")
+
+    # Assert
+    assert code == 1, output
+    assert "expected 9 columns" in output, output
+
+
+def test_accessibility_rejects_a_row_with_too_many_columns(tmp_path):
+    path = tmp_path / "wide.narrowPeak"
+    write_lines(path, [narrow_peak_row(), [*narrow_peak_row(start=2000, end=2200), "extra"]])
+
+    code, output = run_script(ACCESSIBILITY, path)
+
+    assert code == 1, output
+    assert "expected 10 columns" in output, output
+    assert re.search(r"Valid peaks:\s+1\b", output), output
+
+
+def test_methylation_value_above_one_hundred_is_left_out_of_the_statistics(tmp_path):
+    # Arrange
+    path = tmp_path / "over.bedMethyl"
+    write_lines(
+        path,
+        [
+            encode_methyl_row(methylation=10),
+            encode_methyl_row(start=2000, end=2001, methylation=20),
+            encode_methyl_row(start=3000, end=3001, methylation=150),
+        ],
+    )
+
+    # Act
+    code, output = run_script(METHYLATION, path)
+
+    # Assert: 150 is an error and must not become the maximum of the distribution
+    assert code == 1, output
+    assert "150" in output, output
+    assert re.search(r"Max:\s+20\.0%", output), output
+    assert re.search(r"Valid CpGs:\s+2\b", output), output

@@ -1186,6 +1186,24 @@ class TestBatchDownloadResponse:
         assert json.loads(raw)["total_note"] == note
 
     @pytest.mark.asyncio
+    async def test_batch_download_empty_page_keeps_the_number_of_matches(self):
+        # 50 files match; asking for offset=100 gives an empty page, not "0 files match"
+        mock_client = AsyncMock()
+        mock_client.search_files.return_value = _make_file_search_result([], total=50)
+
+        with (
+            patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)),
+            patch("encode_connector.server.main._get_downloader", return_value=MagicMock()),
+        ):
+            from encode_connector.server.main import encode_batch_download
+
+            raw = await encode_batch_download(download_dir="/tmp/test", file_format="bed", offset=100)
+
+        data = json.loads(raw)
+        assert data["total"] == 50
+        assert "No files found" not in data["message"]
+
+    @pytest.mark.asyncio
     async def test_batch_download_takes_the_next_offset_it_reports(self):
         # the reply carried next_offset, but the tool had no offset parameter to pass it back to
         mock_client = AsyncMock()

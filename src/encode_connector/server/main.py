@@ -726,12 +726,23 @@ async def encode_batch_download(
     total_note = search_result.get("total_note")
 
     if not files:
+        # with an offset, an empty page means "past the last match", not "nothing matches"
+        search_total = search_result.get("total", 0)
+        if search_total:
+            message = f"No files at offset {offset}: the search matches {search_total} file(s). Use a smaller offset."
+            suggestion = "Call again with offset=0 to start from the first matching file."
+        else:
+            message = "No files found matching the search criteria."
+            suggestion = (
+                "Try broadening your search filters. Use encode_get_facets to see what data is "
+                "available for your criteria."
+            )
         empty_result = {
-            "message": "No files found matching the search criteria.",
-            "total": 0,
+            "message": message,
+            "total": search_total,
             "has_more": False,
             "next_offset": None,
-            "suggestion": "Try broadening your search filters. Use encode_get_facets to see what data is available for your criteria.",
+            "suggestion": suggestion,
         }
         if total_note:
             empty_result["total_note"] = total_note

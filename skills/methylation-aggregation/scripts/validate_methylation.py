@@ -150,7 +150,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path, requested_sca
     chrom_counts = Counter()
     strand_counts = Counter()
     coverage_values = []
-    raw_methylation = []  # (line number, raw value) — scaled once the whole file has been read
+    records = []  # rows whose fields all parsed: (line, chrom, strand, coverage, methylation, in blacklist)
     total_lines = 0
     # Every line excluded from the statistics below counts as malformed, so
     # total_lines == valid_records + bad_lines always holds.
@@ -236,73 +236,69 @@ def validate_methylation(input_path, min_coverage, blacklist_path, requested_sca
                 bad_lines += 1
                 continue
 
-            chrom_counts[chrom] += 1
+            # Every field is checked before anything is counted: a row with an unusable strand,
+            # coverage or methylation value is malformed and stays out of every statistic.
+            row_ok = True
+            strand = fields[5]
+            if strand not in VALID_STRANDS:
+                errors.append(f"Line {line_num}: invalid strand '{strand}' (expected +, -, or .)")
+                row_ok = False
 
-            # Strand validation
-            strand_field_idx = 5
-            if len(fields) > strand_field_idx:
-                strand = fields[strand_field_idx]
-                if strand not in VALID_STRANDS:
-                    errors.append(f"Line {line_num}: invalid strand '{strand}' (expected +, -, or .)")
-                strand_counts[strand] += 1
-
-            # Coverage validation
             try:
-                coverage = int(fields[cov_col])
+                coverage = int(float(fields[cov_col]))  # some tools write coverage as a float
+            except ValueError:
+                errors.append(f"Line {line_num}: invalid coverage in column {cov_col + 1}")
+                row_ok = False
+            else:
                 if coverage < 0:
                     errors.append(f"Line {line_num}: negative coverage ({coverage})")
-                else:
-                    coverage_values.append(coverage)
-                    if coverage < min_coverage:
-                        low_coverage += 1
-            except (ValueError, IndexError):
-                # Try float then round (some tools output float coverage)
-                try:
-                    coverage = float(fields[cov_col])
-                    if coverage < 0:
-                        errors.append(f"Line {line_num}: negative coverage ({coverage})")
-                    else:
-                        coverage_values.append(int(coverage))
-                        if coverage < min_coverage:
-                            low_coverage += 1
-                except (ValueError, IndexError):
-                    errors.append(f"Line {line_num}: invalid coverage in column {cov_col + 1}")
+                    row_ok = False
 
-            # Methylation value validation (the scale is applied after the whole file is read)
             try:
                 meth = float(fields[meth_col])
-            except (ValueError, IndexError):
+            except ValueError:
                 errors.append(f"Line {line_num}: invalid methylation value in column {meth_col + 1}")
+                row_ok = False
             else:
                 if meth < 0:
                     errors.append(f"Line {line_num}: negative methylation value ({meth})")
-                else:
-                    raw_methylation.append((line_num, meth))
+                    row_ok = False
 
-            # Blacklist overlap check
-            if blacklist and overlaps_blacklist(chrom, start, end, blacklist):
-                blacklist_overlaps += 1
+            if not row_ok:
+                bad_lines += 1
+                continue
+
+            # The methylation scale is known only after the whole file is read, so the row is
+            # kept here and counted below, once its value is known to be in range.
+            in_blacklist = bool(blacklist) and overlaps_blacklist(chrom, start, end, blacklist)
+            records.append((line_num, chrom, strand, coverage, meth, in_blacklist))
 
     if total_lines == 0:
         print(f"ERROR: no data rows in {input_path} (only comments, headers or blank lines)", file=sys.stderr)
         sys.exit(1)
 
-    valid_records = total_lines - bad_lines
-
-    # --- Apply one scale to every methylation value ---
-    scale = decide_scale(requested_scale, detected_format, [value for _, value in raw_methylation])
+    # --- Apply one scale to every methylation value, then count the rows that are in range ---
+    scale = decide_scale(requested_scale, detected_format, [record[4] for record in records])
+    upper, factor = (1.0, 100) if scale == "fraction" else (100, 1)
     methylation_values = []
-    if scale == "fraction":
-        for line_num, value in raw_methylation:
-            if value > 1.0:
-                errors.append(f"Line {line_num}: methylation value {value} > 1 with --scale fraction (expected 0-1).")
+    for line_num, chrom, strand, coverage, meth, in_blacklist in records:
+        if meth > upper:
+            if scale == "fraction":
+                errors.append(f"Line {line_num}: methylation value {meth} > 1 with --scale fraction (expected 0-1).")
             else:
-                methylation_values.append(value * 100)
-    else:
-        for line_num, value in raw_methylation:
-            if value > 100:
-                errors.append(f"Line {line_num}: methylation value > 100 ({value}). Expected 0-100 (percentage).")
-            methylation_values.append(value)
+                errors.append(f"Line {line_num}: methylation value > 100 ({meth}). Expected 0-100 (percentage).")
+            bad_lines += 1
+            continue
+        chrom_counts[chrom] += 1
+        strand_counts[strand] += 1
+        coverage_values.append(coverage)
+        if coverage < min_coverage:
+            low_coverage += 1
+        if in_blacklist:
+            blacklist_overlaps += 1
+        methylation_values.append(meth * factor)
+
+    valid_records = total_lines - bad_lines
 
     # --- Report Statistics ---
     print("=== bedMethyl Validation Report ===")

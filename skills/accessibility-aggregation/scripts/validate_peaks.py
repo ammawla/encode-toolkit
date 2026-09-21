@@ -144,7 +144,7 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
             fields = line.split("\t")
 
             # Accessibility peaks should always be narrowPeak
-            if len(fields) < NARROWPEAK_COLS:
+            if len(fields) != NARROWPEAK_COLS:
                 bad_lines += 1
                 column_errors += 1
                 if column_errors <= MAX_COLUMN_ERRORS:
@@ -187,9 +187,24 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
                 bad_lines += 1
                 continue
 
+            # signalValue, pValue and qValue are checked before anything is counted: a row with
+            # an unusable value is malformed and stays out of every statistic
+            scores = {}
+            for col_idx, col_name in [(6, "signalValue"), (7, "pValue"), (8, "qValue")]:
+                try:
+                    scores[col_name] = float(fields[col_idx])
+                except ValueError:
+                    errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
+            if scores.get("signalValue", 0) < 0:
+                errors.append(f"Line {line_num}: negative signalValue ({scores['signalValue']})")
+            if len(scores) < 3 or scores["signalValue"] < 0:
+                bad_lines += 1
+                continue
+
             peak_size = end - start
             peak_sizes.append(peak_size)
             chrom_counts[chrom] += 1
+            signal_values.append(scores["signalValue"])
 
             # Track start positions for Tn5 pileup detection (ATAC-specific)
             if assay == "atac":
@@ -203,22 +218,6 @@ def validate_accessibility_peaks(input_path, blacklist_path, assay):
 
             if peak_size < ATAC_SMALL_THRESHOLD:
                 tiny_peaks += 1
-
-            # SignalValue validation
-            try:
-                signal_val = float(fields[6])
-                signal_values.append(signal_val)
-                if signal_val < 0:
-                    errors.append(f"Line {line_num}: negative signalValue ({signal_val})")
-            except (ValueError, IndexError):
-                errors.append(f"Line {line_num}: invalid signalValue in column 7")
-
-            # pValue and qValue validation
-            for col_idx, col_name in [(7, "pValue"), (8, "qValue")]:
-                try:
-                    float(fields[col_idx])
-                except (ValueError, IndexError):
-                    errors.append(f"Line {line_num}: invalid {col_name} in column {col_idx + 1}")
 
             # Blacklist overlap check
             if blacklist and overlaps_blacklist(chrom, start, end, blacklist):
