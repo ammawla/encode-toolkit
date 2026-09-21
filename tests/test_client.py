@@ -1467,6 +1467,32 @@ class TestSearchAsksForUsableFields:
         assert result["offset"] == 0
 
 
+class TestExperimentDetailsCarryAudits:
+    # ENCODE leaves the "audit" property out of frame=embedded, so every experiment looked
+    # clean (0 errors, 0 warnings). frame=page is the embedded frame plus the audits.
+    async def test_get_experiment_asks_for_the_frame_that_has_audits(self):
+        client = EncodeClient()
+        client._request = AsyncMock(
+            side_effect=[
+                {"accession": "ENCSR133RZO", "audit": {"WARNING": [{}, {}], "ERROR": [{}]}},
+                {"@graph": []},
+            ]
+        )
+
+        detail = await client.get_experiment("ENCSR133RZO")
+
+        assert client._request.call_args_list[0].args[1]["frame"] == "page"
+        assert (detail.audit_error_count, detail.audit_warning_count) == (1, 2)
+
+    async def test_get_experiment_raw_asks_for_the_frame_that_has_audits(self):
+        client = EncodeClient()
+        client._request = AsyncMock(return_value={"accession": "ENCSR133RZO"})
+
+        await client.get_experiment_raw("ENCSR133RZO")
+
+        assert client._request.call_args.args[1]["frame"] == "page"
+
+
 class TestSearchFilesByOrganismPaginates:
     @staticmethod
     def _client_with_files(per_experiment: int, experiments: int) -> EncodeClient:

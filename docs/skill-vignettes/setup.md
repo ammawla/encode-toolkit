@@ -31,20 +31,20 @@ The setup skill helps new users install the ENCODE MCP server, verify their conn
     "TF ChIP-seq",
     "ATAC-seq",
     "DNase-seq",
-    "RNA-seq",
     "total RNA-seq",
+    "polyA plus RNA-seq",
     "WGBS",
-    "Hi-C",
+    "intact Hi-C",
     "CUT&RUN",
     "CUT&Tag",
     "CRISPR screen",
     "..."
   ],
-  "count": 56
+  "count": 79
 }
 ```
 
-**What this means:** ENCODE hosts 56 distinct assay types spanning chromatin profiling, transcription, DNA methylation, 3D genome structure, and functional screens.
+**What this means:** ENCODE hosts 79 distinct assay types spanning chromatin profiling, transcription, DNA methylation, 3D genome structure, and functional screens. Note how specific the names are: there is no plain `"RNA-seq"` -- you filter on `"total RNA-seq"`, `"polyA plus RNA-seq"`, `"small RNA-seq"` and so on.
 
 ### Step 2: See What Pancreas Data Exists
 
@@ -54,29 +54,29 @@ The setup skill helps new users install the ENCODE MCP server, verify their conn
 ```json
 {
   "assay_title": [
-    {"key": "Histone ChIP-seq", "doc_count": 48},
-    {"key": "RNA-seq", "doc_count": 35},
-    {"key": "TF ChIP-seq", "doc_count": 15},
-    {"key": "ATAC-seq", "doc_count": 12},
-    {"key": "WGBS", "doc_count": 6}
+    {"term": "Histone ChIP-seq", "count": 48},
+    {"term": "total RNA-seq", "count": 35},
+    {"term": "TF ChIP-seq", "count": 15},
+    {"term": "ATAC-seq", "count": 12},
+    {"term": "WGBS", "count": 6}
   ],
   "biosample_ontology.classification": [
-    {"key": "tissue", "doc_count": 72},
-    {"key": "cell line", "doc_count": 18},
-    {"key": "in vitro differentiated cells", "doc_count": 14},
-    {"key": "primary cell", "doc_count": 9}
+    {"term": "tissue", "count": 72},
+    {"term": "cell line", "count": 18},
+    {"term": "in vitro differentiated cells", "count": 14},
+    {"term": "primary cell", "count": 9}
   ],
   "target.label": [
-    {"key": "H3K27ac", "doc_count": 12},
-    {"key": "H3K4me3", "doc_count": 10},
-    {"key": "H3K27me3", "doc_count": 8},
-    {"key": "H3K4me1", "doc_count": 7},
-    {"key": "CTCF", "doc_count": 5}
+    {"term": "H3K27ac", "count": 12},
+    {"term": "H3K4me3", "count": 10},
+    {"term": "H3K27me3", "count": 8},
+    {"term": "H3K4me1", "count": 7},
+    {"term": "CTCF", "count": 5}
   ]
 }
 ```
 
-**What this means:** ENCODE has over 100 pancreas experiments. Histone ChIP-seq and RNA-seq dominate, with active (H3K27ac, H3K4me3) and repressive (H3K27me3) marks well represented. Most data comes from bulk tissue, but cell line and in vitro differentiated samples are also available. CTCF ChIP-seq provides insulator and 3D genome boundary data.
+**What this means:** ENCODE has over 100 pancreas experiments. The top-level keys are ENCODE's facet field names, and each one lists its terms with live counts. Histone ChIP-seq and total RNA-seq dominate, with active (H3K27ac, H3K4me3) and repressive (H3K27me3) marks well represented. Most data comes from bulk tissue, but cell line and in vitro differentiated samples are also available. CTCF ChIP-seq provides insulator and 3D genome boundary data.
 
 ### Step 3: Check Biosample Type Options
 
@@ -87,13 +87,13 @@ The setup skill helps new users install the ENCODE MCP server, verify their conn
 {
   "metadata_type": "biosample_types",
   "values": [
-    "tissue",
     "cell line",
+    "tissue",
     "primary cell",
-    "in vitro differentiated cells",
-    "organoid",
     "whole organisms",
+    "in vitro differentiated cells",
     "cell-free sample",
+    "organoid",
     "technical sample"
   ],
   "count": 8

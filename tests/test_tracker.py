@@ -667,6 +667,18 @@ class TestCitationExport:
         assert "Test Paper" in bibtex
         assert "Smith J" in bibtex
 
+    def test_bibtex_separates_authors_with_and(self, tracker, sample_experiment):
+        # BibTeX reads "A, B, C" as ONE author named "B" with the surname "A"; names are joined by " and "
+        tracker.track_experiment(sample_experiment)
+        tracker.store_publications(
+            "ENCSR133RZO",
+            [{"pmid": "35045337", "title": "T", "authors": "Sai Zhang, Johnathan Cooper-Knock, Annika K. Weimer"}],
+        )
+
+        bibtex = tracker.export_citations_bibtex(["ENCSR133RZO"])
+
+        assert "author = {Sai Zhang and Johnathan Cooper-Knock and Annika K. Weimer}," in bibtex
+
     def test_ris_export(self, tracker, sample_experiment):
         tracker.track_experiment(sample_experiment)
         tracker.store_publications(
@@ -754,6 +766,11 @@ class TestMetadataTable:
         assert "publication_count" in table[0]
         assert "derived_file_count" in table[0]
         assert "raw_metadata" not in table[0]
+
+    def test_an_empty_accession_list_selects_nothing(self, tracker, sample_experiment):
+        tracker.track_experiment(sample_experiment)
+
+        assert tracker.get_metadata_table([]) == []
 
     def test_table_with_accession_filter(self, tracker, sample_experiment, sample_experiment2):
         tracker.track_experiment(sample_experiment)
@@ -982,6 +999,14 @@ class TestExportTrackedData:
         assert isinstance(parsed, list)
         assert len(parsed) == 1
         assert parsed[0]["accession"] == "ENCSR133RZO"
+
+    def test_a_filter_that_matches_nothing_exports_nothing(self, tracker, sample_experiment):
+        # an empty match used to fall through to "no filter" and export every tracked experiment
+        tracker.track_experiment(sample_experiment)
+
+        exported = tracker.export_tracked_data(format="json", organ="no such organ")
+
+        assert json.loads(exported) == []
 
     def test_export_empty(self, tracker):
         csv_data = tracker.export_tracked_data(format="csv")

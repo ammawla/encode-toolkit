@@ -22,7 +22,7 @@ A scientist builds a complete regulatory landscape of human liver by layering fi
 encode_get_facets(organ="liver", organism="Homo sapiens")
 ```
 
-Liver tissue has strong multi-omic coverage: Histone ChIP-seq (H3K27ac: 8, H3K4me1: 6, H3K4me3: 7, H3K27me3: 5), ATAC-seq (5), RNA-seq (12), Hi-C (3), TF ChIP-seq (14 targets). Sufficient for full integration.
+Liver tissue has strong multi-omic coverage: Histone ChIP-seq (H3K27ac: 8, H3K4me1: 6, H3K4me3: 7, H3K27me3: 5), ATAC-seq (5), total RNA-seq (12), Hi-C (3), TF ChIP-seq (14 targets). Sufficient for full integration.
 
 ### Step 2: Select Donor-Matched Experiments
 
@@ -33,7 +33,7 @@ Search each layer separately (`encode_search_experiments` per assay + target), t
 | H3K27ac | ENCSR832RBL | liver, adult male 37y | Ren, UCSD | Clean |
 | H3K4me1 | ENCSR537BCG | liver, adult male 37y | Ren, UCSD | Clean |
 | ATAC-seq | ENCSR862GLC | liver, adult male 37y | Ren, UCSD | Clean |
-| RNA-seq | ENCSR094PJT | liver, adult female 51y | Gingeras, CSHL | WARNING: 1 |
+| total RNA-seq | ENCSR094PJT | liver, adult female 51y | Gingeras, CSHL | WARNING: 1 |
 | Hi-C | ENCSR128LUB | liver, adult male 32y | Ren, UCSD | Clean |
 
 H3K27ac, H3K4me1, and ATAC-seq are donor-matched -- ideal for peak-level intersection. RNA-seq and Hi-C come from different donors, acceptable for expression filtering and contact-based linkage but noted for provenance.

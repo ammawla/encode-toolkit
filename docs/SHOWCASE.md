@@ -130,69 +130,86 @@ encode_search_experiments(
     assay_title="Histone ChIP-seq",
     organ="pancreas",
     target="H3K27ac",
-    status="released"
+    status="released",
+    limit=5
 )
 ```
 
 ```json
 {
-  "total": 8,
   "results": [
     {
       "accession": "ENCSR831YAX",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27ac-human",
+      "target": "H3K27ac",
       "biosample_summary": "pancreas tissue female adult (51 years)",
-      "lab": "bradley-bernstein",
+      "organ": "pancreas",
+      "biosample_type": "tissue",
       "status": "released",
       "date_released": "2019-07-22",
-      "audit": { "WARNING": 1, "NOT_COMPLIANT": 0, "ERROR": 0 }
+      "lab": "Bradley Bernstein, Broad",
+      "file_count": 22,
+      "assembly": ["GRCh38"],
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
+      "audit_warning_count": 1,
+      "audit_internal_action_count": 2
     },
     {
       "accession": "ENCSR976DGN",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27ac-human",
+      "target": "H3K27ac",
       "biosample_summary": "pancreas tissue male adult (37 years)",
-      "lab": "bradley-bernstein",
-      "status": "released",
+      "lab": "Bradley Bernstein, Broad",
       "date_released": "2019-07-22",
-      "audit": { "WARNING": 0, "NOT_COMPLIANT": 0, "ERROR": 0 }
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
+      "audit_warning_count": 0
     },
     {
       "accession": "ENCSR291OZG",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27ac-human",
+      "target": "H3K27ac",
       "biosample_summary": "pancreas tissue female adult (30 years)",
-      "lab": "john-stamatoyannopoulos",
-      "status": "released",
+      "lab": "John Stamatoyannopoulos, UW",
       "date_released": "2020-01-17",
-      "audit": { "WARNING": 2, "NOT_COMPLIANT": 0, "ERROR": 0 }
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
+      "audit_warning_count": 2
     },
     {
       "accession": "ENCSR428GHF",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27ac-human",
+      "target": "H3K27ac",
       "biosample_summary": "pancreas tissue male adult (54 years)",
-      "lab": "john-stamatoyannopoulos",
-      "status": "released",
+      "lab": "John Stamatoyannopoulos, UW",
       "date_released": "2020-01-17",
-      "audit": { "WARNING": 0, "NOT_COMPLIANT": 0, "ERROR": 0 }
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
+      "audit_warning_count": 0
     },
     {
       "accession": "ENCSR715JEI",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27ac-human",
+      "target": "H3K27ac",
       "biosample_summary": "pancreas tissue female child (3 years)",
-      "lab": "bradley-bernstein",
-      "status": "released",
+      "lab": "Bradley Bernstein, Broad",
       "date_released": "2021-03-15",
-      "audit": { "WARNING": 0, "NOT_COMPLIANT": 0, "ERROR": 0 }
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
+      "audit_warning_count": 0
     }
   ],
+  "total": 8,
+  "limit": 5,
+  "offset": 0,
   "has_more": true,
   "next_offset": 5
 }
 ```
+
+(Each result carries the full 21-field `ExperimentSummary`; the entries above are
+trimmed to the fields relevant here.)
 
 **Claude:** Found 8 released H3K27ac ChIP-seq experiments from human pancreas tissue. Five shown above from two labs (Bernstein, Stamatoyannopoulos), spanning donors aged 3 to 54 years (3 female, 2 male). No ERROR or NOT_COMPLIANT audit flags on any experiment.
 
@@ -206,15 +223,43 @@ encode_track_experiment(accession="ENCSR428GHF", notes="H3K27ac pancreas, M/54y,
 encode_track_experiment(accession="ENCSR715JEI", notes="H3K27ac pancreas, F/3y, Bernstein lab")
 ```
 
+Each call returns its own tracking record; the first one:
+
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR831YAX",
-  "publications_found": 2,
+  "tracking": {
+    "accession": "ENCSR831YAX",
+    "action": "tracked"
+  },
+  "auto_linked_references": [
+    { "type": "geo_accession", "id": "GSE187091" }
+  ],
+  "publications_found": 1,
+  "publications": [
+    {
+      "pmid": "32728249",
+      "doi": "10.1038/s41586-020-2493-4",
+      "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes",
+      "authors": "ENCODE Project Consortium, Moore JE, Purcaro MJ",
+      "journal": "Nature",
+      "year": "2020",
+      "abstract": ""
+    }
+  ],
   "pipelines_found": 1,
-  "message": "Experiment tracked with 2 publications and 1 pipeline"
+  "pipelines": [
+    {
+      "title": "Histone ChIP-seq 2",
+      "version": "1.7.1",
+      "software": [{ "name": "bowtie2", "version": "2.3.4.3" }],
+      "status": "released"
+    }
+  ]
 }
 ```
+
+The `notes` text is written to the tracker but is not echoed here -- read it back
+with `encode_list_tracked`.
 
 All 5 experiments tracked. Now let me preview the downloads:
 
@@ -234,17 +279,20 @@ encode_batch_download(
 
 ```json
 {
-  "mode": "dry_run",
-  "files_found": 5,
-  "total_size": "3.8 MB",
+  "file_count": 5,
+  "total_size": 3947520,
+  "total_size_human": "3.8 MB",
   "files": [
-    { "accession": "ENCFF294WMG", "experiment": "ENCSR831YAX", "output_type": "pseudoreplicated peaks", "size": "814 KB" },
-    { "accession": "ENCFF518XEJ", "experiment": "ENCSR976DGN", "output_type": "pseudoreplicated peaks", "size": "792 KB" },
-    { "accession": "ENCFF107TRG", "experiment": "ENCSR291OZG", "output_type": "replicated peaks", "size": "731 KB" },
-    { "accession": "ENCFF660AIB", "experiment": "ENCSR428GHF", "output_type": "replicated peaks", "size": "768 KB" },
-    { "accession": "ENCFF943PLQ", "experiment": "ENCSR715JEI", "output_type": "pseudoreplicated peaks", "size": "729 KB" }
+    { "accession": "ENCFF294WMG", "file_format": "bed", "output_type": "pseudoreplicated peaks", "file_size": 855040, "file_size_human": "835.0 KB", "target_path": "/data/encode/pancreas_h3k27ac/ENCSR831YAX/ENCFF294WMG.bed.gz", "already_exists": false },
+    { "accession": "ENCFF518XEJ", "file_format": "bed", "output_type": "pseudoreplicated peaks", "file_size": 811008, "file_size_human": "792.0 KB", "target_path": "/data/encode/pancreas_h3k27ac/ENCSR976DGN/ENCFF518XEJ.bed.gz", "already_exists": false },
+    { "accession": "ENCFF107TRG", "file_format": "bed", "output_type": "replicated peaks", "file_size": 748544, "file_size_human": "731.0 KB", "target_path": "/data/encode/pancreas_h3k27ac/ENCSR291OZG/ENCFF107TRG.bed.gz", "already_exists": false },
+    { "accession": "ENCFF660AIB", "file_format": "bed", "output_type": "replicated peaks", "file_size": 786432, "file_size_human": "768.0 KB", "target_path": "/data/encode/pancreas_h3k27ac/ENCSR428GHF/ENCFF660AIB.bed.gz", "already_exists": false },
+    { "accession": "ENCFF943PLQ", "file_format": "bed", "output_type": "pseudoreplicated peaks", "file_size": 746496, "file_size_human": "729.0 KB", "target_path": "/data/encode/pancreas_h3k27ac/ENCSR715JEI/ENCFF943PLQ.bed.gz", "already_exists": false }
   ],
-  "message": "Set dry_run=False to download"
+  "message": "Found 5 files (3.8 MB). Set dry_run=False to download.",
+  "search_total": 5,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -267,17 +315,23 @@ encode_batch_download(
 
 ```json
 {
-  "mode": "download",
-  "downloaded": 5,
-  "failed": 0,
-  "total_size": "3.8 MB",
-  "results": [
-    { "accession": "ENCFF294WMG", "path": "/data/encode/pancreas_h3k27ac/ENCSR831YAX/ENCFF294WMG.bed.gz", "md5_verified": true },
-    { "accession": "ENCFF518XEJ", "path": "/data/encode/pancreas_h3k27ac/ENCSR976DGN/ENCFF518XEJ.bed.gz", "md5_verified": true },
-    { "accession": "ENCFF107TRG", "path": "/data/encode/pancreas_h3k27ac/ENCSR291OZG/ENCFF107TRG.bed.gz", "md5_verified": true },
-    { "accession": "ENCFF660AIB", "path": "/data/encode/pancreas_h3k27ac/ENCSR428GHF/ENCFF660AIB.bed.gz", "md5_verified": true },
-    { "accession": "ENCFF943PLQ", "path": "/data/encode/pancreas_h3k27ac/ENCSR715JEI/ENCFF943PLQ.bed.gz", "md5_verified": true }
-  ]
+  "downloaded": [
+    { "accession": "ENCFF294WMG", "file_path": "/data/encode/pancreas_h3k27ac/ENCSR831YAX/ENCFF294WMG.bed.gz", "file_size": 855040, "file_size_human": "835.0 KB", "success": true, "error": "", "md5_verified": true },
+    { "accession": "ENCFF518XEJ", "file_path": "/data/encode/pancreas_h3k27ac/ENCSR976DGN/ENCFF518XEJ.bed.gz", "file_size": 811008, "file_size_human": "792.0 KB", "success": true, "error": "", "md5_verified": true },
+    { "accession": "ENCFF107TRG", "file_path": "/data/encode/pancreas_h3k27ac/ENCSR291OZG/ENCFF107TRG.bed.gz", "file_size": 748544, "file_size_human": "731.0 KB", "success": true, "error": "", "md5_verified": true },
+    { "accession": "ENCFF660AIB", "file_path": "/data/encode/pancreas_h3k27ac/ENCSR428GHF/ENCFF660AIB.bed.gz", "file_size": 786432, "file_size_human": "768.0 KB", "success": true, "error": "", "md5_verified": true },
+    { "accession": "ENCFF943PLQ", "file_path": "/data/encode/pancreas_h3k27ac/ENCSR715JEI/ENCFF943PLQ.bed.gz", "file_size": 746496, "file_size_human": "729.0 KB", "success": true, "error": "", "md5_verified": true }
+  ],
+  "summary": {
+    "total_found": 5,
+    "total_downloaded": 5,
+    "successful": 5,
+    "failed": 0,
+    "total_size": 3947520,
+    "total_size_human": "3.8 MB"
+  },
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -527,25 +581,27 @@ encode_search_experiments(
     assay_title="TF ChIP-seq",
     organ="pancreas",
     status="released",
-    limit=50
+    limit=10
 )
 ```
 
 ```json
 {
-  "total": 22,
   "results": [
-    { "accession": "ENCSR174YOD", "target": "CTCF-human", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR582OQF", "target": "CTCF-human", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR219PXD", "target": "FOXA2-human", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR840FDT", "target": "FOXA2-human", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR311UPP", "target": "PDX1-human", "biosample_summary": "pancreas tissue male adult (54 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR967KLW", "target": "NKX6-1-human", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR045JBY", "target": "HNF1A-human", "biosample_summary": "pancreas tissue female adult (30 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR512NKF", "target": "HNF4A-human", "biosample_summary": "pancreas tissue male adult (54 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR630PQT", "target": "MAFB-human", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "michael-snyder" },
-    { "accession": "ENCSR278YNX", "target": "NKX2-2-human", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "michael-snyder" }
+    { "accession": "ENCSR174YOD", "assay_title": "TF ChIP-seq", "target": "CTCF", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR582OQF", "assay_title": "TF ChIP-seq", "target": "CTCF", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR219PXD", "assay_title": "TF ChIP-seq", "target": "FOXA2", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR840FDT", "assay_title": "TF ChIP-seq", "target": "FOXA2", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR311UPP", "assay_title": "TF ChIP-seq", "target": "PDX1", "biosample_summary": "pancreas tissue male adult (54 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR967KLW", "assay_title": "TF ChIP-seq", "target": "NKX6-1", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR045JBY", "assay_title": "TF ChIP-seq", "target": "HNF1A", "biosample_summary": "pancreas tissue female adult (30 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR512NKF", "assay_title": "TF ChIP-seq", "target": "HNF4A", "biosample_summary": "pancreas tissue male adult (54 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR630PQT", "assay_title": "TF ChIP-seq", "target": "MAFB", "biosample_summary": "pancreas tissue female adult (51 years)", "lab": "Michael Snyder, Stanford" },
+    { "accession": "ENCSR278YNX", "assay_title": "TF ChIP-seq", "target": "NKX2-2", "biosample_summary": "pancreas tissue male adult (37 years)", "lab": "Michael Snyder, Stanford" }
   ],
+  "total": 22,
+  "limit": 10,
+  "offset": 0,
   "has_more": true,
   "next_offset": 10
 }
@@ -569,10 +625,20 @@ encode_batch_download(
 
 ```json
 {
-  "mode": "download",
-  "downloaded": 22,
-  "failed": 0,
-  "total_size": "18.4 MB"
+  "downloaded": [
+    { "accession": "ENCFF722MFD", "file_path": "/data/encode/pancreas_tf/ENCSR174YOD/ENCFF722MFD.bed.gz", "file_size": 899072, "file_size_human": "878.0 KB", "success": true, "error": "", "md5_verified": true },
+    "... 21 more DownloadResult entries ..."
+  ],
+  "summary": {
+    "total_found": 22,
+    "total_downloaded": 22,
+    "successful": 22,
+    "failed": 0,
+    "total_size": 19293798,
+    "total_size_human": "18.4 MB"
+  },
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -785,19 +851,31 @@ encode_search_files(
 
 ```json
 {
-  "total": 3,
   "results": [
     {
       "accession": "ENCFF812QKT",
       "file_format": "bigWig",
+      "file_type": "bigWig",
       "output_type": "signal of unique reads",
+      "output_category": "signal",
+      "file_size": 431973990,
+      "file_size_human": "412.0 MB",
       "assembly": "hg19",
-      "experiment": "ENCSR749ATK",
+      "biological_replicates": [1, 2],
+      "status": "released",
+      "download_url": "https://www.encodeproject.org/files/ENCFF812QKT/@@download/ENCFF812QKT.bigWig",
+      "md5sum": "c6f2a0f1d8b34e57a9d2c1b8e0f37a41",
+      "experiment_accession": "ENCSR749ATK",
+      "experiment_assay": "ATAC-seq",
       "biosample_summary": "pancreas tissue male adult (37 years)",
-      "file_size": "412 MB",
       "preferred_default": true
     }
-  ]
+  ],
+  "total": 3,
+  "limit": 5,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -811,10 +889,25 @@ encode_download_files(
 
 ```json
 {
-  "downloaded": 1,
-  "results": [
-    { "accession": "ENCFF812QKT", "path": "/data/encode/pancreas_atac/ENCFF812QKT.bigWig", "md5_verified": true }
-  ]
+  "downloaded": [
+    {
+      "accession": "ENCFF812QKT",
+      "file_path": "/data/encode/pancreas_atac/ENCFF812QKT.bigWig",
+      "file_size": 431973990,
+      "file_size_human": "412.0 MB",
+      "success": true,
+      "error": "",
+      "md5_verified": true
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "total_requested": 1,
+    "successful": 1,
+    "failed": 0,
+    "total_size": 431973990,
+    "total_size_human": "412.0 MB"
+  }
 }
 ```
 
@@ -1222,8 +1315,8 @@ And the BibTeX for all citations:
 
 | Metric | Count |
 |--------|-------|
-| MCP Tools | 19 (live ENCODE REST API) |
-| Skills | 43 (released) + 1 (unreleased) |
+| MCP Tools | 20 (live ENCODE REST API) |
+| Skills | 47 |
 | Nextflow Pipelines | 7 (Docker + SLURM + GCP + AWS) |
 | External Database Integrations | 14 (GTEx, ClinVar, CellxGene, GWAS Catalog, JASPAR, Ensembl, GEO, gnomAD, UCSC, PubMed, bioRxiv, ClinicalTrials.gov, Open Targets, Consensus) |
 | Literature References | 100+ (with DOIs and PMIDs) |
@@ -1240,7 +1333,7 @@ And the BibTeX for all citations:
 ```
 ENCODE Toolkit
   |
-  +-- 19 MCP Tools (live ENCODE REST API)
+  +-- 20 MCP Tools (live ENCODE REST API)
   |     |-- Search: search_experiments, search_files, get_facets, get_metadata
   |     |-- Download: download_files, batch_download, list_files, get_file_info
   |     |-- Track: track_experiment, list_tracked, compare_experiments
@@ -1249,15 +1342,17 @@ ENCODE Toolkit
   |     +-- Admin: get_experiment, manage_credentials, export_data,
   |               summarize_collection
   |
-  +-- 43 Skills (expert genomics workflows)
+  +-- 47 Skills (expert genomics workflows)
   |     |-- Core (5): setup, search, download, track, cross-reference
   |     |-- Analysis (9): QC, integration, regulatory, epigenome, comparison,
   |     |                  visualization, motif, peak annotation, batch
+  |     |-- Functional genomics (1): functional screen analysis
   |     |-- Aggregation (4): histone, accessibility, Hi-C, methylation
   |     |-- External DB (9): GTEx, ClinVar, CellxGene, GWAS, JASPAR,
   |     |                     Ensembl, GEO, gnomAD, UCSC
-  |     |-- Workflows (7): provenance, citation, variant, pipeline guide,
-  |     |                   single-cell, disease research, publication trust
+  |     |-- Workflows (10): provenance, citation, variant, pipeline guide,
+  |     |                    single-cell, disease research, publication trust,
+  |     |                    installer, scientific writing, liftover
   |     |-- Pipelines (7): ChIP-seq, ATAC-seq, RNA-seq, WGBS, Hi-C,
   |     |                   DNase-seq, CUT&RUN
   |     +-- Meta-Analysis (2): scRNA-seq, multi-omics integration
@@ -1278,7 +1373,7 @@ ENCODE Toolkit
 
 **Bioinformaticians** running analysis pipelines who need reproducible, documented workflows with tool versions and parameters logged automatically.
 
-**Graduate students** learning epigenomics who benefit from 43 skills encoding expert knowledge about assay-specific QC, file selection, and analysis.
+**Graduate students** learning epigenomics who benefit from 47 skills encoding expert knowledge about assay-specific QC, file selection, and analysis.
 
 **Clinical researchers** connecting regulatory variants to disease mechanisms across ENCODE, GWAS Catalog, ClinVar, and Open Targets.
 
@@ -1305,5 +1400,5 @@ ENCODE Toolkit
 
 *Built by [Dr. Alex M. Mawla, PhD](https://github.com/ammawla)*
 
-*43 skills for genomics research. 20 live tools. 7 pipelines. 100+ literature references.*
+*47 skills for genomics research. 20 live tools. 7 pipelines. 100+ literature references.*
 *The research infrastructure that ENCODE data deserves.*

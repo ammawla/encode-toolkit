@@ -61,7 +61,7 @@ Check what ENCODE data exists for pancreas to pair with GTEx expression.
 encode_get_facets(organ="pancreas")
 ```
 
-Available pancreas data includes Histone ChIP-seq (38 experiments), ATAC-seq (6), RNA-seq (12), and DNase-seq (4). This is sufficient to build a regulatory profile around each gene.
+Available pancreas data includes Histone ChIP-seq (38 experiments), ATAC-seq (6), total RNA-seq (12), and DNase-seq (4). This is sufficient to build a regulatory profile around each gene.
 
 ```
 encode_search_experiments(

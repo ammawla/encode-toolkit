@@ -7,9 +7,14 @@ values, and reports summary statistics with warnings for low-coverage sites.
 Usage:
     python validate_methylation.py input.bedMethyl [--min-coverage 5] [--blacklist hg38-blacklist.v2.bed]
     python validate_methylation.py input.bed --min-coverage 10
+    python validate_methylation.py input.bedMethyl --scale fraction
+
+Plain and gzipped (.gz) inputs and blacklists are both accepted.
 """
 
 import argparse
+import gzip
+import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -23,6 +28,14 @@ BEDMETHYL_COLS = 11
 
 # Alternative minimal format: chr start end name score strand coverage methylation%
 MINIMAL_COLS = 8
+
+# layout -> (coverage column, methylation column, how the column count is described), 0-indexed
+LAYOUTS = {
+    "encode_bedmethyl": (9, 10, "11+"),
+    "minimal": (6, 7, "8"),
+}
+
+MAX_COLUMN_ERRORS = 5
 
 
 def parse_args():
@@ -49,13 +62,39 @@ def parse_args():
         default=None,
         help="ENCODE blacklist BED file (e.g., hg38-blacklist.v2.bed)",
     )
+    parser.add_argument(
+        "--scale",
+        choices=["auto", "percent", "fraction"],
+        default="auto",
+        help=(
+            "Scale of the methylation column, decided once for the whole file. "
+            "auto: percent for the ENCODE 11-column layout, and for the minimal "
+            "layout fraction only when the file's maximum value is <= 1. Default: auto"
+        ),
+    )
     return parser.parse_args()
+
+
+def open_text(path):
+    """Open a plain or gzipped text file for reading."""
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt")
+    return open(path)
+
+
+def quartiles(values):
+    """25th percentile, median and 75th percentile (interpolated)."""
+    median = statistics.median(values)
+    if len(values) < 2:
+        return values[0], median, values[0]
+    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+    return q1, median, q3
 
 
 def load_blacklist(path):
     """Load blacklist regions as a dict of chrom -> list of (start, end)."""
     regions = defaultdict(list)
-    with open(path) as f:
+    with open_text(path) as f:
         for line in f:
             if line.startswith("#") or line.strip() == "":
                 continue
@@ -79,31 +118,46 @@ def overlaps_blacklist(chrom, start, end, blacklist):
     return False
 
 
-def detect_format(first_data_line):
-    """Detect whether the file is ENCODE bedMethyl (11 cols) or minimal format (8 cols)."""
-    fields = first_data_line.strip().split("\t")
-    n_cols = len(fields)
+def detect_format(n_cols):
+    """ENCODE bedMethyl (11 or more columns), minimal (exactly 8), or None for anything else."""
     if n_cols >= BEDMETHYL_COLS:
-        return "encode_bedmethyl", BEDMETHYL_COLS
-    elif n_cols >= MINIMAL_COLS:
-        return "minimal", MINIMAL_COLS
-    else:
-        return "unknown", n_cols
+        return "encode_bedmethyl"
+    if n_cols == MINIMAL_COLS:
+        return "minimal"
+    return None
 
 
-def validate_methylation(input_path, min_coverage, blacklist_path):
+def layout_matches(detected_format, n_cols):
+    """Check a later line against the layout detected from the first data line."""
+    if detected_format == "encode_bedmethyl":
+        return n_cols >= BEDMETHYL_COLS
+    return n_cols == MINIMAL_COLS
+
+
+def decide_scale(requested, detected_format, values):
+    """Decide once per file whether the methylation column holds percentages or fractions."""
+    if requested != "auto":
+        return requested
+    # ENCODE bedMethyl column 11 is a percentage (0-100) by specification.
+    if detected_format == "encode_bedmethyl":
+        return "percent"
+    return "fraction" if values and max(values) <= 1.0 else "percent"
+
+
+def validate_methylation(input_path, min_coverage, blacklist_path, requested_scale):
     errors = []
     warnings = []
     chrom_counts = Counter()
     strand_counts = Counter()
     coverage_values = []
-    methylation_values = []
+    raw_methylation = []  # (line number, raw value) — scaled once the whole file has been read
     total_lines = 0
+    # Every line excluded from the statistics below counts as malformed, so
+    # total_lines == valid_records + bad_lines always holds.
     bad_lines = 0
+    column_errors = 0
     low_coverage = 0
     blacklist_overlaps = 0
-    fraction_format_detected = False
-    percentage_format_detected = False
 
     blacklist = None
     if blacklist_path:
@@ -116,37 +170,12 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
         print(f"ERROR: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Detect format from first data line
     detected_format = None
-    expected_cols = None
+    expected_desc = None
     cov_col = None  # 0-indexed column for coverage
-    meth_col = None  # 0-indexed column for methylation %
+    meth_col = None  # 0-indexed column for methylation
 
-    with open(input_path) as f:
-        for line in f:
-            if line.startswith("#") or line.startswith("track") or line.startswith("browser"):
-                continue
-            line = line.strip()
-            if not line:
-                continue
-            detected_format, expected_cols = detect_format(line)
-            break
-
-    if detected_format == "encode_bedmethyl":
-        cov_col = 9  # Column 10 (0-indexed: 9)
-        meth_col = 10  # Column 11 (0-indexed: 10)
-    elif detected_format == "minimal":
-        cov_col = 6  # Column 7
-        meth_col = 7  # Column 8
-    else:
-        print(
-            f"ERROR: Could not detect bedMethyl format. "
-            f"Expected 11 columns (ENCODE) or 8 columns (minimal), got {expected_cols}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    with open(input_path) as f:
+    with open_text(input_path) as f:
         for line_num, line in enumerate(f, 1):
             if line.startswith("#") or line.startswith("track") or line.startswith("browser"):
                 continue
@@ -157,15 +186,27 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             total_lines += 1
             fields = line.split("\t")
 
-            if len(fields) < expected_cols:
-                errors.append(
-                    f"Line {line_num}: expected {expected_cols} columns ({detected_format}), got {len(fields)}"
-                )
+            # The first data line fixes the layout for the whole file
+            if detected_format is None:
+                detected_format = detect_format(len(fields))
+                if detected_format is None:
+                    print(
+                        f"ERROR: Could not detect bedMethyl format. "
+                        f"Expected 8 columns (minimal) or >= 11 columns (ENCODE bedMethyl), got {len(fields)}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+                cov_col, meth_col, expected_desc = LAYOUTS[detected_format]
+
+            if not layout_matches(detected_format, len(fields)):
                 bad_lines += 1
-                if bad_lines > 5:
-                    if bad_lines == 6:
-                        errors.append("... suppressing further column-count errors")
-                    continue
+                column_errors += 1
+                if column_errors <= MAX_COLUMN_ERRORS:
+                    errors.append(
+                        f"Line {line_num}: expected {expected_desc} columns ({detected_format}), got {len(fields)}"
+                    )
+                elif column_errors == MAX_COLUMN_ERRORS + 1:
+                    errors.append("... suppressing further column-count errors")
                 continue
 
             chrom = fields[0]
@@ -190,6 +231,8 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
                 errors.append(f"Line {line_num}: negative end coordinate ({end})")
             if start >= end:
                 errors.append(f"Line {line_num}: start ({start}) >= end ({end})")
+                bad_lines += 1
+                continue
 
             chrom_counts[chrom] += 1
 
@@ -223,69 +266,71 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
                 except (ValueError, IndexError):
                     errors.append(f"Line {line_num}: invalid coverage in column {cov_col + 1}")
 
-            # Methylation value validation
+            # Methylation value validation (the scale is applied after the whole file is read)
             try:
                 meth = float(fields[meth_col])
-                if meth < 0:
-                    errors.append(f"Line {line_num}: negative methylation value ({meth})")
-                elif meth > 100:
-                    errors.append(
-                        f"Line {line_num}: methylation value > 100 ({meth}). "
-                        f"Expected 0-100 (percentage) or 0-1 (fraction)."
-                    )
-                elif meth <= 1.0 and meth > 0:
-                    fraction_format_detected = True
-                elif meth > 1.0:
-                    percentage_format_detected = True
-
-                # Store as percentage for consistent reporting
-                if meth <= 1.0:
-                    methylation_values.append(meth * 100)
-                else:
-                    methylation_values.append(meth)
             except (ValueError, IndexError):
                 errors.append(f"Line {line_num}: invalid methylation value in column {meth_col + 1}")
+            else:
+                if meth < 0:
+                    errors.append(f"Line {line_num}: negative methylation value ({meth})")
+                else:
+                    raw_methylation.append((line_num, meth))
 
             # Blacklist overlap check
             if blacklist and overlaps_blacklist(chrom, start, end, blacklist):
                 blacklist_overlaps += 1
 
+    if total_lines == 0:
+        print(f"ERROR: no data rows in {input_path} (only comments, headers or blank lines)", file=sys.stderr)
+        sys.exit(1)
+
+    valid_records = total_lines - bad_lines
+
+    # --- Apply one scale to every methylation value ---
+    scale = decide_scale(requested_scale, detected_format, [value for _, value in raw_methylation])
+    methylation_values = []
+    if scale == "fraction":
+        for line_num, value in raw_methylation:
+            if value > 1.0:
+                errors.append(f"Line {line_num}: methylation value {value} > 1 with --scale fraction (expected 0-1).")
+            else:
+                methylation_values.append(value * 100)
+    else:
+        for line_num, value in raw_methylation:
+            if value > 100:
+                errors.append(f"Line {line_num}: methylation value > 100 ({value}). Expected 0-100 (percentage).")
+            methylation_values.append(value)
+
     # --- Report Statistics ---
     print("=== bedMethyl Validation Report ===")
     print(f"File: {input_path}")
-    print(f"Detected format: {detected_format} ({expected_cols} columns)")
+    print(f"Detected format: {detected_format} ({expected_desc} columns)")
     print()
 
     print("--- Summary ---")
-    print(f"Total CpGs: {total_lines:,}")
+    print(f"Data lines: {total_lines:,}")
+    print(f"Valid CpGs: {valid_records:,}")
     print(f"Malformed lines: {bad_lines}")
-    print(f"Low-coverage CpGs (<{min_coverage}x): {low_coverage:,} ({100 * low_coverage / max(total_lines, 1):.1f}%)")
+    print(f"Low-coverage CpGs (<{min_coverage}x): {low_coverage:,} ({100 * low_coverage / max(valid_records, 1):.1f}%)")
     if blacklist_path:
-        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(total_lines, 1):.1f}%)")
+        print(f"Blacklist overlaps: {blacklist_overlaps:,} ({100 * blacklist_overlaps / max(valid_records, 1):.1f}%)")
     print()
 
-    # Methylation format detection
-    if fraction_format_detected and percentage_format_detected:
-        msg = (
-            "WARNING: Mixed methylation formats detected. Some values appear "
-            "to be fractions (0-1) and others percentages (0-100). Normalize "
-            "before aggregation."
-        )
-        print(msg, file=sys.stderr)
-    elif fraction_format_detected:
-        print("Methylation format: fraction (0-1)")
-    else:
-        print("Methylation format: percentage (0-100)")
+    scale_source = "auto-detected" if requested_scale == "auto" else f"--scale {requested_scale}"
+    scale_label = "fraction (0-1), reported as percent" if scale == "fraction" else "percent (0-100)"
+    print(f"Methylation scale: {scale_label} [{scale_source}]")
     print()
 
     if coverage_values:
         sorted_cov = sorted(coverage_values)
         n = len(sorted_cov)
+        cov_q1, cov_median, cov_q3 = quartiles(sorted_cov)
         print("--- Coverage Distribution ---")
         print(f"Min:    {sorted_cov[0]:>6}")
-        print(f"25th:   {sorted_cov[n // 4]:>6}")
-        print(f"Median: {sorted_cov[n // 2]:>6}")
-        print(f"75th:   {sorted_cov[3 * n // 4]:>6}")
+        print(f"25th:   {cov_q1:>6.1f}")
+        print(f"Median: {cov_median:>6.1f}")
+        print(f"75th:   {cov_q3:>6.1f}")
         print(f"Max:    {sorted_cov[-1]:>6}")
 
         # Coverage buckets
@@ -295,7 +340,7 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
             ("5-10x", 5, 10),
             ("10-20x", 10, 20),
             ("20-50x", 20, 50),
-            (">50x", 50, float("inf")),
+            (">=50x", 50, float("inf")),
         ]
         print("\n  Coverage buckets:")
         for label, lo, hi in buckets:
@@ -306,11 +351,12 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
     if methylation_values:
         sorted_meth = sorted(methylation_values)
         n_m = len(sorted_meth)
+        meth_q1, meth_median, meth_q3 = quartiles(sorted_meth)
         print("--- Methylation Distribution (as %) ---")
         print(f"Min:    {sorted_meth[0]:>6.1f}%")
-        print(f"25th:   {sorted_meth[n_m // 4]:>6.1f}%")
-        print(f"Median: {sorted_meth[n_m // 2]:>6.1f}%")
-        print(f"75th:   {sorted_meth[3 * n_m // 4]:>6.1f}%")
+        print(f"25th:   {meth_q1:>6.1f}%")
+        print(f"Median: {meth_median:>6.1f}%")
+        print(f"75th:   {meth_q3:>6.1f}%")
         print(f"Max:    {sorted_meth[-1]:>6.1f}%")
 
         # Methylation state buckets
@@ -330,27 +376,27 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
     print("--- Strand Breakdown ---")
     for strand in ["+", "-", "."]:
         count = strand_counts.get(strand, 0)
-        pct = 100 * count / max(total_lines, 1)
+        pct = 100 * count / max(valid_records, 1)
         print(f"  {strand:<3} {count:>10,}  ({pct:5.1f}%)")
     print()
 
     print("--- Chromosome Distribution ---")
     for chrom in sorted(chrom_counts.keys(), key=lambda c: (len(c), c)):
         count = chrom_counts[chrom]
-        pct = 100 * count / max(total_lines, 1)
+        pct = 100 * count / max(valid_records, 1)
         print(f"  {chrom:<6} {count:>10,}  ({pct:5.1f}%)")
     print()
 
     # --- Warnings ---
-    if low_coverage > total_lines * 0.3:
+    if low_coverage > valid_records * 0.3:
         msg = (
-            f"WARNING: {100 * low_coverage / max(total_lines, 1):.0f}% of CpGs have "
+            f"WARNING: {100 * low_coverage / max(valid_records, 1):.0f}% of CpGs have "
             f"coverage <{min_coverage}x. Consider filtering these for reliable "
             f"methylation estimates."
         )
         print(msg, file=sys.stderr)
 
-    if strand_counts.get(".", 0) == total_lines:
+    if valid_records and strand_counts.get(".", 0) == valid_records:
         msg = (
             "INFO: All CpGs have strand '.'. This file may already be strand-merged. "
             "Skip the strand-merge step in aggregation."
@@ -393,5 +439,5 @@ def validate_methylation(input_path, min_coverage, blacklist_path):
 
 if __name__ == "__main__":
     args = parse_args()
-    exit_code = validate_methylation(args.input, args.min_coverage, args.blacklist)
+    exit_code = validate_methylation(args.input, args.min_coverage, args.blacklist, args.scale)
     sys.exit(exit_code)

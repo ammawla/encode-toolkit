@@ -109,6 +109,13 @@ encode_download_files(
 )
 ```
 
+Validate the downloaded files before filtering. `--format` must match the file
+(narrowPeak has 10 columns, broadPeak 9); gzipped inputs are read directly.
+
+```bash
+python3 scripts/validate_peaks.py sample.narrowPeak [--format narrow|broad] [--blacklist hg38-blacklist.v2.bed]
+```
+
 ## Step 4: Per-Sample Noise Filtering
 
 **IMPORTANT**: Filter BEFORE merging, not after.
@@ -119,6 +126,7 @@ Remove artifact-prone regions (centromeres, telomeres, rDNA repeats, satellite r
 # Download ENCODE blocklist for GRCh38 from:
 # https://github.com/Boyle-Lab/Blacklist/blob/master/lists/hg38-blacklist.v2.bed.gz
 # For mm10: https://github.com/Boyle-Lab/Blacklist/blob/master/lists/mm10-blacklist.v2.bed.gz
+gunzip -k hg38-blacklist.v2.bed.gz
 bedtools intersect -a sample.narrowPeak -b hg38-blacklist.v2.bed -v > sample.filtered.narrowPeak
 ```
 

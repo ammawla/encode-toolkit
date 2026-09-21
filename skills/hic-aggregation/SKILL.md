@@ -139,6 +139,13 @@ encode_download_files(
 )
 ```
 
+Validate the downloaded BEDPE files before filtering. The report gives the detected
+anchor resolution, which Step 4 needs; gzipped inputs are read directly.
+
+```bash
+python3 scripts/validate_loops.py sample.bedpe [--min-distance 20000] [--expected-resolution 10000]
+```
+
 ## Step 4: Understanding Hi-C Resolution and Anchors
 
 ### Critical: Resolution-Aware Processing
@@ -174,13 +181,15 @@ awk -v res=10000 'BEGIN{OFS="\t"} {
 Remove loops with anchors in artifact-prone regions (download from https://github.com/Boyle-Lab/Blacklist/blob/master/lists/hg38-blacklist.v2.bed.gz):
 ```bash
 # Filter loops where EITHER anchor overlaps a blocklist region
+gunzip -k hg38-blacklist.v2.bed.gz
+
 # First, extract anchor 1 and anchor 2 as separate BED files
 awk 'BEGIN{OFS="\t"} {print $1,$2,$3,NR}' sample.bedpe > anchors1.bed
 awk 'BEGIN{OFS="\t"} {print $4,$5,$6,NR}' sample.bedpe > anchors2.bed
 
 # Find anchor rows NOT in blocklist
-bedtools intersect -a anchors1.bed -b ENCODE_blocklist.bed -v | cut -f4 > clean_rows_1.txt
-bedtools intersect -a anchors2.bed -b ENCODE_blocklist.bed -v | cut -f4 > clean_rows_2.txt
+bedtools intersect -a anchors1.bed -b hg38-blacklist.v2.bed -v | cut -f4 > clean_rows_1.txt
+bedtools intersect -a anchors2.bed -b hg38-blacklist.v2.bed -v | cut -f4 > clean_rows_2.txt
 
 # Keep only rows where BOTH anchors pass
 comm -12 <(sort clean_rows_1.txt) <(sort clean_rows_2.txt) > clean_rows.txt

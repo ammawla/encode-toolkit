@@ -19,6 +19,7 @@ from encode_connector.client.constants import (
     DEFAULT_LIMIT,
     DEFAULT_TIMEOUT,
     EXPERIMENT_FILTER_MAP,
+    EXPERIMENT_FRAME,
     EXPERIMENT_PAGE_SIZE,
     EXPERIMENT_SEARCH_FIELDS,
     FILE_FILTER_MAP,
@@ -305,11 +306,11 @@ class EncodeClient:
         }
 
     async def get_experiment_raw(self, accession: str) -> dict:
-        """Get raw experiment data with embedded frame."""
+        """Get raw experiment data: linked objects embedded, audits included."""
         validate_accession(accession)
         return await self._request(
             f"/experiments/{accession}/",
-            {"format": "json", "frame": "embedded"},
+            {"format": "json", "frame": EXPERIMENT_FRAME},
         )
 
     async def get_experiment(self, accession: str) -> ExperimentDetail:
@@ -318,7 +319,7 @@ class EncodeClient:
         # Get experiment data
         exp_data = await self._request(
             f"/experiments/{accession}/",
-            {"format": "json", "frame": "embedded"},
+            {"format": "json", "frame": EXPERIMENT_FRAME},
         )
 
         # Get files for this experiment

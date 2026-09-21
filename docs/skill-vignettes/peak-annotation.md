@@ -58,7 +58,7 @@ For distal peaks (>3 kb from any TSS), nearest-gene assignment is unreliable. Th
 
 ```
 encode_search_files(
-    output_type="element gene regulatory interaction predictions",
+    output_type="element gene links",
     organ="pancreas", assembly="GRCh38", preferred_default=True
 )
 ```

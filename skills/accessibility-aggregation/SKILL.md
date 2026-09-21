@@ -132,11 +132,19 @@ encode_download_files(
 )
 ```
 
+Validate the downloaded files before filtering. Pass `--assay` so the peak-width
+and Tn5 checks match the assay; gzipped inputs are read directly.
+
+```bash
+python3 scripts/validate_peaks.py sample.narrowPeak [--assay atac|dnase|unknown] [--blacklist hg38-blacklist.v2.bed]
+```
+
 ## Step 4: Per-Sample Noise Filtering
 
 ### 4a. ENCODE Blocklist Filtering (Amemiya et al. 2019)
 ```bash
 # Download from: https://github.com/Boyle-Lab/Blacklist/blob/master/lists/hg38-blacklist.v2.bed.gz
+gunzip -k hg38-blacklist.v2.bed.gz
 bedtools intersect -a sample.narrowPeak -b hg38-blacklist.v2.bed -v > sample.filtered.narrowPeak
 ```
 

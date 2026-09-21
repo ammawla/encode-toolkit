@@ -60,30 +60,40 @@ islet-specific work may need supplementary external data.
 
 **Claude calls:** `encode_search_experiments(assay_title="Histone ChIP-seq", organ="pancreas", target="H3K27me3")`
 
-**Result:**
+**Result (key fields of each record):**
 ```json
 {
   "results": [
     {
       "accession": "ENCSR133RZO",
-      "target": "H3K27me3-human",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female child (16 years)",
-      "lab": "bradley-bernstein",
+      "organ": "pancreas",
+      "lab": "Bradley Bernstein, Broad",
+      "assembly": ["GRCh38"],
       "replication_type": "unreplicated",
       "audit_warning_count": 8,
       "dbxrefs": ["GEO:GSE187091"]
     },
     {
       "accession": "ENCSR511LIV",
-      "target": "H3K27me3-human",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female adult (61 years)",
-      "lab": "bradley-bernstein",
+      "organ": "pancreas",
+      "lab": "Bradley Bernstein, Broad",
+      "assembly": ["GRCh38"],
       "replication_type": "unreplicated",
       "audit_warning_count": 8,
       "dbxrefs": ["GEO:GSE187520"]
     }
   ],
-  "total": 73
+  "total": 2,
+  "limit": 25,
+  "offset": 0,
+  "has_more": false,
+  "next_offset": null
 }
 ```
 
@@ -105,10 +115,11 @@ data or supplementary metadata.
   "metadata_type": "assays",
   "values": [
     "Histone ChIP-seq", "TF ChIP-seq", "ATAC-seq", "DNase-seq",
-    "RNA-seq", "WGBS", "Hi-C", "CUT&RUN", "CUT&Tag",
-    "STARR-seq", "MPRA", "CRISPR screen", "eCLIP"
+    "total RNA-seq", "polyA plus RNA-seq", "WGBS", "intact Hi-C",
+    "CUT&RUN", "CUT&Tag", "STARR-seq", "MPRA", "CRISPR screen", "eCLIP",
+    "..."
   ],
-  "count": 59
+  "count": 79
 }
 ```
 
@@ -140,13 +151,21 @@ and INTERNAL_ACTION. Always check before downloading.
   "accession": "ENCSR133RZO",
   "status": "released",
   "replication_type": "unreplicated",
-  "audit": {
-    "ERROR": 0,
-    "NOT_COMPLIANT": 0,
-    "WARNING": 8,
-    "INTERNAL_ACTION": 0
-  },
-  "files_count": 14
+  "bio_replicate_count": 1,
+  "tech_replicate_count": 1,
+  "audit_error_count": 0,
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 8,
+  "audit_internal_action_count": 2,
+  "files": [
+    {
+      "accession": "ENCFF635JIA",
+      "file_format": "bed",
+      "output_type": "pseudoreplicated peaks",
+      "preferred_default": true
+    },
+    "..."
+  ]
 }
 ```
 

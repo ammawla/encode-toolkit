@@ -729,7 +729,8 @@ class ExperimentTracker:
             if pub.get("title"):
                 entry += f"  title = {{{pub['title']}}},\n"
             if pub.get("authors"):
-                entry += f"  author = {{{pub['authors']}}},\n"
+                # stored as "A, B, C"; BibTeX separates names with " and "
+                entry += f"  author = {{{' and '.join(pub['authors'].split(', '))}}},\n"
             if pub.get("journal"):
                 entry += f"  journal = {{{pub['journal']}}},\n"
             if pub.get("year"):
@@ -786,8 +787,14 @@ class ExperimentTracker:
     # ------------------------------------------------------------------
 
     def get_metadata_table(self, accessions: list[str] | None = None) -> list[dict]:
-        """Get a metadata table of tracked experiments for analysis."""
+        """Get a metadata table of tracked experiments for analysis.
+
+        ``None`` selects every tracked experiment; a list selects those accessions, so an empty
+        list (a filter that matched nothing) selects nothing.
+        """
         conn = self._get_conn()
+        if accessions is not None and not accessions:
+            return []
         if accessions:
             placeholders = ",".join("?" for _ in accessions)
             rows = conn.execute(
@@ -922,7 +929,7 @@ class ExperimentTracker:
             organ=organ,
         )
 
-        table = self.get_metadata_table([e["accession"] for e in experiments] if experiments else None)
+        table = self.get_metadata_table([e["accession"] for e in experiments])
 
         # Enrich with external reference counts and PMIDs
         conn = self._get_conn()

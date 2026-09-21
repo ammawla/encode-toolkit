@@ -51,34 +51,45 @@
 **Scientist asks Claude:**
 > "Find me H3K27me3 ChIP-seq experiments on human pancreas tissue."
 
-**Claude calls:** `encode_search_experiments(assay_title="Histone ChIP-seq", organ="pancreas", limit=3)`
+**Claude calls:** `encode_search_experiments(assay_title="Histone ChIP-seq", organ="pancreas", limit=2)`
 
-**Response (trimmed to first 2 of 73 results):**
+**Response (first 2 of 73 matching experiments; each result trimmed to key fields):**
 ```json
 {
   "results": [
     {
       "accession": "ENCSR133RZO",
-      "target": "H3K27me3-human",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female child (16 years)",
-      "lab": "bradley-bernstein",
+      "organ": "pancreas",
+      "biosample_type": "tissue",
+      "lab": "Bradley Bernstein, Broad",
       "file_count": 14,
+      "assembly": ["GRCh38"],
       "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
       "dbxrefs": ["GEO:GSE187091"],
       "url": "https://www.encodeproject.org/experiments/ENCSR133RZO/"
     },
     {
       "accession": "ENCSR511LIV",
-      "target": "H3K27me3-human",
+      "assay_title": "Histone ChIP-seq",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female adult (61 years)",
-      "lab": "bradley-bernstein",
+      "lab": "Bradley Bernstein, Broad",
       "file_count": 14,
+      "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
       "dbxrefs": ["GEO:GSE187520"],
       "url": "https://www.encodeproject.org/experiments/ENCSR511LIV/"
     }
   ],
   "total": 73,
-  "offset": 0
+  "limit": 2,
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 2
 }
 ```
 
@@ -171,36 +182,60 @@
 **Scientist asks Claude:**
 > "Track experiment ENCSR133RZO in my local library with its publications."
 
-**Claude calls:** `encode_track_experiment(accession="ENCSR133RZO", fetch_publications=true, fetch_pipelines=true)`
+**Claude calls:** `encode_track_experiment(accession="ENCSR133RZO", fetch_publications=True, fetch_pipelines=True)`
 
 **Response (representative):**
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR133RZO",
-  "assay_title": "Histone ChIP-seq",
-  "target": "H3K27me3",
-  "organism": "Homo sapiens",
-  "organ": "pancreas",
+  "tracking": {
+    "accession": "ENCSR133RZO",
+    "action": "tracked"
+  },
+  "auto_linked_references": [
+    { "type": "geo_accession", "id": "GSE187091" }
+  ],
   "publications_found": 1,
-  "pipelines_found": 1
+  "publications": [
+    {
+      "pmid": "32728249",
+      "doi": "10.1038/s41586-020-2493-4",
+      "title": "Expanded encyclopaedias of DNA elements in the human and mouse genomes",
+      "authors": "ENCODE Project Consortium, Moore JE, Purcaro MJ",
+      "journal": "Nature",
+      "year": "2020",
+      "abstract": ""
+    }
+  ],
+  "pipelines_found": 1,
+  "pipelines": [
+    {
+      "title": "Histone ChIP-seq 2",
+      "version": "1.7.1",
+      "software": [{ "name": "bowtie2", "version": "2.3.4.3" }],
+      "status": "released"
+    }
+  ]
 }
 ```
+
+The experiment metadata itself is written to the local database rather than echoed
+back -- `encode_list_tracked` reads it out again.
 
 **Then the scientist asks:**
 > "Export the citations for my tracked experiments."
 
 **Claude calls:** `encode_get_citations(accession="ENCSR133RZO", export_format="bibtex")`
 
-**Response (representative BibTeX):**
+**Response (raw BibTeX text, not JSON):**
 ```bibtex
-@article{ENCSR133RZO_pub1,
-  title   = {An atlas of gene regulatory elements in adult mouse cerebrum},
-  author  = {Li, Yang Eric and Preissl, Sebastian and Hou, Xiaomeng and others},
+@article{32728249,
+  title = {Expanded encyclopaedias of DNA elements in the human and mouse genomes},
+  author = {ENCODE Project Consortium and Moore JE and Purcaro MJ},
   journal = {Nature},
-  year    = {2021},
-  doi     = {10.1038/s41586-021-03604-1},
-  note    = {Associated with ENCODE experiment ENCSR133RZO}
+  year = {2020},
+  doi = {10.1038/s41586-020-2493-4},
+  pmid = {32728249},
+  note = {ENCODE experiment: ENCSR133RZO},
 }
 ```
 
@@ -215,12 +250,15 @@
 ## Example 5: Cross-Database Integration
 
 **Scientist asks Claude:**
-> "Link PubMed article 32728249 to my tracked experiment ENCSR133RZO -- it's from the
-> Roadmap Epigenomics study that provides context for this data."
+> "Link PubMed article 32728249 to my tracked experiment ENCSR133RZO -- it's the ENCODE
+> consortium paper that provides context for this data."
 
-**Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="pmid", reference_id="32728249", description="Roadmap Epigenomics context for pancreas H3K27me3")`
+**Claude calls:** `encode_link_reference(experiment_accession="ENCSR133RZO", reference_type="pmid", reference_id="32728249", description="ENCODE consortium paper for pancreas H3K27me3")`
 
-**Response:** `{"status": "linked", "experiment_accession": "ENCSR133RZO", "reference_type": "pmid", "reference_id": "32728249"}`
+**Response:** `{"action": "linked", "experiment_accession": "ENCSR133RZO", "reference_type": "pmid", "reference_id": "32728249"}`
+
+(`action` is `"already_linked"` if that same reference was stored before -- for example
+by the GEO/PMID auto-linking that runs during `encode_track_experiment`.)
 
 **Then the scientist asks:**
 > "Show me all external references linked to my ENCODE experiments."
@@ -232,16 +270,27 @@
 {
   "references": [
     {
+      "id": 2,
       "experiment_accession": "ENCSR133RZO",
       "reference_type": "pmid",
       "reference_id": "32728249",
-      "description": "Roadmap Epigenomics context for pancreas H3K27me3",
-      "date_linked": "2026-03-08"
+      "description": "ENCODE consortium paper for pancreas H3K27me3",
+      "linked_at": 1772928051.442137
+    },
+    {
+      "id": 1,
+      "experiment_accession": "ENCSR133RZO",
+      "reference_type": "geo_accession",
+      "reference_id": "GSE187091",
+      "description": "Auto-extracted from ENCODE dbxrefs",
+      "linked_at": 1772928000.118904
     }
   ],
-  "total": 1
+  "count": 2
 }
 ```
+
+`linked_at` is epoch seconds (newest first), not a formatted date.
 
 **What the scientist learns:**
 - ENCODE experiments can be linked to PubMed IDs, DOIs, bioRxiv preprints, GEO accessions, and ClinicalTrials.gov NCT IDs

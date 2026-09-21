@@ -7,15 +7,21 @@ cis/trans classification, and reports summary statistics.
 Usage:
     python validate_loops.py input.bedpe [--min-distance 20000] [--expected-resolution 10000]
     python validate_loops.py input.bedpe --expected-resolution 5000
+
+Plain and gzipped (.gz) inputs are both accepted.
 """
 
 import argparse
+import gzip
+import statistics
 import sys
 from collections import Counter
 from pathlib import Path
 
 VALID_CHROMS = {f"chr{i}" for i in range(1, 23)} | {"chrX", "chrY", "chrM"}
 MIN_BEDPE_COLS = 6
+
+MAX_COLUMN_ERRORS = 5
 
 
 def parse_args():
@@ -45,6 +51,27 @@ def parse_args():
     return parser.parse_args()
 
 
+def open_text(path):
+    """Open a plain or gzipped text file for reading."""
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt")
+    return open(path)
+
+
+def fmt_distance(bp):
+    """Render a genomic distance, in bp below 1kb so sub-kb values do not read as 0kb."""
+    return f"{bp}bp" if bp < 1000 else f"{bp // 1000}kb"
+
+
+def quartiles(values):
+    """25th percentile, median and 75th percentile (interpolated)."""
+    median = statistics.median(values)
+    if len(values) < 2:
+        return values[0], median, values[0]
+    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+    return q1, median, q3
+
+
 def validate_loops(input_path, min_distance, expected_resolution):
     errors = []
     warnings = []
@@ -53,7 +80,10 @@ def validate_loops(input_path, min_distance, expected_resolution):
     anchor2_sizes = []
     loop_distances = []
     total_lines = 0
+    # Every line excluded from the statistics below counts as malformed, so
+    # total_lines == valid_loops + bad_lines always holds.
     bad_lines = 0
+    column_errors = 0
     cis_loops = 0
     trans_loops = 0
     short_range = 0
@@ -63,7 +93,7 @@ def validate_loops(input_path, min_distance, expected_resolution):
         print(f"ERROR: Input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(input_path) as f:
+    with open_text(input_path) as f:
         for line_num, line in enumerate(f, 1):
             if line.startswith("#") or line.startswith("track") or line.startswith("browser"):
                 continue
@@ -76,23 +106,29 @@ def validate_loops(input_path, min_distance, expected_resolution):
 
             # BEDPE requires at least 6 columns
             if len(fields) < MIN_BEDPE_COLS:
-                errors.append(f"Line {line_num}: expected >= {MIN_BEDPE_COLS} columns (BEDPE), got {len(fields)}")
                 bad_lines += 1
-                if bad_lines > 5:
-                    if bad_lines == 6:
-                        errors.append("... suppressing further column-count errors")
-                    continue
+                column_errors += 1
+                if column_errors <= MAX_COLUMN_ERRORS:
+                    errors.append(f"Line {line_num}: expected >= {MIN_BEDPE_COLS} columns (BEDPE), got {len(fields)}")
+                elif column_errors == MAX_COLUMN_ERRORS + 1:
+                    errors.append("... suppressing further column-count errors")
                 continue
 
             chr1 = fields[0]
             chr2 = fields[3]
 
-            # Chromosome validation for both anchors
-            for chrom_label, chrom_val in [("anchor1", chr1), ("anchor2", chr2)]:
-                if chrom_val not in VALID_CHROMS:
-                    if not chrom_val.startswith("chr"):
-                        errors.append(f"Line {line_num}: invalid {chrom_label} chromosome '{chrom_val}'")
-                        bad_lines += 1
+            # Chromosome validation for both anchors: a row with either anchor on an
+            # unrecognized chromosome is one malformed line, and is skipped entirely.
+            invalid_anchors = [
+                (label, value)
+                for label, value in (("anchor1", chr1), ("anchor2", chr2))
+                if value not in VALID_CHROMS and not value.startswith("chr")
+            ]
+            if invalid_anchors:
+                for label, value in invalid_anchors:
+                    errors.append(f"Line {line_num}: invalid {label} chromosome '{value}'")
+                bad_lines += 1
+                continue
 
             # Coordinate validation
             try:
@@ -111,10 +147,16 @@ def validate_loops(input_path, min_distance, expected_resolution):
                     errors.append(f"Line {line_num}: negative {label} ({val})")
 
             # Start < end for each anchor
+            reversed_anchor = False
             if start1 >= end1:
                 errors.append(f"Line {line_num}: anchor1 start ({start1}) >= end ({end1})")
+                reversed_anchor = True
             if start2 >= end2:
                 errors.append(f"Line {line_num}: anchor2 start ({start2}) >= end ({end2})")
+                reversed_anchor = True
+            if reversed_anchor:
+                bad_lines += 1
+                continue
 
             a1_size = end1 - start1
             a2_size = end2 - start2
@@ -150,6 +192,12 @@ def validate_loops(input_path, min_distance, expected_resolution):
                     if len(warnings) < 10:
                         warnings.append(f"Line {line_num}: anchor2 size {a2_size} != expected {expected_resolution}")
 
+    if total_lines == 0:
+        print(f"ERROR: no data rows in {input_path} (only comments, headers or blank lines)", file=sys.stderr)
+        sys.exit(1)
+
+    valid_loops = total_lines - bad_lines
+
     # --- Detect resolution from anchor sizes ---
     detected_resolution = None
     if anchor1_sizes:
@@ -166,17 +214,18 @@ def validate_loops(input_path, min_distance, expected_resolution):
     print()
 
     print("--- Summary ---")
-    print(f"Total loops: {total_lines:,}")
+    print(f"Data lines: {total_lines:,}")
+    print(f"Valid loops: {valid_loops:,}")
     print(f"Malformed lines: {bad_lines}")
-    print(f"Cis loops (same chromosome): {cis_loops:,} ({100 * cis_loops / max(total_lines, 1):.1f}%)")
-    print(f"Trans loops (inter-chromosomal): {trans_loops:,} ({100 * trans_loops / max(total_lines, 1):.1f}%)")
+    print(f"Cis loops (same chromosome): {cis_loops:,} ({100 * cis_loops / max(valid_loops, 1):.1f}%)")
+    print(f"Trans loops (inter-chromosomal): {trans_loops:,} ({100 * trans_loops / max(valid_loops, 1):.1f}%)")
     print(f"Non-canonical ordering (anchor1 > anchor2): {non_canonical:,}")
-    print(f"Short-range loops (<{min_distance // 1000}kb): {short_range:,}")
+    print(f"Short-range loops (<{fmt_distance(min_distance)}): {short_range:,}")
     print()
 
     if detected_resolution:
         print("--- Resolution ---")
-        print(f"Detected resolution: {detected_resolution:,} bp ({detected_resolution // 1000}kb)")
+        print(f"Detected resolution: {detected_resolution:,} bp ({fmt_distance(detected_resolution)})")
         print(f"Anchor size consistency: {size_pct:.1f}% of anchors match detected resolution")
     elif anchor1_sizes:
         print("--- Resolution ---")
@@ -189,12 +238,13 @@ def validate_loops(input_path, min_distance, expected_resolution):
     if loop_distances:
         sorted_dist = sorted(loop_distances)
         n = len(sorted_dist)
+        dist_q1, dist_median, dist_q3 = quartiles(sorted_dist)
         print("--- Loop Distance Distribution (cis only) ---")
-        print(f"Min:    {sorted_dist[0]:>12,} bp ({sorted_dist[0] // 1000}kb)")
-        print(f"25th:   {sorted_dist[n // 4]:>12,} bp ({sorted_dist[n // 4] // 1000}kb)")
-        print(f"Median: {sorted_dist[n // 2]:>12,} bp ({sorted_dist[n // 2] // 1000}kb)")
-        print(f"75th:   {sorted_dist[3 * n // 4]:>12,} bp ({sorted_dist[3 * n // 4] // 1000}kb)")
-        print(f"Max:    {sorted_dist[-1]:>12,} bp ({sorted_dist[-1] // 1000}kb)")
+        print(f"Min:    {sorted_dist[0]:>12,} bp ({fmt_distance(sorted_dist[0])})")
+        print(f"25th:   {dist_q1:>12,.1f} bp ({fmt_distance(int(dist_q1))})")
+        print(f"Median: {dist_median:>12,.1f} bp ({fmt_distance(int(dist_median))})")
+        print(f"75th:   {dist_q3:>12,.1f} bp ({fmt_distance(int(dist_q3))})")
+        print(f"Max:    {sorted_dist[-1]:>12,} bp ({fmt_distance(sorted_dist[-1])})")
 
         # Distance buckets
         buckets = [
@@ -202,7 +252,7 @@ def validate_loops(input_path, min_distance, expected_resolution):
             ("100kb - 500kb", 100_000, 500_000),
             ("500kb - 1Mb", 500_000, 1_000_000),
             ("1Mb - 5Mb", 1_000_000, 5_000_000),
-            ("> 5Mb", 5_000_000, float("inf")),
+            (">= 5Mb", 5_000_000, float("inf")),
         ]
         print("\n  Distance buckets:")
         for label, lo, hi in buckets:
@@ -219,16 +269,16 @@ def validate_loops(input_path, min_distance, expected_resolution):
         print()
 
     # --- Warnings ---
-    if trans_loops > total_lines * 0.05:
+    if trans_loops > valid_loops * 0.05:
         msg = (
-            f"WARNING: {100 * trans_loops / max(total_lines, 1):.1f}% of loops are trans "
+            f"WARNING: {100 * trans_loops / max(valid_loops, 1):.1f}% of loops are trans "
             f"(inter-chromosomal). Expect <5% for typical Hi-C data."
         )
         print(msg, file=sys.stderr)
 
     if short_range > 0:
         msg = (
-            f"WARNING: {short_range:,} loops have anchors <{min_distance // 1000}kb apart. "
+            f"WARNING: {short_range:,} loops have anchors <{fmt_distance(min_distance)} apart. "
             f"These may be self-ligation artifacts."
         )
         print(msg, file=sys.stderr)

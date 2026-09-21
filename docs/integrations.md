@@ -33,9 +33,10 @@ User: Track ENCODE experiment ENCSR133RZO and find related PubMed articles
 
 Claude chains:
 1. encode_track_experiment("ENCSR133RZO")
-   → Returns experiment metadata + auto-extracted PMIDs from publications
+   → Stores the experiment locally; returns tracking (accession + action),
+     auto_linked_references for any GEO/PMID dbxref, publications and pipelines
 2. encode_get_citations("ENCSR133RZO", export_format="json")
-   → Returns PMIDs: ["32728249", "29126249"]
+   → Returns {"publications": [...], "count": 2}; read pmid from each entry
 3. get_article_metadata(pmids=["32728249", "29126249"])
    → Full PubMed metadata for each paper
 4. find_related_articles(pmids=["32728249"])
@@ -71,7 +72,7 @@ Claude chains:
 1. encode_get_citations(export_format="bibtex")
    → BibTeX entries for ENCODE-associated publications
 2. encode_get_references(reference_type="pmid")
-   → All manually-linked PMIDs
+   → All linked PMIDs, manual and auto-extracted alike
 3. get_article_metadata(pmids=[...additional PMIDs...])
    → Enrich with full PubMed metadata
 ```
@@ -195,7 +196,8 @@ Claude chains:
      year_min=2019, sjr_max=1)
    → Papers on ChIP-seq QC standards
 2. encode_summarize_collection()
-   → Overview of tracked experiments with audit counts
+   → Totals for tracked experiments, publications, derived files and external
+     references, plus counts by assay, target, organism, organ, biosample type and lab
 3. encode_export_data(format="csv")
    → Export for comparison with published benchmarks
 ```
@@ -217,7 +219,7 @@ Step 1: Discover ENCODE data
 Step 2: Track and summarize
 > encode_track_experiment("ENCSR...") (for each relevant experiment)
 > encode_summarize_collection(organ="pancreas")
-→ Overview: which marks, how many experiments, quality
+→ Overview: by_target shows which marks, total_experiments how many, by_lab who produced them
 
 Step 3: Find published analyses (PubMed)
 > encode_get_citations(export_format="json")
@@ -342,11 +344,16 @@ The `encode_export_data` tool generates tabular exports that include PMIDs and r
 encode_export_data(format="csv")
 ```
 
-Output columns include:
+The CSV/TSV header is fixed at 17 columns, in this order:
+
 - `accession`, `assay_title`, `target`, `organism`, `organ`
-- `biosample_term_name`, `lab`, `assembly`, `status`, `date_released`
-- `pmids` — comma-separated list of linked PubMed IDs
-- `publication_count`, `reference_count`
+- `biosample_type`, `biosample_summary`, `lab`, `assembly`, `status`, `date_released`
+- `replication_type`, `life_stage`
+- `publication_count`, `pmids` — a semicolon-separated list of PubMed IDs
+- `derived_file_count`, `external_reference_count`
+
+`format="json"` returns the same rows as a JSON array with six extra fields
+(`description`, `award`, `url`, `tracked_at`, `updated_at`, `notes`).
 
 ### Collection Summary
 

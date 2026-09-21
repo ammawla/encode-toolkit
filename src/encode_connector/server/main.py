@@ -322,11 +322,13 @@ async def encode_search_experiments(
 async def encode_get_experiment(accession: str) -> str:
     """Get full details for a specific ENCODE experiment by accession ID.
 
-    Returns complete experiment metadata including all associated files,
-    quality metrics, controls, replicate information, and audit status.
+    Returns the experiment's metadata, all associated files, the accessions of its possible
+    controls, replicate counts, and the number of audit flags at each level (ERROR,
+    NOT_COMPLIANT, WARNING, INTERNAL_ACTION). It does not return QC metric values such as
+    FRiP or NSC; those are on the experiment's page at encodeproject.org.
 
     WHEN TO USE: Use when you have a specific accession and need full details
-    including files, quality metrics, and audit status.
+    including files, controls, and audit counts.
     RELATED TOOLS: encode_list_files, encode_track_experiment, encode_compare_experiments
 
     Args:
@@ -650,6 +652,7 @@ async def encode_batch_download(
     verify_md5: bool = True,
     limit: int = 100,
     dry_run: bool = True,
+    offset: int = 0,
 ) -> str:
     """Search for files and download them all in batch.
 
@@ -688,6 +691,8 @@ async def encode_batch_download(
         verify_md5: Verify downloads with MD5 checksums (default True)
         limit: Max files to download (default 100, safety limit)
         dry_run: If True (default), only preview what would be downloaded. Set False to download.
+        offset: Skip the first N matching files; pass the next_offset of the previous reply to
+            continue a search that has more files than limit
 
     Returns:
         JSON with download preview (dry_run=True) or download results (dry_run=False).
@@ -696,6 +701,7 @@ async def encode_batch_download(
     downloader = _get_downloader()
     validate_organize_by(organize_by)
     limit = clamp_limit(limit)
+    offset = max(0, offset)
     filter_warnings = _validate_filters(assay_title, organ, biosample_type)
 
     # Search for files
@@ -712,6 +718,7 @@ async def encode_batch_download(
         status="released",
         preferred_default=preferred_default,
         limit=limit,
+        offset=offset,
     )
 
     files = search_result["results"]
@@ -740,8 +747,8 @@ async def encode_batch_download(
             f"Found {preview['file_count']} files ({preview['total_size_human']}). Set dry_run=False to download."
         )
         preview["search_total"] = search_total
-        preview["has_more"] = search_total > limit
-        preview["next_offset"] = limit if search_total > limit else None
+        preview["has_more"] = search_total > offset + limit
+        preview["next_offset"] = offset + limit if search_total > offset + limit else None
         if total_note:
             preview["total_note"] = total_note
         if filter_warnings:
@@ -762,8 +769,8 @@ async def encode_batch_download(
             "total_size": sum(r.file_size for r in results if r.success),
             "total_size_human": _human_size(sum(r.file_size for r in results if r.success)),
         },
-        "has_more": search_total > limit,
-        "next_offset": limit if search_total > limit else None,
+        "has_more": search_total > offset + limit,
+        "next_offset": offset + limit if search_total > offset + limit else None,
     }
     if total_note:
         output["total_note"] = total_note
@@ -1134,7 +1141,7 @@ async def encode_list_tracked(
     )
 
     # Build metadata table
-    table = tracker.get_metadata_table([e["accession"] for e in experiments] if experiments else None)
+    table = tracker.get_metadata_table([e["accession"] for e in experiments])
 
     # Remove raw_metadata from output
     for row in table:

@@ -22,7 +22,7 @@ Surveys all available histone marks, chromatin accessibility, TF binding, transc
 encode_get_facets(organ="heart", biosample_type="tissue")
 ```
 
-Facets reveal Histone ChIP-seq (42 experiments), ATAC-seq (6), DNase-seq (8), RNA-seq (12), TF ChIP-seq (4), WGBS (2), and Hi-C (1) across heart biosamples. Sufficient depth for a full profile.
+Facets reveal Histone ChIP-seq (42 experiments), ATAC-seq (6), DNase-seq (8), total RNA-seq (12), TF ChIP-seq (4), WGBS (2), and Hi-C (1) across heart biosamples. Sufficient depth for a full profile.
 
 ### Step 2: Search Core Histone Marks
 
@@ -48,7 +48,7 @@ encode_search_experiments(assay_title="Histone ChIP-seq", target="H3K9me3", orga
 | H3K36me3 | Histone ChIP | 4 | 3 | Transcribed gene bodies |
 | H3K9me3 | Histone ChIP | 3 | 2 | Constitutive heterochromatin |
 | Accessibility | ATAC-seq | 6 | 4 | Validates regulatory elements |
-| Expression | RNA-seq | 12 | 8 | Links states to function |
+| Expression | total RNA-seq | 12 | 8 | Links states to function |
 
 All six marks present. The 5-mark core (H3K4me3, H3K4me1, H3K27me3, H3K36me3, H3K9me3) enables the Roadmap 15-state ChromHMM model. Adding H3K27ac enables the 18-state extended model that separates active from poised enhancers (Creyghton et al. 2010).
 
@@ -85,11 +85,11 @@ With all six marks binarized into 200bp bins, ChromHMM learns an 18-state model.
 ### Step 6: Track and Document
 
 ```
-encode_track_experiment(accession="ENCSR...)  # repeat for each experiment
+encode_track_experiment(accession="ENCSR...")  # repeat for each experiment
 encode_summarize_collection(organ="heart")
 ```
 
-The summary confirms 24 tracked experiments across 6 histone marks, ATAC-seq, and RNA-seq -- a complete 18-state-capable epigenomic profile.
+The summary confirms 24 tracked experiments across 6 histone marks, ATAC-seq, and total RNA-seq -- a complete 18-state-capable epigenomic profile.
 
 ## Key Principles
 

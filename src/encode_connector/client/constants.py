@@ -12,6 +12,9 @@ DOWNLOAD_CONCURRENCY = 3
 DEFAULT_TIMEOUT = 30.0
 DOWNLOAD_TIMEOUT = 300.0
 DEFAULT_LIMIT = 25
+# Frame for a single experiment. "page" is "embedded" plus the "audit" property; with
+# "embedded" ENCODE omits the audits and every experiment looks free of errors and warnings.
+EXPERIMENT_FRAME = "page"
 # experiments read per request while a file search walks the experiments of one organism
 EXPERIMENT_PAGE_SIZE = 200
 # ...and how many experiments it reads at most: each one costs a request to ENCODE

@@ -266,7 +266,7 @@ Returns entries like:
 ```bibtex
 @article{12345678,
   title = {Genome-wide maps of chromatin state in pancreatic islets},
-  author = {Smith J, Jones K, ...},
+  author = {Smith J and Jones K and ...},
   journal = {Nature},
   year = {2020},
   doi = {10.1038/...},

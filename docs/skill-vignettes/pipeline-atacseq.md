@@ -93,12 +93,15 @@ Intersect your peaks with ENCODE reference peaks using bedtools to quantify conc
 ```
 encode_log_derived_file(
     file_path="results/peaks/idr/islet_idr_peaks.narrowPeak",
-    source_accessions=["local_islet_atac_rep1", "local_islet_atac_rep2"],
-    description="IDR thresholded ATAC-seq peaks, human islets, 2 bio reps",
+    source_accessions=["ENCFF635JIA"],
+    description="IDR thresholded ATAC-seq peaks from local islet FASTQs (2 bio reps), benchmarked against the ENCODE reference peaks",
     file_type="idr_peaks",
     tool_used="ENCODE ATAC-seq pipeline (Bowtie2 2.5.1, MACS2 2.2.9.1, IDR 2.0.4)",
     parameters="--genome GRCh38 --nfr_max 150, Tn5 shift +4/-5, blacklist v2 filtered")
 ```
+
+`source_accessions` only accepts ENCODE accessions, so record your local replicates in the
+description and point the chain at the ENCODE file you benchmarked against.
 
 ## Common Pitfalls
 

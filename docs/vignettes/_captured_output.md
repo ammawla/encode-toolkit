@@ -3,6 +3,12 @@
 > Generated: 2026-03-07
 > Source: Live ENCODE MCP tool calls against encodeproject.org
 > Purpose: Embed in vignette documentation as real-world examples
+>
+> Revised: sections 1, 3, 5 and 6 were captured from an earlier build whose responses no
+> longer match what the tools return. They have been corrected against the current server:
+> the search response now carries the labels, organism, organ, biosample classification and
+> assemblies the client asks ENCODE to embed, plus `has_more` / `next_offset`; the assay list
+> in section 6 is the server's own vocabulary verbatim. Counts and accessions are unchanged.
 
 ---
 
@@ -25,21 +31,23 @@
     {
       "accession": "ENCSR133RZO",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27me3-human",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female child (16 years)",
-      "organism": "",
-      "organ": "",
-      "biosample_type": "/biosample-types/tissue_UBERON_0001264/",
+      "organism": "Homo sapiens",
+      "organ": "pancreas",
+      "biosample_type": "tissue",
       "status": "released",
       "date_released": "2021-06-24",
       "description": "H3K27me3 ChIP-seq on pancreas tissue female child (16 years)",
-      "lab": "bradley-bernstein",
+      "lab": "Bradley Bernstein, Broad",
       "file_count": 14,
       "replication_type": "unreplicated",
       "life_stage": "child 16 years",
-      "assembly": [],
+      "assembly": ["GRCh38"],
       "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
       "audit_warning_count": 8,
+      "audit_internal_action_count": 2,
       "dbxrefs": [
         "GEO:GSE187091"
       ],
@@ -48,21 +56,23 @@
     {
       "accession": "ENCSR511LIV",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K27me3-human",
+      "target": "H3K27me3",
       "biosample_summary": "Homo sapiens pancreas tissue female adult (61 years)",
-      "organism": "",
-      "organ": "",
-      "biosample_type": "/biosample-types/tissue_UBERON_0001264/",
+      "organism": "Homo sapiens",
+      "organ": "pancreas",
+      "biosample_type": "tissue",
       "status": "released",
       "date_released": "2021-06-24",
       "description": "H3K27me3 ChIP-seq on pancreas tissue female adult (61 years)",
-      "lab": "bradley-bernstein",
+      "lab": "Bradley Bernstein, Broad",
       "file_count": 14,
       "replication_type": "unreplicated",
       "life_stage": "adult 61 years",
-      "assembly": [],
+      "assembly": ["GRCh38"],
       "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
       "audit_warning_count": 8,
+      "audit_internal_action_count": 0,
       "dbxrefs": [
         "GEO:GSE187520"
       ],
@@ -71,21 +81,23 @@
     {
       "accession": "ENCSR368EPJ",
       "assay_title": "Histone ChIP-seq",
-      "target": "H3K9me3-human",
+      "target": "H3K9me3",
       "biosample_summary": "Homo sapiens pancreas tissue female adult (59 years)",
-      "organism": "",
-      "organ": "",
-      "biosample_type": "/biosample-types/tissue_UBERON_0001264/",
+      "organism": "Homo sapiens",
+      "organ": "pancreas",
+      "biosample_type": "tissue",
       "status": "released",
       "date_released": "2021-06-24",
       "description": "H3K9me3 ChIP-seq on pancreas tissue female adult (59 years)",
-      "lab": "bradley-bernstein",
+      "lab": "Bradley Bernstein, Broad",
       "file_count": 18,
       "replication_type": "unreplicated",
       "life_stage": "adult 59 years",
-      "assembly": [],
+      "assembly": ["GRCh38"],
       "audit_error_count": 0,
+      "audit_not_compliant_count": 0,
       "audit_warning_count": 12,
+      "audit_internal_action_count": 0,
       "dbxrefs": [
         "GEO:GSE187290"
       ],
@@ -94,7 +106,9 @@
   ],
   "total": 73,
   "limit": 3,
-  "offset": 0
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 3
 }
 ```
 
@@ -235,6 +249,7 @@
   "biosample_type": "tissue",
   "life_stage": "child 16 years",
   "replication_type": "unreplicated",
+  "assembly": ["GRCh38"],
   "bio_replicate_count": 1,
   "tech_replicate_count": 2,
   "possible_controls": [
@@ -347,6 +362,7 @@
       "technical_replicates": ["1_1"],
       "status": "released",
       "download_url": "https://www.encodeproject.org/files/ENCFF757TPV/@@download/ENCFF757TPV.fastq.gz",
+      "s3_uri": "s3://encode-public/2021/04/30/9d0c3f2e-6f1a-4b6d-9a3e-2f0c1d7b5e44/ENCFF757TPV.fastq.gz",
       "md5sum": "b639731572f81990f3e8cfc96c65c626",
       "experiment_accession": "ENCSR133RZO",
       "experiment_assay": "Histone ChIP-seq",
@@ -367,6 +383,7 @@
       "technical_replicates": ["1_1", "1_2"],
       "status": "released",
       "download_url": "https://www.encodeproject.org/files/ENCFF186PZN/@@download/ENCFF186PZN.bigWig",
+      "s3_uri": "s3://encode-public/2021/06/23/1f3a9c07-2b8e-4d55-90c1-7a6b4e2f8d10/ENCFF186PZN.bigWig",
       "md5sum": "a735b39e5a074c39a42db7299767a444",
       "experiment_accession": "ENCSR133RZO",
       "experiment_assay": "Histone ChIP-seq",
@@ -387,6 +404,7 @@
       "technical_replicates": ["1_1", "1_2"],
       "status": "released",
       "download_url": "https://www.encodeproject.org/files/ENCFF387ALH/@@download/ENCFF387ALH.bigWig",
+      "s3_uri": "s3://encode-public/2021/06/23/6c81b4ad-05f7-4e39-8b2a-c94d3e1f7a62/ENCFF387ALH.bigWig",
       "md5sum": "2c8ec6977bb98c2909dc6f02edfbf676",
       "experiment_accession": "ENCSR133RZO",
       "experiment_assay": "Histone ChIP-seq",
@@ -399,53 +417,62 @@
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "472.4 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF208TEX",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "509.1 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF161KCS",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "503.7 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF867QKO",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "545.8 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF365MQX",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "551.8 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF210ECA",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "544.9 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     },
     {
       "accession": "ENCFF004TKM",
       "file_format": "fastq",
       "output_type": "reads",
       "file_size_human": "532.8 MB",
-      "preferred_default": false
+      "preferred_default": false,
+      "...": "..."
     }
   ],
   "audit_error_count": 0,
-  "audit_warning_count": 0
+  "audit_not_compliant_count": 0,
+  "audit_warning_count": 8,
+  "audit_internal_action_count": 2
 }
 ```
 
@@ -504,9 +531,10 @@
 }
 ```
 
-**Note:** The original query with `output_type="IDR thresholded peaks"` returned a 404.
-The ENCODE API does not support `output_type` as a direct file search filter via this endpoint.
-Use `file_format` + `target` + `assembly` as the primary file search strategy instead.
+**Note:** `output_type` is a supported filter here -- it is forwarded to the ENCODE file
+search like `file_format`, `output_category`, `assembly` and `status`. It must be one of
+ENCODE's own output types (`"IDR thresholded peaks"`, `"pseudoreplicated peaks"`,
+`"fold change over control"`, ...); an unknown string simply matches nothing.
 
 **Response:**
 ```json
@@ -578,7 +606,9 @@ Use `file_format` + `target` + `assembly` as the primary file search strategy in
   ],
   "total": 2055,
   "limit": 3,
-  "offset": 0
+  "offset": 0,
+  "has_more": true,
+  "next_offset": 3
 }
 ```
 
@@ -603,63 +633,83 @@ Use `file_format` + `target` + `assembly` as the primary file search strategy in
     "TF ChIP-seq",
     "Control ChIP-seq",
     "Mint-ChIP-seq",
+    "Control Mint-ChIP-seq",
     "ATAC-seq",
     "DNase-seq",
-    "RNA-seq",
+    "GM DNase-seq",
+    "FAIRE-seq",
+    "MNase-seq",
+    "snATAC-seq",
     "total RNA-seq",
+    "polyA plus RNA-seq",
+    "polyA minus RNA-seq",
     "small RNA-seq",
     "long read RNA-seq",
     "microRNA-seq",
-    "polyA plus RNA-seq",
-    "polyA minus RNA-seq",
-    "single-cell RNA sequencing assay",
+    "microRNA counts",
+    "shRNA RNA-seq",
+    "siRNA RNA-seq",
+    "CRISPR RNA-seq",
+    "CRISPRi RNA-seq",
+    "scRNA-seq",
+    "long read scRNA-seq",
+    "snRNA-seq",
     "CAGE",
     "RAMPAGE",
-    "RRBS",
+    "PRO-seq",
+    "PRO-cap",
+    "GRO-seq",
+    "GRO-cap",
+    "PAS-seq",
+    "Bru-seq",
+    "BruChase-seq",
+    "BruUV-seq",
     "WGBS",
-    "whole-genome shotgun bisulfite sequencing",
+    "RRBS",
+    "MeDIP-seq",
+    "MRE-seq",
+    "TAB-seq",
+    "DNAme array",
     "Hi-C",
     "intact Hi-C",
     "in situ Hi-C",
+    "dilution Hi-C",
+    "capture Hi-C",
     "Micro-C",
     "ChIA-PET",
     "HiChIP",
     "PLAC-seq",
-    "PRO-seq",
-    "GRO-seq",
+    "SPRITE",
+    "5C",
     "CUT&RUN",
     "CUT&Tag",
+    "eCLIP",
+    "Control eCLIP",
+    "iCLIP",
+    "RIP-seq",
+    "RIP-chip",
+    "RNA Bind-n-Seq",
     "STARR-seq",
     "MPRA",
     "CRISPR screen",
     "proliferation CRISPR screen",
     "FlowFISH CRISPR screen",
-    "eCLIP",
-    "iCLIP",
-    "shRNA knockdown followed by RNA-seq",
-    "siRNA knockdown followed by RNA-seq",
-    "CRISPRi followed by RNA-seq",
-    "MeDIP-seq",
-    "MRE-seq",
-    "MNase-seq",
-    "5C",
-    "BruUV-seq",
-    "genetic modification followed by DNase-seq",
-    "long read sequencing assay",
-    "direct RNA-seq",
-    "Parse SPLiT-seq",
-    "SHARE-seq",
-    "10x multiome",
-    "single-nucleus ATAC-seq",
-    "single-nucleus RNA-seq",
-    "snATAC-seq",
+    "WGS",
+    "genotyping array",
+    "RNA microarray",
     "Repli-seq",
     "Repli-chip",
     "Switchgear",
-    "genotyping HTS",
-    "whole genome sequencing assay"
+    "MS-MS",
+    "RNA-PET",
+    "DNA-PET",
+    "icSHAPE",
+    "icLASER",
+    "seqFISH",
+    "Circulome-seq",
+    "5' RLM RACE"
   ],
-  "count": 59
+  "count": 79
 }
 ```
 
@@ -669,7 +719,7 @@ Use `file_format` + `target` + `assembly` as the primary file search strategy in
 
 1. **Accession stability**: ENCODE accessions (ENCSR*, ENCFF*) are permanent identifiers. These outputs will remain valid indefinitely.
 
-2. **`output_type` filter caveat**: The `encode_search_files` tool does NOT support `output_type` as a filter parameter for cross-experiment file search (returns 404). Use `file_format`, `target`, and `assembly` instead. To find IDR peaks specifically, search with `encode_list_files` on a known experiment accession.
+2. **`output_type` must be an ENCODE output type**: `encode_search_files` does forward `output_type` to the portal, alongside `file_format`, `output_category`, `assembly` and `status`. The value has to come from ENCODE's vocabulary (`encode_get_metadata(metadata_type="output_types")`) -- `"IDR thresholded peaks"`, `"pseudoreplicated peaks"`, `"loops"`, `"contact domains"`, and so on. Anything else quietly matches nothing.
 
 3. **Facets are live counts**: The facet numbers reflect the current state of the ENCODE database and may change as new data is released.
 
@@ -681,3 +731,7 @@ Use `file_format` + `target` + `assembly` as the primary file search strategy in
    - 200 tissue samples, 51 cell line, 32 in vitro differentiated, 5 organoid
 
 5. **File counts** (from facets): 2055 H3K27ac BED files across all tissues/cell types in GRCh38.
+
+6. **Audit counts in `encode_get_experiment`**: up to 0.3.3 this tool asked ENCODE for `frame=embedded`, which omits audits, so its four `audit_*_count` fields were always zero. From 0.3.4 it asks for `frame=page` and reports the same counts as the portal (8 warnings and 2 internal-action flags for ENCSR133RZO when this was checked).
+
+7. **Long responses are trimmed**: where a record shows `"...": "..."`, the remaining fields were cut for readability. Every file record really carries all 19 `FileSummary` fields.

@@ -21,23 +21,32 @@ compatible for combined analysis, and share the metadata table with your collabo
 
 ```json
 {
-  "status": "tracked",
-  "accession": "ENCSR133RZO",
-  "metadata_stored": {
-    "assay_title": "Histone ChIP-seq",
-    "target": "H3K27me3",
-    "biosample_summary": "Homo sapiens pancreas tissue female child (16 years)",
-    "organism": "Homo sapiens",
-    "assembly": "GRCh38",
-    "lab": "Bradley Bernstein, Broad"
+  "tracking": {
+    "accession": "ENCSR133RZO",
+    "action": "tracked"
   },
+  "auto_linked_references": [
+    {"type": "geo_accession", "id": "GSE187091"}
+  ],
   "publications_found": 0,
-  "pipelines_found": 1
+  "publications": [],
+  "pipelines_found": 1,
+  "pipelines": [
+    {
+      "title": "Histone ChIP-seq 2 (unreplicated)",
+      "version": "1.7.1",
+      "software": [{"name": "bowtie2", "version": "2.3.4.3"}],
+      "status": "released"
+    }
+  ]
 }
 ```
 
-The experiment is now in your local SQLite library. The `notes` field records your
-research intent -- invaluable when revisiting the collection weeks later.
+The experiment is now in your local SQLite library -- `action` is `"tracked"` on the first
+insert and `"updated"` if you track it again. The response confirms what was fetched, not
+what was stored: your `notes` and the experiment metadata go straight into the database.
+Read them back with `encode_list_tracked`. The note records your research intent --
+invaluable when revisiting the collection weeks later.
 
 ## Step 2: Track a Matching H3K4me3 Experiment
 
@@ -46,11 +55,11 @@ research intent -- invaluable when revisiting the collection weeks later.
 **Claude calls:** `encode_track_experiment(accession="ENCSR649YSX", notes="H3K4me3 pancreas, bivalent promoter study")`
 
 ```json
-{"status": "tracked", "accession": "ENCSR649YSX",
- "metadata_stored": {"assay_title": "Histone ChIP-seq", "target": "H3K4me3",
-   "biosample_summary": "Homo sapiens pancreas tissue female adult (51 years)",
-   "organism": "Homo sapiens", "assembly": "GRCh38", "lab": "Bradley Bernstein, Broad"},
- "publications_found": 0, "pipelines_found": 1}
+{"tracking": {"accession": "ENCSR649YSX", "action": "tracked"},
+ "publications_found": 0, "publications": [],
+ "pipelines_found": 1,
+ "pipelines": [{"title": "Histone ChIP-seq 2 (unreplicated)", "version": "1.7.1",
+   "software": [{"name": "bowtie2", "version": "2.3.4.3"}], "status": "released"}]}
 ```
 
 Your library now holds two experiments -- both human, GRCh38, same lab, but different
@@ -78,20 +87,37 @@ collection grows.
 
 ```json
 {
-  "verdict": "WARNINGS",
-  "matching": {"organism": "Homo sapiens", "assembly": "GRCh38",
-    "assay_title": "Histone ChIP-seq", "lab": "Bradley Bernstein, Broad"},
-  "warnings": ["Different targets: H3K27me3 vs H3K4me3",
-    "Different donor age: child (16 years) vs adult (51 years)"],
+  "experiment_1": {
+    "accession": "ENCSR133RZO",
+    "assay": "Histone ChIP-seq",
+    "biosample": "Homo sapiens pancreas tissue female child (16 years)"
+  },
+  "experiment_2": {
+    "accession": "ENCSR649YSX",
+    "assay": "Histone ChIP-seq",
+    "biosample": "Homo sapiens pancreas tissue female adult (51 years)"
+  },
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Histone ChIP-seq",
+    "Same biosample type: tissue",
+    "Same organ: pancreas",
+    "Same lab: Bradley Bernstein, Broad"
+  ],
   "issues": [],
-  "recommendation": "Compatible for cross-mark comparison. Target difference is expected for bivalent analysis."
+  "warnings": ["Different targets: H3K27me3 vs H3K4me3."]
 }
 ```
 
-Organism, assembly, assay, and lab all match -- the critical fields. The target difference
-is intentional (you need both marks for bivalency). The age difference is worth noting
-in your methods. Had organism or assembly mismatched, the verdict would be
-**INCOMPATIBLE**.
+Organism, assembly, assay, biosample type, organ, and lab all match -- the critical fields.
+The one warning is the target difference, which is intentional (you need both marks for
+bivalency). Donor age is not compared, so note it in your methods yourself. Warnings alone
+give `COMPATIBLE_WITH_CAVEATS`; had organism or assembly mismatched, that would be an entry
+in `issues` and the verdict would be `NOT_COMPATIBLE`. With neither, it is
+`FULLY_COMPATIBLE`.
 
 ## Step 5: Export for Collaborators
 
@@ -100,13 +126,15 @@ in your methods. Had organism or assembly mismatched, the verdict would be
 **Claude calls:** `encode_export_data(format="csv")`
 
 ```csv
-accession,assay_title,target,biosample_summary,organism,assembly,lab,date_released,publications,derived_files,notes
-ENCSR133RZO,Histone ChIP-seq,H3K27me3,"pancreas tissue female child (16 years)",Homo sapiens,GRCh38,"Bradley Bernstein, Broad",2021-06-24,0,0,"H3K27me3 pancreas, bivalent promoter study"
-ENCSR649YSX,Histone ChIP-seq,H3K4me3,"pancreas tissue female adult (51 years)",Homo sapiens,GRCh38,"Bradley Bernstein, Broad",2020-11-18,0,0,"H3K4me3 pancreas, bivalent promoter study"
+accession,assay_title,target,organism,organ,biosample_type,biosample_summary,lab,assembly,status,date_released,replication_type,life_stage,publication_count,pmids,derived_file_count,external_reference_count
+ENCSR133RZO,Histone ChIP-seq,H3K27me3,Homo sapiens,pancreas,tissue,"Homo sapiens pancreas tissue female child (16 years)","Bradley Bernstein, Broad",GRCh38,released,2021-06-24,unreplicated,child 16 years,0,,0,1
+ENCSR649YSX,Histone ChIP-seq,H3K4me3,Homo sapiens,pancreas,tissue,"Homo sapiens pancreas tissue female adult (51 years)","Bradley Bernstein, Broad",GRCh38,released,2020-11-18,unreplicated,adult 51 years,0,,0,1
 ```
 
 Your collaborator can open this in Excel, R (`read.csv`), or pandas (`pd.read_csv`).
-TSV and JSON formats are also available.
+The CSV and TSV forms always carry these 17 columns; your `notes` are not among them --
+export with `format="json"` when you need them, together with `description`, `award`,
+`url`, `tracked_at` and `updated_at`.
 
 ## Best Practices
 

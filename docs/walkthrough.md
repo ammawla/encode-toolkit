@@ -64,23 +64,30 @@ Before searching, it helps to know what's available. ENCODE has thousands of exp
 
 > **You:** What assay types are available on ENCODE?
 
-Claude uses `encode_get_metadata` with `metadata_type="assays"` and returns a list like:
+Claude calls `encode_get_metadata(metadata_type="assays")`. The reply is
+`{"metadata_type": "assays", "values": [...], "count": 79}`; the 79 `values` read:
 
 ```
-Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, RNA-seq,
-total RNA-seq, Hi-C, intact Hi-C, Micro-C, CUT&RUN, CUT&Tag,
+Histone ChIP-seq, TF ChIP-seq, ATAC-seq, DNase-seq, total RNA-seq,
+polyA plus RNA-seq, Hi-C, intact Hi-C, Micro-C, CUT&RUN, CUT&Tag,
 STARR-seq, MPRA, CRISPR screen, eCLIP, WGBS, RRBS, ...
 ```
+
+These are ENCODE's own assay titles, so they are exactly what the search filters
+accept. Note there is no bare `"RNA-seq"` title -- use `"total RNA-seq"` or
+`"polyA plus RNA-seq"`.
 
 You can do this for any filter dimension:
 
 > **You:** What organs have data on ENCODE?
 
-Returns: `blood, brain, liver, lung, heart, kidney, pancreas, intestine, spleen, thymus, ...`
+`encode_get_metadata(metadata_type="organs")` returns 66 values:
+`blood, brain, liver, lung, heart, kidney, pancreas, intestine, spleen, thymus, ...`
 
 > **You:** What genome assemblies are available?
 
-Returns: `GRCh38, hg19, mm10, mm9, GRCm39, dm6, ce11, ...`
+`encode_get_metadata(metadata_type="assemblies")` returns 17 values:
+`GRCh38, hg19, mm10, mm9, GRCm39, dm6, ce11, ...`
 
 ### Get live counts with facets
 
@@ -88,18 +95,25 @@ Facets show you how much data exists for a given filter combination. This is the
 
 > **You:** What histone marks have ChIP-seq data for human pancreas?
 
-Claude uses `encode_get_facets` with `assay_title="Histone ChIP-seq"` and `organ="pancreas"`, returning counts like:
+Claude calls `encode_get_facets(assay_title="Histone ChIP-seq", organ="pancreas")`.
+Each key of the reply is an ENCODE facet field and each value is a list of
+`{"term": ..., "count": ...}` objects -- there is no `facets` wrapper:
 
 ```
-Target:
-  H3K27me3    12 experiments
-  H3K4me3     11 experiments
-  H3K27ac     10 experiments
-  H3K4me1      9 experiments
-  H3K36me3     8 experiments
-  H3K9me3      7 experiments
+"target.label":
+  { "term": "H3K27me3", "count": 12 }
+  { "term": "H3K4me3",  "count": 11 }
+  { "term": "H3K27ac",  "count": 10 }
+  { "term": "H3K4me1",  "count":  9 }
+  { "term": "H3K36me3", "count":  8 }
+  { "term": "H3K9me3",  "count":  7 }
   ...
 ```
+
+Which facet fields come back depends on `search_type` and the filters --
+`assay_title`, `status`, `target.label`, `biosample_ontology.classification`,
+`biosample_ontology.organ_slims`, `lab.title` and `files.file_type` are the usual
+ones for experiments.
 
 More facet examples:
 
@@ -283,7 +297,9 @@ Returns files from every matching experiment in one table.
 
 > **You:** Give me the full metadata for file ENCFF635JIA.
 
-Claude calls `encode_get_file_info` and returns format, size, MD5, download URL, assembly, output type, biological replicates, quality metrics, and more.
+Claude calls `encode_get_file_info` and returns the file record: `file_format`, `file_type`, `output_type`, `output_category`, `file_size` (bytes) with `file_size_human`, `assembly`, `biological_replicates`, `technical_replicates`, `status`, `download_url`, `s3_uri`, `md5sum`, `experiment_accession`, `experiment_assay`, `biosample_summary`, `preferred_default` and `date_created`.
+
+Sequencing details such as read length, run type or paired-end mate are not part of this record -- query the ENCODE portal directly if you need them.
 
 ---
 
@@ -386,10 +402,15 @@ The experiment tracker lets you build a local library of ENCODE experiments, lik
 Claude calls `encode_track_experiment` with `accession="ENCSR133RZO"`:
 
 ```
-Tracked ENCSR133RZO (Histone ChIP-seq, H3K27me3, pancreas)
+tracking: ENCSR133RZO -> tracked
+  Auto-linked references: 1 (geo_accession GSE187091)
   Publications found: 2
-  Pipeline info found: 1 (ENCODE Histone ChIP-seq pipeline v2.0)
+  Pipelines found: 1 (Histone ChIP-seq 2 (unreplicated), v1.7.1)
 ```
+
+The reply carries `tracking` (`accession` plus an `action` of `"tracked"` or
+`"updated"`), the publications and pipelines it found, and any references it
+auto-linked. The experiment metadata itself goes into the database, not the reply.
 
 This fetches and stores:
 - Full experiment metadata
@@ -453,8 +474,12 @@ Claude calls `encode_get_citations` with `accession="ENCSR133RZO"`:
    Nature Genetics, DOI: 10.1038/ng.xxxx, PMID: 12345678
 
 2. ENCODE Consortium (2020) "Expanded encyclopaedias of DNA elements..."
-   Nature, DOI: 10.1038/s41586-020-xxxx, PMID: 32728249
+   Nature, DOI: 10.1038/s41586-020-2493-4, PMID: 32728249
 ```
+
+In JSON mode the tool returns `{"publications": [...], "count": 2}`, where each
+publication carries `id`, `experiment_accession`, `pmid`, `doi`, `title`, `authors`,
+`journal`, `year` and `abstract`.
 
 ### Export as BibTeX
 
@@ -462,23 +487,27 @@ Claude calls `encode_get_citations` with `accession="ENCSR133RZO"`:
 
 Claude calls `encode_get_citations` with `export_format="bibtex"`:
 
+The reply is raw BibTeX text (not JSON), one entry per stored publication, keyed by PMID:
+
 ```bibtex
-@article{PMID12345678,
-  author  = {Smith, J. and Jones, A. and Lee, B.},
-  title   = {Chromatin landscape of the human pancreas},
+@article{12345678,
+  title = {Chromatin landscape of the human pancreas},
+  author = {Smith J and Jones A and Lee B},
   journal = {Nature Genetics},
-  year    = {2023},
-  doi     = {10.1038/ng.xxxx},
-  pmid    = {12345678},
+  year = {2023},
+  doi = {10.1038/ng.xxxx},
+  pmid = {12345678},
+  note = {ENCODE experiment: ENCSR133RZO},
 }
 
-@article{PMID32728249,
-  author  = {ENCODE Project Consortium},
-  title   = {Expanded encyclopaedias of DNA elements...},
+@article{32728249,
+  title = {Expanded encyclopaedias of DNA elements in the human and mouse genomes},
+  author = {ENCODE Project Consortium and Moore JE and Purcaro MJ},
   journal = {Nature},
-  year    = {2020},
-  doi     = {10.1038/s41586-020-xxxx},
-  pmid    = {32728249},
+  year = {2020},
+  doi = {10.1038/s41586-020-2493-4},
+  pmid = {32728249},
+  note = {ENCODE experiment: ENCSR133RZO},
 }
 ```
 
@@ -492,13 +521,15 @@ export_format="ris"
 
 ```
 TY  - JOUR
-AU  - Smith, J.
-AU  - Jones, A.
-AU  - Lee, B.
 TI  - Chromatin landscape of the human pancreas
+AU  - Smith J
+AU  - Jones A
+AU  - Lee B
 JO  - Nature Genetics
 PY  - 2023
 DO  - 10.1038/ng.xxxx
+AN  - PMID:12345678
+N1  - ENCODE experiment: ENCSR133RZO
 ER  -
 ```
 
@@ -510,43 +541,67 @@ Before combining data from two experiments in a joint analysis, check whether th
 
 > **You:** Are ENCSR133RZO and ENCSR456ABC compatible for combined analysis?
 
-Both experiments must be tracked first. Claude calls `encode_compare_experiments`:
+Both experiments must be tracked first. Claude calls
+`encode_compare_experiments(accession1="ENCSR133RZO", accession2="ENCSR456ABC")`:
 
+```json
+{
+  "experiment_1": {
+    "accession": "ENCSR133RZO",
+    "assay": "Histone ChIP-seq",
+    "biosample": "pancreas tissue female child (16 years)"
+  },
+  "experiment_2": {
+    "accession": "ENCSR456ABC",
+    "assay": "Histone ChIP-seq",
+    "biosample": "pancreas tissue male adult (37 years)"
+  },
+  "verdict": "COMPATIBLE_WITH_CAVEATS",
+  "recommendation": "These experiments can be compared, but the warnings should be addressed in your analysis.",
+  "compatible_aspects": [
+    "Same organism: Homo sapiens",
+    "Same assembly: GRCh38",
+    "Same assay: Histone ChIP-seq",
+    "Same biosample type: tissue",
+    "Same organ: pancreas"
+  ],
+  "issues": [],
+  "warnings": [
+    "Different targets: H3K27me3 vs H3K4me3.",
+    "Different labs: Bradley Bernstein, Broad vs Bing Ren, UCSD. Batch effects possible."
+  ]
+}
 ```
-Compatibility Report
---------------------
-Verdict: COMPATIBLE (with caveats)
 
-Matches:
-  Organism:    Homo sapiens
-  Assembly:    GRCh38
-  Assay:       Histone ChIP-seq
-  Organ:       pancreas
-  Biosample:   tissue
-
-Caveats:
-  Different targets: H3K27me3 vs H3K4me3
-  Different labs: Bernstein vs Ren
-
-Recommendations:
-  These experiments can be combined for multi-mark chromatin analysis.
-  Ensure consistent peak-calling parameters across labs.
-```
+`verdict` is one of `FULLY_COMPATIBLE`, `COMPATIBLE_WITH_CAVEATS` (warnings only) or
+`NOT_COMPATIBLE` (at least one blocking issue).
 
 ### Incompatible experiments
 
-> **You:** Can I combine ENCSR133RZO (human) with ENCSRXXX (mouse)?
+> **You:** Can I combine ENCSR133RZO (human pancreas) with ENCSR789DEF (mouse brain)?
 
+```json
+{
+  "experiment_1": { "accession": "ENCSR133RZO", "assay": "Histone ChIP-seq", "biosample": "pancreas tissue female child (16 years)" },
+  "experiment_2": { "accession": "ENCSR789DEF", "assay": "ATAC-seq", "biosample": "brain tissue male adult (8 weeks)" },
+  "verdict": "NOT_COMPATIBLE",
+  "recommendation": "These experiments have fundamental incompatibilities that must be resolved before combined analysis.",
+  "compatible_aspects": [
+    "Same biosample type: tissue"
+  ],
+  "issues": [
+    "Different organisms: Homo sapiens vs Mus musculus. Cross-species comparison requires ortholog mapping.",
+    "Different genome assemblies: GRCh38 vs mm10. Coordinate liftover needed before comparison."
+  ],
+  "warnings": [
+    "Different assay types: Histone ChIP-seq vs ATAC-seq. Multi-omic integration may be needed.",
+    "Different organs/tissues: pancreas vs brain."
+  ]
+}
 ```
-Verdict: INCOMPATIBLE
 
-Issues:
-  Different organisms: Homo sapiens vs Mus musculus
-  Different genome assemblies: GRCh38 vs mm10
-
-Recommendations:
-  Cross-species analysis requires ortholog mapping and coordinate liftover.
-```
+If either accession has not been tracked, the reply is a single key:
+`{"error": "Experiment ENCSR789DEF not tracked. Track it first."}`
 
 ---
 
@@ -569,26 +624,53 @@ tool_used = "bedtools intersect"
 parameters = "bedtools intersect -a ENCFF635JIA.bed -b promoters.bed -u"
 ```
 
+```json
+{
+  "success": true,
+  "record_id": 1,
+  "file_path": "~/analysis/pancreas_h3k27me3_filtered.bed",
+  "source_accessions": ["ENCSR133RZO", "ENCFF635JIA"],
+  "message": "Provenance logged. Use encode_get_provenance to view the full chain."
+}
 ```
-Provenance logged (record #1).
-```
+
+The `description`, `file_type`, `tool_used` and `parameters` you passed are stored but
+not echoed back -- `encode_get_provenance` reads them out again.
 
 ### View the provenance chain
 
 > **You:** Show me the provenance for my filtered peaks file.
 
-Claude calls `encode_get_provenance` with `file_path="~/analysis/pancreas_h3k27me3_filtered.bed"`:
+Claude calls `encode_get_provenance(file_path="~/analysis/pancreas_h3k27me3_filtered.bed")`:
 
+```json
+{
+  "id": 1,
+  "file_path": "~/analysis/pancreas_h3k27me3_filtered.bed",
+  "source_accessions": ["ENCSR133RZO", "ENCFF635JIA"],
+  "description": "H3K27me3 peaks filtered to promoter regions",
+  "created_at": 1772807400.512345,
+  "file_type": "filtered_peaks",
+  "tool_used": "bedtools intersect",
+  "parameters": "bedtools intersect -a ENCFF635JIA.bed -b promoters.bed -u",
+  "notes": "",
+  "source_experiments": [
+    {
+      "accession": "ENCSR133RZO",
+      "assay_title": "Histone ChIP-seq",
+      "biosample_summary": "pancreas tissue female child (16 years)",
+      "organism": "Homo sapiens"
+    },
+    {
+      "accession": "ENCFF635JIA",
+      "tracked": false
+    }
+  ]
+}
 ```
-Provenance Chain:
-  ~/analysis/pancreas_h3k27me3_filtered.bed
-    Created: 2026-03-06 14:30:00
-    Tool: bedtools intersect
-    Params: bedtools intersect -a ENCFF635JIA.bed -b promoters.bed -u
-    Sources:
-      ENCSR133RZO (Histone ChIP-seq, H3K27me3, pancreas)
-      ENCFF635JIA (bed narrowPeak, IDR thresholded peaks, GRCh38)
-```
+
+`created_at` is epoch seconds. A source that is not a tracked experiment -- a file
+accession such as ENCFF635JIA, for instance -- comes back as `{"accession": ..., "tracked": false}`.
 
 ### List all files derived from an experiment
 
@@ -659,12 +741,15 @@ Step 6: "Log my differential accessibility results."
 
 ### Workflow C: Multi-Omics Integration
 
-**Goal:** Collect ChIP-seq, ATAC-seq, and RNA-seq data for GM12878 to build an integrative model.
+**Goal:** Collect ChIP-seq, ATAC-seq, and total RNA-seq data for GM12878 to build an integrative model.
 
 ```
 Step 1: "What assay types have data for GM12878 on ENCODE?"
-         -> encode_get_facets with biosample_term_name="GM12878"
-         -> Shows ChIP-seq (200+), ATAC-seq (15), RNA-seq (30), Hi-C (8)...
+         -> encode_search_experiments with biosample_term_name="GM12878"
+            (encode_get_facets narrows by assay_title, organism, organ or
+             biosample_type -- not by an individual cell line)
+         -> One search per assay gives the breakdown:
+            TF ChIP-seq (200+), ATAC-seq (15), total RNA-seq (30), Hi-C (8)...
 
 Step 2: "Find H3K27ac ChIP-seq for GM12878."
          -> 6 experiments found
@@ -672,7 +757,7 @@ Step 2: "Find H3K27ac ChIP-seq for GM12878."
 Step 3: "Find ATAC-seq for GM12878."
          -> 15 experiments found
 
-Step 4: "Find RNA-seq for GM12878."
+Step 4: "Find total RNA-seq for GM12878."
          -> 30 experiments found
 
 Step 5: "Download the recommended peak files and signal tracks for these

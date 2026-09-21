@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A negative `offset` in `encode_search_experiments` and `encode_search_files` is treated as 0,
   in the request, in the reported `offset` and in `has_more` / `next_offset`, instead of hiding
   or repeating pages.
+- **`encode_get_experiment` always reported zero audit flags.** It asked ENCODE for
+  `frame=embedded`, which leaves out the `audit` property, so every experiment looked free of
+  errors and warnings (the search tool was not affected). It now asks for `frame=page`. Checked
+  against the portal: ENCSR133RZO has 8 warnings and 2 internal-action flags, not 0.
+- BibTeX export joined author names with commas, which BibTeX reads as a single author; they
+  are joined with `and`.
+- **`encode_list_tracked` and `encode_export_data` ignored a filter that matched nothing** and
+  returned every tracked experiment. They now return none.
+- `encode_batch_download` reported `next_offset` but had no `offset` parameter to continue with;
+  it has one now.
+- The description of `encode_get_experiment` promised quality metrics. It returns audit counts,
+  replicate counts and possible controls, and now says so.
 - The value lists behind `encode_get_metadata` named three values ENCODE does not have (file
   format `dat`, output type `stable peaks`, output category `quality metric`) and lacked eleven
   file formats (among them `h5ad`) and eight assemblies. File formats, assemblies and output
@@ -70,6 +82,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version and the checksum. It now accepts only the pinned release.
 - Trimmed-read FastQC reports are kept and passed to MultiQC in every pipeline that trims.
 - Conda environments: `idr` added to ATAC-seq, `picard` added to DNase-seq, BWA 0.7.18.
+
+- **The four validation scripts that ship in the aggregation skills had no tests and several
+  bugs.** `validate_methylation.py` rescaled every methylation value at or below 1 by 100, so in
+  an ENCODE bedMethyl (percentages) a CpG at 1% was reported as 100% methylated and every real
+  file triggered a "mixed formats" warning; the scale is now decided once per file (`--scale`).
+  Reversed intervals entered the statistics in the histone and Hi-C scripts, 9- and 10-column
+  bedMethyl files were read with the wrong columns, percentages were taken over malformed lines
+  too, gzipped inputs crashed, and an empty file passed. All fixed, with 37 tests that run the
+  scripts on synthetic files. The skills now say how to run them.
 
 ### Changed
 
@@ -111,6 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   corrected.
 - Reference commands were checked against the pinned tool versions (Hotspot2, MethylDackel,
   SEACR, Juicer tools, pairtools, RGT, MPRAflow) and corrected.
+- **`docs/`, the README, `agents/` and `commands/` were never checked against the code.** The
+  API reference, showcase, walkthrough and vignettes showed invented response shapes (facets as
+  `key`/`doc_count`, a nested `audit` object, `href`, `files_found`, wrong compatibility verdicts);
+  all are corrected to what the server returns, and the API reference documents all 20 tools
+  instead of 16. The seven pipeline agents described steps the workflows do not run (Arrowhead
+  TAD calling, a WGBS conversion-rate stage, RNA-SeQC, Trimmomatic) and flags they do not use.
+  The doc checker now covers all of these folders, and CI also compares `agents/` and
+  `commands/` with their copies under `plugin/`.
 - Examples used values ENCODE does not have: the assay title `RNA-seq` (it is `total RNA-seq`,
   `polyA plus RNA-seq`, ...), and the output types `chromatin interactions` (it is `loops`) and
   `filtered feature barcode matrix`. Four `encode_link_reference` calls omitted the experiment.

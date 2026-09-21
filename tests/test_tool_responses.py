@@ -423,6 +423,23 @@ class TestTrackingResponses:
         assert tracker.get_tracked_experiment("ENCSR133RZO")["assembly"] == "GRCh38, hg19"
 
     @pytest.mark.asyncio
+    async def test_list_tracked_with_a_filter_that_matches_nothing_lists_nothing(self, tmp_path):
+        # a filter without matches used to return every tracked experiment
+        from encode_connector.client.tracker import ExperimentTracker
+
+        tracker = ExperimentTracker(db_path=tmp_path / "tracker.db")
+        tracker.track_experiment({"accession": "ENCSR133RZO", "assay_title": "Histone ChIP-seq", "organ": "pancreas"})
+
+        with patch("encode_connector.server.main._get_tracker", return_value=tracker):
+            from encode_connector.server.main import encode_list_tracked
+
+            raw = await encode_list_tracked(organ="kidney")
+
+        data = json.loads(raw)
+        assert data["experiments"] == []
+        assert data["count"] == 0
+
+    @pytest.mark.asyncio
     async def test_track_experiment_response_structure(self):
         """Tracking result must confirm success with tracking and publications keys."""
         mock_client = AsyncMock()
@@ -1167,6 +1184,32 @@ class TestBatchDownloadResponse:
             raw = await encode_batch_download(download_dir="/tmp/test", file_format="hic")
 
         assert json.loads(raw)["total_note"] == note
+
+    @pytest.mark.asyncio
+    async def test_batch_download_takes_the_next_offset_it_reports(self):
+        # the reply carried next_offset, but the tool had no offset parameter to pass it back to
+        mock_client = AsyncMock()
+        mock_client.search_files.return_value = _make_file_search_result([_mock_file_summary()], total=250)
+        mock_downloader = MagicMock()
+        mock_downloader.preview_downloads.return_value = {
+            "file_count": 1,
+            "total_size": 1,
+            "total_size_human": "1 B",
+            "files": [],
+        }
+
+        with (
+            patch("encode_connector.server.main._get_client", new=AsyncMock(return_value=mock_client)),
+            patch("encode_connector.server.main._get_downloader", return_value=mock_downloader),
+        ):
+            from encode_connector.server.main import encode_batch_download
+
+            raw = await encode_batch_download(download_dir="/tmp/test", file_format="bed", limit=100, offset=100)
+
+        data = json.loads(raw)
+        assert mock_client.search_files.call_args.kwargs["offset"] == 100
+        assert data["has_more"] is True
+        assert data["next_offset"] == 200
 
     @pytest.mark.asyncio
     async def test_batch_download_preview_keeps_the_search_note(self):
