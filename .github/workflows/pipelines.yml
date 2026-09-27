@@ -142,7 +142,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           init-shell: none
 
